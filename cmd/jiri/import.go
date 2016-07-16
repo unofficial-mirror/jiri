@@ -15,7 +15,7 @@ import (
 
 var (
 	// Flags for configuring project attributes for remote imports.
-	flagImportName, flagImportProtocol, flagImportRemoteBranch, flagImportRoot string
+	flagImportName, flagImportRemoteBranch, flagImportRoot string
 	// Flags for controlling the behavior of the command.
 	flagImportOverwrite bool
 	flagImportOut       string
@@ -23,7 +23,6 @@ var (
 
 func init() {
 	cmdImport.Flags.StringVar(&flagImportName, "name", "manifest", `The name of the remote manifest project.`)
-	cmdImport.Flags.StringVar(&flagImportProtocol, "protocol", "git", `The version control protocol used by the remote manifest project.`)
 	cmdImport.Flags.StringVar(&flagImportRemoteBranch, "remote-branch", "master", `The branch of the remote manifest project to track, without the leading "origin/".`)
 	cmdImport.Flags.StringVar(&flagImportRoot, "root", "", `Root to store the manifest project locally.`)
 
@@ -79,7 +78,6 @@ func runImport(jirix *jiri.X, args []string) error {
 	manifest.Imports = append(manifest.Imports, project.Import{
 		Manifest:     args[0],
 		Name:         flagImportName,
-		Protocol:     flagImportProtocol,
 		Remote:       args[1],
 		RemoteBranch: flagImportRemoteBranch,
 		Root:         flagImportRoot,

@@ -528,7 +528,7 @@ against the fuchsia.googlesource.com/jiri/project.ProjectState structure. This s
 has the following fields:
 project.ProjectState{Branches:[]project.BranchState(nil), CurrentBranch:"",
 HasUncommitted:false, HasUntracked:false, Project:project.Project{Name:"",
-Path:"", Protocol:"", Remote:"", RemoteBranch:"", Revision:"", GerritHost:"",
+Path:"", Remote:"", RemoteBranch:"", Revision:"", GerritHost:"",
 GitHooks:"", RunHook:"", XMLName:struct {}{}}}
 
 Usage:

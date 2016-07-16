@@ -221,9 +221,6 @@ type Import struct {
 	// Name is the name of the remote manifest project, used to determine the
 	// project key.
 	Name string `xml:"name,attr,omitempty"`
-	// Protocol is the version control protocol used by the remote manifest
-	// project. If not set, "git" is used as the default.
-	Protocol string `xml:"protocol,attr,omitempty"`
 	// Remote is the remote manifest project to import.
 	Remote string `xml:"remote,attr,omitempty"`
 	// RemoteBranch is the name of the remote branch to track. It doesn't affect
@@ -236,9 +233,6 @@ type Import struct {
 }
 
 func (i *Import) fillDefaults() error {
-	if i.Protocol == "" {
-		i.Protocol = "git"
-	}
 	if i.RemoteBranch == "" {
 		i.RemoteBranch = "master"
 	}
@@ -246,9 +240,6 @@ func (i *Import) fillDefaults() error {
 }
 
 func (i *Import) unfillDefaults() error {
-	if i.Protocol == "git" {
-		i.Protocol = ""
-	}
 	if i.RemoteBranch == "master" {
 		i.RemoteBranch = ""
 	}
@@ -266,7 +257,6 @@ func (i *Import) toProject(path string) (Project, error) {
 	p := Project{
 		Name:         i.Name,
 		Path:         path,
-		Protocol:     i.Protocol,
 		Remote:       i.Remote,
 		RemoteBranch: i.RemoteBranch,
 	}
@@ -346,9 +336,6 @@ type Project struct {
 	// paths to an absolute paths, using the current value of the
 	// $JIRI_ROOT environment variable as a prefix.
 	Path string `xml:"path,attr,omitempty"`
-	// Protocol is the version control protocol used by the
-	// project. If not set, "git" is used as the default.
-	Protocol string `xml:"protocol,attr,omitempty"`
 	// Remote is the project remote.
 	Remote string `xml:"remote,attr,omitempty"`
 	// RemoteBranch is the name of the remote branch to track.  It doesn't affect
@@ -457,9 +444,6 @@ func (p Project) Key() ProjectKey {
 }
 
 func (p *Project) fillDefaults() error {
-	if p.Protocol == "" {
-		p.Protocol = "git"
-	}
 	if p.RemoteBranch == "" {
 		p.RemoteBranch = "master"
 	}
@@ -470,9 +454,6 @@ func (p *Project) fillDefaults() error {
 }
 
 func (p *Project) unfillDefaults() error {
-	if p.Protocol == "git" {
-		p.Protocol = ""
-	}
 	if p.RemoteBranch == "master" {
 		p.RemoteBranch = ""
 	}
@@ -485,9 +466,6 @@ func (p *Project) unfillDefaults() error {
 func (p *Project) validate() error {
 	if strings.Contains(p.Name, projectKeySeparator) {
 		return fmt.Errorf("bad project: name cannot contain %q: %+v", projectKeySeparator, *p)
-	}
-	if p.Protocol != "" && p.Protocol != "git" {
-		return fmt.Errorf("bad project: only git protocol is supported: %+v", *p)
 	}
 	return nil
 }
@@ -597,12 +575,6 @@ const (
 	FullScan = ScanMode(true)
 )
 
-type UnsupportedProtocolErr string
-
-func (e UnsupportedProtocolErr) Error() string {
-	return "unsupported protocol: " + string(e)
-}
-
 // Update represents an update of projects as a map from
 // project names to a collections of commits.
 type Update map[string][]CL
@@ -706,16 +678,11 @@ func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
 // each project as found on the filesystem
 func setProjectRevisions(jirix *jiri.X, projects Projects) (_ Projects, e error) {
 	for name, project := range projects {
-		switch project.Protocol {
-		case "git":
-			revision, err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).CurrentRevisionOfBranch("master")
-			if err != nil {
-				return nil, err
-			}
-			project.Revision = revision
-		default:
-			return nil, UnsupportedProtocolErr(project.Protocol)
+		revision, err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).CurrentRevisionOfBranch("master")
+		if err != nil {
+			return nil, err
 		}
+		project.Revision = revision
 		projects[name] = project
 	}
 	return projects, nil
@@ -829,38 +796,32 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 		// We only inspect this project if an update operation is required.
 		cls := []CL{}
 		if updateOp, ok := op.(updateOperation); ok {
-			switch updateOp.project.Protocol {
-			case "git":
+			// Enter project directory - this assumes absolute paths.
+			if err := s.Chdir(updateOp.destination).Done(); err != nil {
+				return nil, err
+			}
 
-				// Enter project directory - this assumes absolute paths.
-				if err := s.Chdir(updateOp.destination).Done(); err != nil {
-					return nil, err
-				}
+			// Fetch the latest from origin.
+			if err := gitutil.New(jirix.NewSeq()).FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
+				return nil, err
+			}
 
-				// Fetch the latest from origin.
-				if err := gitutil.New(jirix.NewSeq()).FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
-					return nil, err
-				}
+			// Collect commits visible from FETCH_HEAD that aren't visible from master.
+			commitsText, err := gitutil.New(jirix.NewSeq()).Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
+			if err != nil {
+				return nil, err
+			}
 
-				// Collect commits visible from FETCH_HEAD that aren't visible from master.
-				commitsText, err := gitutil.New(jirix.NewSeq()).Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
-				if err != nil {
-					return nil, err
+			// Format those commits and add them to the results.
+			for _, commitText := range commitsText {
+				if got, want := len(commitText), 3; got < want {
+					return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
 				}
-
-				// Format those commits and add them to the results.
-				for _, commitText := range commitsText {
-					if got, want := len(commitText), 3; got < want {
-						return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
-					}
-					cls = append(cls, CL{
-						Author:      commitText[0],
-						Email:       commitText[1],
-						Description: strings.Join(commitText[2:], "\n"),
-					})
-				}
-			default:
-				return nil, UnsupportedProtocolErr(updateOp.project.Protocol)
+				cls = append(cls, CL{
+					Author:      commitText[0],
+					Email:       commitText[1],
+					Description: strings.Join(commitText[2:], "\n"),
+				})
 			}
 		}
 		update[name] = cls
@@ -1043,36 +1004,31 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 		if err := s.Chdir(p.Path).Done(); err != nil {
 			return err
 		}
-		switch p.Protocol {
-		case "git":
-			branch, err := git.CurrentBranchName()
-			if err != nil {
-				return err
-			}
-			stashed, err := git.Stash()
-			if err != nil {
-				return err
-			}
-			if err := git.CheckoutBranch("master"); err != nil {
-				return err
-			}
-			// After running the function, return to this project's directory,
-			// checkout the original branch, and stash pop if necessary.
-			defer collect.Error(func() error {
-				if err := s.Chdir(p.Path).Done(); err != nil {
-					return err
-				}
-				if err := git.CheckoutBranch(branch); err != nil {
-					return err
-				}
-				if stashed {
-					return git.StashPop()
-				}
-				return nil
-			}, &e)
-		default:
-			return UnsupportedProtocolErr(p.Protocol)
+		branch, err := git.CurrentBranchName()
+		if err != nil {
+			return err
 		}
+		stashed, err := git.Stash()
+		if err != nil {
+			return err
+		}
+		if err := git.CheckoutBranch("master"); err != nil {
+			return err
+		}
+		// After running the function, return to this project's directory,
+		// checkout the original branch, and stash pop if necessary.
+		defer collect.Error(func() error {
+			if err := s.Chdir(p.Path).Done(); err != nil {
+				return err
+			}
+			if err := git.CheckoutBranch(branch); err != nil {
+				return err
+			}
+			if stashed {
+				return git.StashPop()
+			}
+			return nil
+		}, &e)
 	}
 	return fn()
 }
@@ -1412,18 +1368,13 @@ func TransitionBinDir(jirix *jiri.X) error {
 
 // fetchProject fetches from the project remote.
 func fetchProject(jirix *jiri.X, project Project) error {
-	switch project.Protocol {
-	case "git":
-		if project.Remote == "" {
-			return fmt.Errorf("project %q does not have a remote", project.Name)
-		}
-		if err := gitutil.New(jirix.NewSeq()).SetRemoteUrl("origin", project.Remote); err != nil {
-			return err
-		}
-		return gitutil.New(jirix.NewSeq()).Fetch("origin")
-	default:
-		return UnsupportedProtocolErr(project.Protocol)
+	if project.Remote == "" {
+		return fmt.Errorf("project %q does not have a remote", project.Name)
 	}
+	if err := gitutil.New(jirix.NewSeq()).SetRemoteUrl("origin", project.Remote); err != nil {
+		return err
+	}
+	return gitutil.New(jirix.NewSeq()).Fetch("origin")
 }
 
 // resetProjectCurrentBranch resets the current branch to the revision and
@@ -1432,17 +1383,12 @@ func resetProjectCurrentBranch(jirix *jiri.X, project Project) error {
 	if err := project.fillDefaults(); err != nil {
 		return err
 	}
-	switch project.Protocol {
-	case "git":
-		// Having a specific revision trumps everything else.
-		if project.Revision != "HEAD" {
-			return gitutil.New(jirix.NewSeq()).Reset(project.Revision)
-		}
-		// If no revision, reset to the configured remote branch.
-		return gitutil.New(jirix.NewSeq()).Reset("origin/" + project.RemoteBranch)
-	default:
-		return UnsupportedProtocolErr(project.Protocol)
+	// Having a specific revision trumps everything else.
+	if project.Revision != "HEAD" {
+		return gitutil.New(jirix.NewSeq()).Reset(project.Revision)
 	}
+	// If no revision, reset to the configured remote branch.
+	return gitutil.New(jirix.NewSeq()).Reset("origin/" + project.RemoteBranch)
 }
 
 // syncProjectMaster fetches from the project remote and resets the local master
@@ -1660,21 +1606,16 @@ func reportNonMaster(jirix *jiri.X, project Project) (e error) {
 	if err := s.Chdir(project.Path).Done(); err != nil {
 		return err
 	}
-	switch project.Protocol {
-	case "git":
-		current, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
-		if err != nil {
-			return err
-		}
-		if current != "master" {
-			line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch is %q`, current)
-			line2 := fmt.Sprintf(`to update the %q branch once the master branch is updated, run "git merge master"`, current)
-			s.Verbose(true).Output([]string{line1, line2})
-		}
-		return nil
-	default:
-		return UnsupportedProtocolErr(project.Protocol)
+	current, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	if err != nil {
+		return err
 	}
+	if current != "master" {
+		line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch is %q`, current)
+		line2 := fmt.Sprintf(`to update the %q branch once the master branch is updated, run "git merge master"`, current)
+		s.Verbose(true).Output([]string{line1, line2})
+	}
+	return nil
 }
 
 // groupByGoogleSourceHosts returns a map of googlesource host to a Projects
@@ -1938,21 +1879,16 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 		return err
 	}
 	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpDir).Done() }, &e)
-	switch op.project.Protocol {
-	case "git":
-		if err := gitutil.New(jirix.NewSeq()).Clone(op.project.Remote, tmpDir); err != nil {
-			return err
-		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-		if err := s.Chdir(tmpDir).Done(); err != nil {
-			return err
-		}
-	default:
-		return UnsupportedProtocolErr(op.project.Protocol)
+	if err := gitutil.New(jirix.NewSeq()).Clone(op.project.Remote, tmpDir); err != nil {
+		return err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
+	if err := s.Chdir(tmpDir).Done(); err != nil {
+		return err
 	}
 	if err := writeMetadata(jirix, op.project, tmpDir); err != nil {
 		return err

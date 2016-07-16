@@ -32,7 +32,6 @@ pkg project, method (ProjectKeys) Less(int, int) bool
 pkg project, method (ProjectKeys) Swap(int, int)
 pkg project, method (Projects) Find(string) Projects
 pkg project, method (Projects) FindUnique(string) (Project, error)
-pkg project, method (UnsupportedProtocolErr) Error() string
 pkg project, type BranchState struct
 pkg project, type BranchState struct, HasGerritMessage bool
 pkg project, type BranchState struct, Name string
@@ -43,7 +42,6 @@ pkg project, type CL struct, Email string
 pkg project, type Import struct
 pkg project, type Import struct, Manifest string
 pkg project, type Import struct, Name string
-pkg project, type Import struct, Protocol string
 pkg project, type Import struct, Remote string
 pkg project, type Import struct, RemoteBranch string
 pkg project, type Import struct, Root string
@@ -63,7 +61,6 @@ pkg project, type Project struct, GerritHost string
 pkg project, type Project struct, GitHooks string
 pkg project, type Project struct, Name string
 pkg project, type Project struct, Path string
-pkg project, type Project struct, Protocol string
 pkg project, type Project struct, Remote string
 pkg project, type Project struct, RemoteBranch string
 pkg project, type Project struct, Revision string
@@ -86,7 +83,6 @@ pkg project, type Tool struct, Package string
 pkg project, type Tool struct, Project string
 pkg project, type Tool struct, XMLName struct{}
 pkg project, type Tools map[string]Tool
-pkg project, type UnsupportedProtocolErr string
 pkg project, type Update map[string][]CL
 pkg project, var JiriName string
 pkg project, var JiriPackage string

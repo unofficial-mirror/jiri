@@ -120,7 +120,6 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 	// Execute the above function in the snapshot directory on a clean master branch.
 	p := project.Project{
 		Path:         snapshotDir,
-		Protocol:     "git",
 		RemoteBranch: "master",
 		Revision:     "HEAD",
 	}

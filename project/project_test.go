@@ -623,13 +623,6 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	}
 }
 
-// TestUnsupportedProtocolErr checks that calling
-// UnsupportedPrototoclErr.Error() does not result in an infinite loop.
-func TestUnsupportedPrototocolErr(t *testing.T) {
-	err := project.UnsupportedProtocolErr("foo")
-	_ = err.Error()
-}
-
 type binDirTest struct {
 	Name        string
 	Setup       func(old, new string) error
@@ -821,14 +814,12 @@ func TestManifestToFromBytes(t *testing.T) {
 					{
 						Manifest:     "manifest1",
 						Name:         "remoteimport1",
-						Protocol:     "git",
 						Remote:       "remote1",
 						RemoteBranch: "master",
 					},
 					{
 						Manifest:     "manifest2",
 						Name:         "remoteimport2",
-						Protocol:     "git",
 						Remote:       "remote2",
 						RemoteBranch: "branch2",
 					},
@@ -840,7 +831,6 @@ func TestManifestToFromBytes(t *testing.T) {
 					{
 						Name:         "project1",
 						Path:         "path1",
-						Protocol:     "git",
 						Remote:       "remote1",
 						RemoteBranch: "master",
 						Revision:     "HEAD",
@@ -851,7 +841,6 @@ func TestManifestToFromBytes(t *testing.T) {
 					{
 						Name:         "project2",
 						Path:         "path2",
-						Protocol:     "git",
 						Remote:       "remote2",
 						RemoteBranch: "branch2",
 						Revision:     "rev2",
@@ -913,7 +902,6 @@ func TestProjectToFromFile(t *testing.T) {
 			project.Project{
 				Name:         "project1",
 				Path:         filepath.Join(jirix.Root, "path1"),
-				Protocol:     "git",
 				Remote:       "remote1",
 				RemoteBranch: "master",
 				Revision:     "HEAD",
@@ -927,7 +915,6 @@ func TestProjectToFromFile(t *testing.T) {
 				Path:         filepath.Join(jirix.Root, "path2"),
 				GitHooks:     filepath.Join(jirix.Root, "git-hooks"),
 				RunHook:      filepath.Join(jirix.Root, "run-hook"),
-				Protocol:     "git",
 				Remote:       "remote2",
 				RemoteBranch: "branch2",
 				Revision:     "rev2",
