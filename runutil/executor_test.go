@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"fuchsia.googlesource.com/jiri/runutil"
-	"v.io/x/lib/envvar"
-	"v.io/x/lib/lookpath"
+	"fuchsia.googlesource.com/jiri/envvar"
+	"fuchsia.googlesource.com/jiri/lookpath"
 )
 
 const timedCommandTimeout = 3 * time.Second

@@ -14,7 +14,7 @@ import (
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/profiles"
 	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
-	"v.io/x/lib/envvar"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 func TestReader(t *testing.T) {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package profilescmdline provides a command line driver (for v.io/x/lib/cmdline)
+// Package profilescmdline provides a command line driver (for fuchsia.googlesource.com/jiri/cmdline)
 // for implementing jiri 'profile' subcommands. The intent is to support
 // project specific instances of such profiles for managing software
 // dependencies.
@@ -19,8 +19,8 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/profiles"
 	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
-	"v.io/x/lib/cmdline"
-	"v.io/x/lib/textutil"
+	"fuchsia.googlesource.com/jiri/cmdline"
+	"fuchsia.googlesource.com/jiri/textutil"
 )
 
 // IsFlagSet returns true if the specified flag has been set on

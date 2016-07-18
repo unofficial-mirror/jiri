@@ -14,8 +14,8 @@ import (
 	"text/template"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/project"
-	"v.io/x/lib/cmdline"
 )
 
 var (

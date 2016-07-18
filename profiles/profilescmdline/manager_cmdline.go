@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package profilescmdline provides a command line driver
-// (for v.io/x/lib/cmdline) for implementing jiri 'profile' subcommands.
+// (for fuchsia.googlesource.com/jiri/cmdline) for implementing jiri 'profile' subcommands.
 // The intent is to support project specific instances of such profiles
 // for managing software dependencies.
 //
@@ -34,8 +34,8 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/profiles"
 	"fuchsia.googlesource.com/jiri/profiles/profilesmanager"
-	"v.io/x/lib/cmdline"
-	"v.io/x/lib/lookpath"
+	"fuchsia.googlesource.com/jiri/cmdline"
+	"fuchsia.googlesource.com/jiri/lookpath"
 )
 
 // newCmdOSPackages represents the "profile os-packages" command.

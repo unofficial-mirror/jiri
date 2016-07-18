@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"v.io/x/lib/cmdline"
+	"fuchsia.googlesource.com/jiri/cmdline"
 )
 
 var cmdWhich = &cmdline.Command{

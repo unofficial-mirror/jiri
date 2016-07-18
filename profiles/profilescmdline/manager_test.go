@@ -24,8 +24,8 @@ import (
 	"fuchsia.googlesource.com/jiri/profiles"
 	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
 	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
-	"v.io/x/lib/envvar"
-	"v.io/x/lib/gosh"
+	"fuchsia.googlesource.com/jiri/envvar"
+	"fuchsia.googlesource.com/jiri/gosh"
 )
 
 func TestManagerArgs(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"v.io/x/lib/envvar"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 // RelPath represents a relative path whose root is JIRI_ROOT.

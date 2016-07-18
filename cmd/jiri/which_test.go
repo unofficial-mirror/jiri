@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/x/lib/gosh"
+	"fuchsia.googlesource.com/jiri/gosh"
 )
 
 func TestWhich(t *testing.T) {

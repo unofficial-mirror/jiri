@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/x/lib/gosh"
+	"fuchsia.googlesource.com/jiri/gosh"
 )
 
 func TestBootstrapJiri(t *testing.T) {

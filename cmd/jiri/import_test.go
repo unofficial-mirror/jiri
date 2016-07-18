@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
-	"v.io/x/lib/gosh"
+	"fuchsia.googlesource.com/jiri/gosh"
 )
 
 type importTestCase struct {

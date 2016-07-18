@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	"v.io/x/lib/cmdline"
-	"v.io/x/lib/envvar"
+	"fuchsia.googlesource.com/jiri/cmdline"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 // Sequence provides for convenient chaining of multiple calls to its
@@ -72,7 +72,7 @@ import (
 // the error from the underlying package, or the IsTimeout, IsNotExists etc
 // functions can be used on the wrapped error. The ExitCode method
 // is also provided to convert to the exit codes expected by the
-// v.io/x/lib/cmdline package which is often used in conjunction with
+// fuchsia.googlesource.com/jiri/cmdline package which is often used in conjunction with
 // Sequence.
 type Sequence struct {
 	// NOTE: we use a struct as the return value of all

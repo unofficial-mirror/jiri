@@ -19,14 +19,14 @@ import (
 	"sync"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cmdline"
+	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
 	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
 	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/simplemr"
 	"fuchsia.googlesource.com/jiri/tool"
-	"v.io/x/lib/cmdline"
-	"v.io/x/lib/envvar"
-	"v.io/x/lib/simplemr"
 )
 
 var (

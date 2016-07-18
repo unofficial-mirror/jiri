@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"v.io/x/lib/envvar"
-	"v.io/x/lib/lookpath"
+	"fuchsia.googlesource.com/jiri/envvar"
+	"fuchsia.googlesource.com/jiri/lookpath"
 )
 
 const (

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"v.io/x/lib/envvar"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 // Target represents specification for the environment that the profile is

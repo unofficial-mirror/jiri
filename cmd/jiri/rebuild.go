@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/collect"
 	"fuchsia.googlesource.com/jiri/project"
-	"v.io/x/lib/cmdline"
 )
 
 // cmdRebuild represents the "jiri rebuild" command.

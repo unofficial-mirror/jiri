@@ -15,7 +15,7 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/profiles"
-	"v.io/x/lib/envvar"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 // GoFlags lists all of the Go environment variables and will be sorted in the

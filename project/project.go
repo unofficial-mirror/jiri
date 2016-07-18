@@ -22,7 +22,7 @@ import (
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/googlesource"
 	"fuchsia.googlesource.com/jiri/runutil"
-	"v.io/x/lib/set"
+	"fuchsia.googlesource.com/jiri/set"
 )
 
 var JiriProject = "release.go.jiri"

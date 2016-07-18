@@ -10,7 +10,7 @@ import (
 
 	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
 	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
-	"v.io/x/lib/cmdline"
+	"fuchsia.googlesource.com/jiri/cmdline"
 )
 
 var parent = cmdline.Command{
