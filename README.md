@@ -66,14 +66,14 @@ Jiri makes it easy to "import" a remote manifest from your local
 `.jiri_manifest` file with the `jiri import` command.  For example, running the
 following command will create a `.jiri_manifest` file (or append to an existing
 one) with an `import` tag that imports the minimal manifest from the
-https://github.com/vanadium/manifest repo.
+`https://fuchsia.googlesource.com/jiri` repo.
 
- ```
- jiri import -name="manifest" minimal https://github.com/vanadium/manifest
+```
+jiri import -name="manifest" minimal https://fuchsia.googlesource.com/jiri
 ```
 
 The next time you run `jiri update`, jiri will sync all projects listed in the
-Vanadium minimal manifest.
+minimal manifest.
 
 ## Quickstart
 
@@ -101,7 +101,7 @@ and initialize the root directory.
 
 ```
 curl -s
-https://raw.githubusercontent.com/vanadium/go.jiri/master/scripts/bootstrap_jiri | bash -s "$MY_ROOT"
+https://raw.githubusercontent.com/fuchsia-mirror/jiri/master/scripts/bootstrap_jiri | bash -s "$MY_ROOT"
 ```
 
 The `jiri` command line tool will be installed in
@@ -112,7 +112,7 @@ export PATH="$MY_ROOT"/.jiri_root/scripts:$PATH
 ```
 
 Next, use the `jiri import` command to import the "minimal" manifest from the
-vanadium manifest repo.  This manifest includes only the projects needed to
+Jiri repo.  This manifest includes only the projects needed to
 build the jiri tool itself.
 
 You can see the minimal manifest [here][minimal manifest].  For more
@@ -120,7 +120,7 @@ information on manifests, read the [manifest docs][manifests].
 
 ```
 cd "$MY_ROOT"
-jiri import -name=manifest minimal https://vanadium.googlesource.com/manifest
+jiri import -name=manifest minimal https://fuchsia.googlesource.com/jiri
 ```
 
 You should now have a file in the root directory called `.jiri_manifest`, which
@@ -134,9 +134,8 @@ listed in the manifest (which in this case will be `HEAD`).
 jiri update
 ```
 
-You should now see the jiri project and dependencies in
-`$MY_ROOT/release/go/src/v.io`, and the vanadium manifest repo in
-`$MY_ROOT/manifest`.
+You should now see the jiri project in
+`$MY_ROOT/src/fuchsia.googlesource.com/jiri`.
 
 Running `jiri update` again will sync the local repos to the remotes, and
 rebuild the jiri tool.
@@ -229,21 +228,21 @@ To find documentation about a specific topic or subcommand, run `jiri help
 <command>`.
 
 You can read all the command-line documentation in a single page here:
-http://godoc.org/v.io/jiri.
+http://godoc.org/fuchsia.googlesource.com/jiri.
 
 ## Filesystem
 
 <!-- TODO(nlacasse): Figure out a way to keep the canonical documentation in
 one place but mirror it to the README and cmdline docs. -->
 
-See the jiri [filesystem godocs](https://godoc.org/v.io/jiri/cmd/jiri#hdr-Jiri_filesystem___Description_of_jiri_file_system_layout).
+See the jiri [filesystem godocs](https://godoc.org/fuchsia.googlesource.com/jiri/cmd/jiri#hdr-Jiri_filesystem___Description_of_jiri_file_system_layout).
 
 ## Manifests<a name="manifests"></a>
 
 <!-- TODO(nlacasse): Figure out a way to keep the canonical documentation in
 one place but mirror it to the README and cmdline docs. -->
 
-See the jiri [manifest godocs](https://godoc.org/v.io/jiri/cmd/jiri#hdr-Jiri_manifest___Description_of_manifest_files).
+See the jiri [manifest godocs](https://godoc.org/fuchsia.googlesource.com/jiri/cmd/jiri#hdr-Jiri_manifest___Description_of_manifest_files).
 
 ## Snapshots
 
@@ -469,4 +468,4 @@ the next `jiri update`.
 [go contrib]: https://golang.org/doc/contribute.html#Code_review "Go Contribution Guidelines - Code Review"
 [jiri-wiki]: https://en.wikipedia.org/wiki/Ji%C5%99%C3%AD "Jiří"
 [manifests]: #manifests "manifests"
-[minimal manifest]: https://vanadium.googlesource.com/manifest/+/refs/heads/master/minimal "minimal manifest"
+[minimal manifest]: https://fuchsia.googlesource.com/jiri/+/refs/heads/master/minimal "minimal manifest"

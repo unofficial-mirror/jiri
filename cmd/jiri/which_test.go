@@ -17,7 +17,7 @@ func TestWhich(t *testing.T) {
 	sh.PropagateChildOutput = true
 	defer sh.Cleanup()
 
-	jiriBinary := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "v.io/jiri/cmd/jiri")
+	jiriBinary := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "fuchsia.googlesource.com/jiri/cmd/jiri")
 	stdout, stderr := sh.Cmd(jiriBinary, []string{"which"}...).StdoutStderr()
 	if got, want := stdout, fmt.Sprintf("# binary\n%s\n", jiriBinary); got != want {
 		t.Errorf("stdout got %q, want %q", got, want)

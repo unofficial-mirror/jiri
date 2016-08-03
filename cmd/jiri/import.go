@@ -7,9 +7,9 @@ package main
 import (
 	"os"
 
-	"v.io/jiri"
-	"v.io/jiri/project"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/runutil"
 	"v.io/x/lib/cmdline"
 )
 

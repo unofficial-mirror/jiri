@@ -7,9 +7,9 @@ package main
 import (
 	"fmt"
 
-	"v.io/jiri"
-	"v.io/jiri/collect"
-	"v.io/jiri/project"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/project"
 	"v.io/x/lib/cmdline"
 )
 

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/runutil"
 	"v.io/x/lib/envvar"
 	"v.io/x/lib/lookpath"
 )

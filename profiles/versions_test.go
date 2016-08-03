@@ -7,7 +7,7 @@ package profiles_test
 import (
 	"testing"
 
-	"v.io/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles"
 )
 
 func cmp(a, b []string) bool {

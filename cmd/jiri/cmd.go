@@ -10,7 +10,7 @@ package main
 import (
 	"runtime"
 
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri/tool"
 	"v.io/x/lib/cmdline"
 )
 
@@ -103,7 +103,7 @@ projects.  By using the shim script, you only need to remember to invoke the
 jiri tool from within the appropriate [root] directory, and the projects and
 tools under that [root] directory will be updated.
 
-The shim script is located at [root]/release/go/src/v.io/jiri/scripts/jiri
+The shim script is located at [root]/release/go/src/fuchsia.googlesource.com/jiri/scripts/jiri
 
 2) Direct binary.  This is the jiri binary, containing all of the actual jiri
 tool logic.  The binary requires the JIRI_ROOT environment variable to point to
@@ -161,7 +161,7 @@ Manifests have the following XML schema:
   </projects>
   <tools>
     <tool name="jiri"
-          package="v.io/jiri"
+          package="fuchsia.googlesource.com/jiri"
           project="release.go.jiri"
     />
     ...

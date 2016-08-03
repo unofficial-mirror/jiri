@@ -16,9 +16,9 @@ import (
 	"strings"
 	"text/template"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesreader"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/textutil"
 )

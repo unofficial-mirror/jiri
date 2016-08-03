@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"v.io/jiri"
+	"fuchsia.googlesource.com/jiri"
 )
 
 // RepoStatus represents the status of a remote repository on googlesource.

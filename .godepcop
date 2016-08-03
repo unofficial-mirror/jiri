@@ -4,7 +4,7 @@
 
        Ensure the strict rule of only allowing dependencies on v.io/x/lib, to
        reduce the exposure to breakage.  -->
-  <pkg allow="v.io/jiri/..."/>
+  <pkg allow="fuchsia.googlesource.com/jiri/..."/>
   <pkg allow="v.io/x/lib/..."/>
   <pkg deny="..."/>
 </godepcop>

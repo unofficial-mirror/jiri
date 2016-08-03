@@ -31,9 +31,9 @@ import (
 	"os"
 	"strings"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesmanager"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilesmanager"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/lookpath"
 )

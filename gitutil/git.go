@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 // PlatformSpecificGitArgs returns a git command line with platform specific,

@@ -8,7 +8,7 @@ import (
 	"flag"
 	"path/filepath"
 
-	"v.io/jiri"
+	"fuchsia.googlesource.com/jiri"
 )
 
 // RegisterReaderFlags registers the flags commonly used with a profiles.Reader.

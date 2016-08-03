@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"os"
 
-	"v.io/jiri/gerrit"
-	"v.io/jiri/jenkins"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/gerrit"
+	"fuchsia.googlesource.com/jiri/jenkins"
+	"fuchsia.googlesource.com/jiri/runutil"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/envvar"
 	"v.io/x/lib/timing"

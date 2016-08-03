@@ -11,10 +11,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesmanager"
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilesmanager"
+	"fuchsia.googlesource.com/jiri/tool"
 )
 
 type myNewProfileMgr struct {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles"
 )
 
 func ExampleProfileTarget() {

@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/jiri/collect"
+	"fuchsia.googlesource.com/jiri/collect"
 )
 
 func New(host string) (*Jenkins, error) {

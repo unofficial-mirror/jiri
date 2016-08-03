@@ -16,12 +16,12 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri"
-	"v.io/jiri/gerrit"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/jiritest"
-	"v.io/jiri/project"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/gerrit"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 // assertCommitCount asserts that the commit count between two

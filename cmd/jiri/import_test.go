@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri"
+	"fuchsia.googlesource.com/jiri"
 	"v.io/x/lib/gosh"
 )
 
@@ -137,7 +137,7 @@ func TestImport(t *testing.T) {
 	}
 	sh := gosh.NewShell(t)
 	defer sh.Cleanup()
-	jiriTool := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "v.io/jiri/cmd/jiri")
+	jiriTool := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "fuchsia.googlesource.com/jiri/cmd/jiri")
 	for _, test := range tests {
 		if err := testImport(t, jiriTool, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)

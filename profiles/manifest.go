@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"v.io/jiri"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 const (

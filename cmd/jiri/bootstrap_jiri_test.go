@@ -49,7 +49,7 @@ func TestBuildJiriLocally(t *testing.T) {
 	defer sh.Cleanup()
 
 	// Extract jiri package path from this line.
-	// GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" v.io/jiri/cmd/jiri
+	// GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" fuchsia.googlesource.com/jiri/cmd/jiri
 	bootstrap, err := filepath.Abs("../../scripts/bootstrap_jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to bootstrap_jiri script")

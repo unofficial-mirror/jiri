@@ -11,9 +11,9 @@ import (
 	"sort"
 	"testing"
 
-	"v.io/jiri/jiritest"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesreader"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
 	"v.io/x/lib/envvar"
 )
 

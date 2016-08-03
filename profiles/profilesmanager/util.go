@@ -7,8 +7,8 @@ package profilesmanager
 import (
 	"fmt"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
 )
 
 // ensureAction ensures that the requested profile and target

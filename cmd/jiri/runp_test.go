@@ -14,9 +14,9 @@ import (
 	"sync"
 	"testing"
 
-	"v.io/jiri/gitutil"
-	"v.io/jiri/jiritest"
-	"v.io/jiri/project"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/project"
 	"v.io/x/lib/gosh"
 )
 
@@ -33,7 +33,7 @@ func buildJiri(t *testing.T) string {
 		}
 		sh := gosh.NewShell(t)
 		defer sh.Cleanup()
-		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
+		gosh.BuildGoPkg(sh, binDir, "fuchsia.googlesource.com/jiri/cmd/jiri", "-o", "jiri")
 		buildJiriBinDir = binDir
 	})
 	return buildJiriBinDir

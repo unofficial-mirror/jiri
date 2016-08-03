@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
 	"v.io/x/lib/envvar"
 )
 

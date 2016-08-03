@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"v.io/jiri"
-	"v.io/jiri/collect"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/project"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/runutil"
 	"v.io/x/lib/cmdline"
 )
 

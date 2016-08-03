@@ -11,11 +11,11 @@ import (
 	"sort"
 	"strings"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesmanager"
-	"v.io/jiri/profiles/profilesutil"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilesmanager"
+	"fuchsia.googlesource.com/jiri/profiles/profilesutil"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 // profileManager is implemented for both in-process and sub-command

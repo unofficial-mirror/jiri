@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"v.io/jiri"
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/tool"
 )
 
 // NewX is similar to jiri.NewX, but is meant for usage in a testing environment.

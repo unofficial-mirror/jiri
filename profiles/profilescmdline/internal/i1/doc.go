@@ -70,7 +70,7 @@ the -profiles-db flag) which is generally useful for debugging.
 Adding Profiles
 
 Profiles are intended to be provided as go packages that register themselves
-with the profile command line tools via the *v.io/jiri/profiles* package. They
+with the profile command line tools via the *fuchsia.googlesource.com/jiri/profiles* package. They
 must implement the interfaces defined by that package and be imported (e.g.
 import _ "myprofile") by the command line tools that are to use them.
 

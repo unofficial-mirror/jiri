@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"v.io/jiri/collect"
+	"fuchsia.googlesource.com/jiri/collect"
 )
 
 // The functions in this file are provided to support writing a presubmit

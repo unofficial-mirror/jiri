@@ -5,15 +5,15 @@
 // Package jiri provides utilities used by the jiri tool and related tools.
 package jiri
 
-// TODO(toddw): Rename this package to v.io/jiri, and rename the tool itself to
-// v.io/jiri/cmd/jiri
+// TODO(toddw): Rename this package to fuchsia.googlesource.com/jiri, and rename the tool itself to
+// fuchsia.googlesource.com/jiri/cmd/jiri
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri/tool"
 	"v.io/x/lib/cmdline"
 	"v.io/x/lib/envvar"
 	"v.io/x/lib/timing"

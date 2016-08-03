@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/jiri"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/jiritest"
-	"v.io/jiri/project"
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/tool"
 )
 
 func createLabelDir(t *testing.T, jirix *jiri.X, snapshotDir, name string, snapshots []string) {

@@ -17,17 +17,17 @@ import (
 	"strings"
 	"time"
 
-	"v.io/jiri"
-	"v.io/jiri/collect"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/googlesource"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/googlesource"
+	"fuchsia.googlesource.com/jiri/runutil"
 	"v.io/x/lib/set"
 )
 
 var JiriProject = "release.go.jiri"
 var JiriName = "jiri"
-var JiriPackage = "v.io/jiri"
+var JiriPackage = "fuchsia.googlesource.com/jiri"
 
 // CL represents a changelist.
 type CL struct {
@@ -562,7 +562,7 @@ type Tool struct {
 	// Package is the package path of the tool.
 	Package string `xml:"package,attr,omitempty"`
 	// Project identifies the project that contains the tool. If not
-	// set, "https://vanadium.googlesource.com/<JiriProject>" is
+	// set, "https://fuchsia.googlesource.com/<JiriProject>" is
 	// used as the default.
 	Project string   `xml:"project,attr,omitempty"`
 	XMLName struct{} `xml:"tool"`
@@ -573,7 +573,7 @@ func (t *Tool) fillDefaults() error {
 		t.Data = "data"
 	}
 	if t.Project == "" {
-		t.Project = "https://vanadium.googlesource.com/" + JiriProject
+		t.Project = "https://fuchsia.googlesource.com/" + JiriProject
 	}
 	return nil
 }

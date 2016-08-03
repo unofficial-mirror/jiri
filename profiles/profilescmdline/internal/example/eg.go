@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"v.io/jiri"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilesutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilesutil"
 )
 
 type exampleManager struct {

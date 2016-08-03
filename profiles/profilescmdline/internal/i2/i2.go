@@ -8,15 +8,15 @@
 package main
 
 import (
-	"v.io/jiri"
-	"v.io/jiri/profiles/profilescmdline"
-	"v.io/jiri/profiles/profilesmanager"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
+	"fuchsia.googlesource.com/jiri/profiles/profilesmanager"
 
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri/tool"
 	"v.io/x/lib/cmdline"
 
 	// Add profile manager implementations here.
-	"v.io/jiri/profiles/profilescmdline/internal/example"
+	"fuchsia.googlesource.com/jiri/profiles/profilescmdline/internal/example"
 )
 
 // commandLineDriver implements the command line for the 'profile-v23'

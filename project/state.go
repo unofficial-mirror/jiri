@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"v.io/jiri"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/runutil"
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/tool"
 )
 
 type BranchState struct {

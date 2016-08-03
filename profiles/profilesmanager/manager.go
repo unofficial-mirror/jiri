@@ -13,7 +13,7 @@ import (
 	"sort"
 	"sync"
 
-	"v.io/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles"
 )
 
 var (

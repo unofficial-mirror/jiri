@@ -5,8 +5,8 @@
 package main
 
 import (
-	"v.io/jiri"
-	"v.io/jiri/profiles/profilescmdline"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
 	"v.io/x/lib/cmdline"
 )
 

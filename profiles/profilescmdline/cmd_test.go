@@ -5,7 +5,7 @@
 package profilescmdline
 
 import (
-	"v.io/jiri"
+	"fuchsia.googlesource.com/jiri"
 )
 
 func Reset() {

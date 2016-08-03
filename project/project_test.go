@@ -15,10 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/jiritest"
-	"v.io/jiri/project"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/project"
 )
 
 func checkReadme(t *testing.T, jirix *jiri.X, p project.Project, message string) {

@@ -19,9 +19,9 @@ import (
 	"strconv"
 	"strings"
 
-	"v.io/jiri/collect"
-	"v.io/jiri/gitutil"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 var (

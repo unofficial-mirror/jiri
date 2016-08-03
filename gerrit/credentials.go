@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"v.io/jiri/collect"
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 type credentials struct {

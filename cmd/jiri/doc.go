@@ -524,7 +524,7 @@ matched against project keys. If no command line arguments are provided the
 project that the contains the current directory is used, or if run from outside
 of a given project, all projects will be used. The information to be displayed
 is specified using a go template, supplied via the -f flag, that is executed
-against the v.io/jiri/project.ProjectState structure. This structure currently
+against the fuchsia.googlesource.com/jiri/project.ProjectState structure. This structure currently
 has the following fields:
 project.ProjectState{Branches:[]project.BranchState(nil), CurrentBranch:"",
 HasUncommitted:false, HasUntracked:false, Project:project.Project{Name:"",
@@ -908,7 +908,7 @@ projects.  By using the shim script, you only need to remember to invoke the
 jiri tool from within the appropriate [root] directory, and the projects and
 tools under that [root] directory will be updated.
 
-The shim script is located at [root]/release/go/src/v.io/jiri/scripts/jiri
+The shim script is located at [root]/release/go/src/fuchsia.googlesource.com/jiri/scripts/jiri
 
 2) Direct binary.  This is the jiri binary, containing all of the actual jiri
 tool logic.  The binary requires the JIRI_ROOT environment variable to point to
@@ -962,7 +962,7 @@ Manifests have the following XML schema:
   </projects>
   <tools>
     <tool name="jiri"
-          package="v.io/jiri"
+          package="fuchsia.googlesource.com/jiri"
           project="release.go.jiri"
     />
     ...

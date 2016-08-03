@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"v.io/jiri/tool"
+	"fuchsia.googlesource.com/jiri/tool"
 )
 
 // TestFindRootEnvSymlink checks that FindRoot interprets the value of the

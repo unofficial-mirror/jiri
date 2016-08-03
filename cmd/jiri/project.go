@@ -13,8 +13,8 @@ import (
 	"strings"
 	"text/template"
 
-	"v.io/jiri"
-	"v.io/jiri/project"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/project"
 	"v.io/x/lib/cmdline"
 )
 
@@ -136,7 +136,7 @@ against project keys. If no command line arguments are provided the project
 that the contains the current directory is used, or if run from outside
 of a given project, all projects will be used. The information to be
 displayed is specified using a go template, supplied via the -f flag, that is
-executed against the v.io/jiri/project.ProjectState structure. This structure
+executed against the fuchsia.googlesource.com/jiri/project.ProjectState structure. This structure
 currently has the following fields: ` + fmt.Sprintf("%#v", project.ProjectState{}),
 	ArgsName: "<project-keys>...",
 	ArgsLong: "<project-keys>... a list of project keys, as regexps, to apply the specified format to",

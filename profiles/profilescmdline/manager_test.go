@@ -19,11 +19,11 @@ import (
 	"sync"
 	"testing"
 
-	"v.io/jiri"
-	"v.io/jiri/jiritest"
-	"v.io/jiri/profiles"
-	"v.io/jiri/profiles/profilescmdline"
-	"v.io/jiri/profiles/profilesreader"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
+	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
 	"v.io/x/lib/envvar"
 	"v.io/x/lib/gosh"
 )
@@ -72,8 +72,8 @@ func buildInstallers(t *testing.T) string {
 		}
 		sh := gosh.NewShell(t)
 		defer sh.Cleanup()
-		prefix := "v.io/jiri/profiles/profilescmdline/internal/"
-		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
+		prefix := "fuchsia.googlesource.com/jiri/profiles/profilescmdline/internal/"
+		gosh.BuildGoPkg(sh, binDir, "fuchsia.googlesource.com/jiri/cmd/jiri", "-o", "jiri")
 		gosh.BuildGoPkg(sh, binDir, prefix+"i1", "-o", "jiri-profile-i1")
 		gosh.BuildGoPkg(sh, binDir, prefix+"i2", "-o", "jiri-profile-i2")
 		buildInstallersBinDir = binDir
@@ -104,7 +104,7 @@ func buildJiri(t *testing.T) string {
 		}
 		sh := gosh.NewShell(t)
 		defer sh.Cleanup()
-		gosh.BuildGoPkg(sh, binDir, "v.io/jiri/cmd/jiri", "-o", "jiri")
+		gosh.BuildGoPkg(sh, binDir, "fuchsia.googlesource.com/jiri/cmd/jiri", "-o", "jiri")
 		buildJiriBinDir = binDir
 	})
 	return buildJiriBinDir

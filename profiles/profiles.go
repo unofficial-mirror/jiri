@@ -56,7 +56,7 @@ import (
 	"flag"
 	"strings"
 
-	"v.io/jiri"
+	"fuchsia.googlesource.com/jiri"
 )
 
 // InstallerSeparator is the string used to separate the installer

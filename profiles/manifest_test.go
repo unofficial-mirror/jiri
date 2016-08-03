@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"v.io/jiri/jiritest"
-	"v.io/jiri/profiles"
+	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/profiles"
 )
 
 func addProfileAndTargets(t *testing.T, pdb *profiles.DB, name string) {

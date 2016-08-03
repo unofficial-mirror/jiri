@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"v.io/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 func rmLineNumbers(s string) string {

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"testing"
 
-	"v.io/jiri/profiles/profilescmdline"
-	"v.io/jiri/profiles/profilesreader"
+	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
+	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
 	"v.io/x/lib/cmdline"
 )
 
