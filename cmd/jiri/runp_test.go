@@ -118,7 +118,7 @@ func TestRunP(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(sh, dir, "jiri", "runp", "-v", "--interactive=false", "basename", "$(", "jiri", "project", "info", "-f", "{{.Project.Path}}", ")")
+	got = run(sh, dir, "jiri", "runp", "-v", "--interactive=false", "basename", "$(", filepath.Join(dir, "jiri"), "project", "info", "-f", "{{.Project.Path}}", ")")
 	if want := hdr + "manifest\nr.a\nr.b\nr.c\nr.t1\nr.t2"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
