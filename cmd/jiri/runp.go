@@ -22,8 +22,6 @@ import (
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
-	"fuchsia.googlesource.com/jiri/profiles/profilesreader"
 	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/simplemr"
 	"fuchsia.googlesource.com/jiri/tool"
@@ -40,10 +38,9 @@ func newRunP() *cmdline.Command {
 		Name:   "runp",
 		Short:  "Run a command in parallel across jiri projects",
 		Long: `
-Run a command in parallel across one or more jiri projects using the specified
-profile target's environment. Commands are run using the shell specified by the
-users $SHELL environment variable, or "sh" if that's not set. Thus commands
-are run as $SHELL -c "args..."
+Run a command in parallel across one or more jiri projects. Commands are run
+using the shell specified by the users $SHELL environment variable, or "sh"
+if that's not set. Thus commands are run as $SHELL -c "args..."
  `,
 		ArgsName: "<command line>",
 		ArgsLong: `
@@ -56,7 +53,6 @@ runp by the shell.
 }
 
 type runpFlagValues struct {
-	profilescmdline.ReaderFlagValues
 	projectKeys      string
 	verbose          bool
 	interactive      bool
@@ -72,7 +68,6 @@ type runpFlagValues struct {
 }
 
 func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
-	profilescmdline.RegisterReaderFlags(flags, &values.ReaderFlagValues, "", jiri.ProfilesDBDir)
 	flags.BoolVar(&values.verbose, "v", false, "Print verbose logging information")
 	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project unless it is run from outside of a project in which case it will default to using all projects.")
 	flags.BoolVar(&values.hasUncommitted, "has-uncommitted", false, "If specified, match projects that have, or have no, uncommitted changes")
@@ -132,7 +127,6 @@ func stateKeys(states map[project.ProjectKey]*mapInput) []string {
 
 type runner struct {
 	args                 []string
-	reader               *profilesreader.Reader
 	serializedWriterLock sync.Mutex
 	collatedOutputLock   sync.Mutex
 }
@@ -300,9 +294,9 @@ func (r *runner) Reduce(mr *simplemr.MR, key string, values []interface{}) error
 }
 
 func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
-	hasUntrackedSet := profilescmdline.IsFlagSet(cmd.ParsedFlags, "has-untracked")
-	hasUncommitedSet := profilescmdline.IsFlagSet(cmd.ParsedFlags, "has-uncommitted")
-	hasGerritSet := profilescmdline.IsFlagSet(cmd.ParsedFlags, "has-gerrit-message")
+	hasUntrackedSet := isFlagSet(cmd.ParsedFlags, "has-untracked")
+	hasUncommitedSet := isFlagSet(cmd.ParsedFlags, "has-uncommitted")
+	hasGerritSet := isFlagSet(cmd.ParsedFlags, "has-gerrit-message")
 
 	if runpFlags.interactive {
 		runpFlags.collateOutput = false
@@ -311,7 +305,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	var keysRE, branchRE *regexp.Regexp
 	var err error
 
-	if profilescmdline.IsFlagSet(cmd.ParsedFlags, "projects") {
+	if isFlagSet(cmd.ParsedFlags, "projects") {
 		re := ""
 		for _, pre := range strings.Split(runpFlags.projectKeys, ",") {
 			re += pre + "|"
@@ -323,7 +317,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		}
 	}
 
-	if profilescmdline.IsFlagSet(cmd.ParsedFlags, "has-branch") {
+	if isFlagSet(cmd.ParsedFlags, "has-branch") {
 		branchRE, err = regexp.Compile(runpFlags.hasBranch)
 		if err != nil {
 			return fmt.Errorf("failed to compile has-branch regexp: %q: %v", runpFlags.hasBranch, err)
@@ -331,8 +325,8 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	}
 
 	for _, f := range []string{"show-key-prefix", "show-name-prefix"} {
-		if profilescmdline.IsFlagSet(cmd.ParsedFlags, f) {
-			if runpFlags.interactive && profilescmdline.IsFlagSet(cmd.ParsedFlags, "interactive") {
+		if isFlagSet(cmd.ParsedFlags, f) {
+			if runpFlags.interactive && isFlagSet(cmd.ParsedFlags, "interactive") {
 				fmt.Fprintf(jirix.Stderr(), "WARNING: interactive mode being disabled because %s was set\n", f)
 			}
 			runpFlags.interactive = false
@@ -422,9 +416,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		fmt.Fprintf(jirix.Stdout(), "Project Keys: %s\n", strings.Join(stateKeys(mapInputs), " "))
 	}
 
-	reader, err := profilesreader.NewReader(jirix, runpFlags.ProfilesMode, runpFlags.DBFilename)
 	runner := &runner{
-		reader: reader,
 		args:   args,
 	}
 	mr := simplemr.MR{}

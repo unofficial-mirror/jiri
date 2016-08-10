@@ -20,7 +20,6 @@ import (
 	"fuchsia.googlesource.com/jiri/collect"
 	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/profiles/profilescmdline"
 	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/runutil"
 )
@@ -549,12 +548,12 @@ func (mp *multiPart) commandline(excludeKey project.ProjectKey, flags []string) 
 func clMailMultiFlags() []string {
 	flags := []string{}
 	stringFlag := func(name, value string) {
-		if profilescmdline.IsFlagSet(cmdCLMail.ParsedFlags, name) {
+		if isFlagSet(cmdCLMail.ParsedFlags, name) {
 			flags = append(flags, fmt.Sprintf("--%s=%s", name, value))
 		}
 	}
 	boolFlag := func(name string, value bool) {
-		if profilescmdline.IsFlagSet(cmdCLMail.ParsedFlags, name) {
+		if isFlagSet(cmdCLMail.ParsedFlags, name) {
 			flags = append(flags, fmt.Sprintf("--%s=%t", name, value))
 		}
 	}
@@ -566,7 +565,7 @@ func clMailMultiFlags() []string {
 	// is specifically set then that setting is used for all repos.
 	// So using --edit=true allows for a different CL message in
 	// each repo of a multipart CL.
-	if profilescmdline.IsFlagSet(cmdCLMail.ParsedFlags, "edit") {
+	if isFlagSet(cmdCLMail.ParsedFlags, "edit") {
 		// if --edit is set on the command line, use that value
 		// for all subcommands
 		flags = append(flags, fmt.Sprintf("--edit=%t", editFlag))

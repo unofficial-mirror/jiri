@@ -48,7 +48,5 @@ func runWhich(env *cmdline.Env, args []string) error {
 		fmt.Fprintln(env.Stdout, abs)
 		return nil
 	}
-	// TODO(toddw): Look up the path to each argument.  This will only be helpful
-	// after the profiles are moved back into the main jiri tool.
 	return fmt.Errorf("unexpected arguments")
 }

@@ -248,10 +248,6 @@ See the jiri [manifest godocs](https://godoc.org/fuchsia.googlesource.com/jiri/c
 
 TODO(nlacasse): Write me.
 
-## Profiles
-
-TODO(nlacasse): Write me.
-
 ## Gerrit CL workflow
 
 [Gerrit][gerrit] is a collaborative code-review tool used by many open source
