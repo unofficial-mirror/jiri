@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gosh"
 )
 
 type importTestCase struct {
@@ -135,29 +135,52 @@ func TestImport(t *testing.T) {
 `,
 		},
 	}
-	sh := gosh.NewShell(t)
-	defer sh.Cleanup()
-	jiriTool := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "fuchsia.googlesource.com/jiri/cmd/jiri")
+
+	// Temporary directory in which our jiri binary will live.
+	binDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(binDir)
+
+	jiriPath := buildGoPkg(t, "fuchsia.googlesource.com/jiri/cmd/jiri", binDir)
 	for _, test := range tests {
-		if err := testImport(t, jiriTool, test); err != nil {
+		if err := testImport(t, jiriPath, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)
 		}
 	}
 }
 
 func testImport(t *testing.T, jiriTool string, test importTestCase) error {
-	sh := gosh.NewShell(t)
-	defer sh.Cleanup()
-	tmpDir := sh.MakeTempDir()
+	// Temporary directory in which to run `jiri import`.
+	tmpDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Return to the current working directory when done.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	defer os.Chdir(cwd)
+
+	// Create and cd into a JIRI_ROOT directory in which to do the actual import.
 	jiriRoot := filepath.Join(tmpDir, "root")
 	if err := os.Mkdir(jiriRoot, 0755); err != nil {
 		return err
 	}
-	sh.Pushd(jiriRoot)
+	if err := os.Chdir(jiriRoot); err != nil {
+		return err
+	}
+
+	// Allow optional non-default filenames, for testing the -out option.
 	filename := test.Filename
 	if filename == "" {
 		filename = ".jiri_manifest"
 	}
+
 	// Set up manfile for the local file import tests.  It should exist in both
 	// the tmpDir (for ../manfile tests) and jiriRoot.
 	for _, dir := range []string{tmpDir, jiriRoot} {
@@ -165,25 +188,25 @@ func testImport(t *testing.T, jiriTool string, test importTestCase) error {
 			return err
 		}
 	}
+
 	// Set up an existing file if it was specified.
 	if test.Exist != "" {
 		if err := ioutil.WriteFile(filename, []byte(test.Exist), 0644); err != nil {
 			return err
 		}
 	}
-	// Run import and check the error.
-	sh.Vars[jiri.RootEnv] = jiriRoot
-	cmd := sh.Cmd(jiriTool, append([]string{"import"}, test.Args...)...)
-	if test.Stderr != "" {
-		cmd.ExitErrorIsOk = true
-	}
-	stdout, stderr := cmd.StdoutStderr()
+
+	// Run import and check the results.
+	importCmd := exec.Command(jiriTool, append([]string{"import"}, test.Args...)...)
+	importCmd.Env = []string{fmt.Sprintf("%s=%s", jiri.RootEnv, jiriRoot)}
+	stdout, stderr := runCmd(t, importCmd, test.Stderr != "")
 	if got, want := stdout, test.Stdout; !strings.Contains(got, want) || (got != "" && want == "") {
 		return fmt.Errorf("stdout got %q, want substr %q", got, want)
 	}
 	if got, want := stderr, test.Stderr; !strings.Contains(got, want) || (got != "" && want == "") {
 		return fmt.Errorf("stderr got %q, want substr %q", got, want)
 	}
+
 	// Make sure the right file is generated.
 	if test.Want != "" {
 		data, err := ioutil.ReadFile(filename)

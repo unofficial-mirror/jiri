@@ -6,20 +6,23 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"fuchsia.googlesource.com/jiri/gosh"
 )
 
 func TestWhich(t *testing.T) {
-	sh := gosh.NewShell(t)
-	sh.PropagateChildOutput = true
-	defer sh.Cleanup()
-
-	jiriBinary := gosh.BuildGoPkg(sh, sh.MakeTempDir(), "fuchsia.googlesource.com/jiri/cmd/jiri")
-	stdout, stderr := sh.Cmd(jiriBinary, []string{"which"}...).StdoutStderr()
-	if got, want := stdout, fmt.Sprintf("# binary\n%s\n", jiriBinary); got != want {
+	buildDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(buildDir)
+	jiriPath := buildGoPkg(t, "fuchsia.googlesource.com/jiri/cmd/jiri", buildDir)
+	whichCmd := exec.Command(jiriPath, "which")
+	stdout, stderr := runCmd(t, whichCmd, true)
+	if got, want := stdout, fmt.Sprintf("# binary\n%s\n", jiriPath); got != want {
 		t.Errorf("stdout got %q, want %q", got, want)
 	}
 	if got, want := stderr, ""; got != want {
@@ -29,15 +32,13 @@ func TestWhich(t *testing.T) {
 
 // TestWhichScript tests the behavior of "jiri which" for the shim script.
 func TestWhichScript(t *testing.T) {
-	sh := gosh.NewShell(t)
-	sh.PropagateChildOutput = true
-	defer sh.Cleanup()
-
+	// This relative path points at the checked-in copy of the jiri script.
 	jiriScript, err := filepath.Abs("../../scripts/jiri")
 	if err != nil {
 		t.Fatalf("couldn't determine absolute path to jiri script")
 	}
-	stdout, stderr := sh.Cmd(jiriScript, "which").StdoutStderr()
+	whichCmd := exec.Command(jiriScript, "which")
+	stdout, stderr := runCmd(t, whichCmd, true)
 	if got, want := stdout, fmt.Sprintf("# script\n%s\n", jiriScript); got != want {
 		t.Errorf("stdout got %q, want %q", got, want)
 	}
