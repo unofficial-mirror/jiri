@@ -1050,34 +1050,11 @@ func TestMultiPart(t *testing.T) {
 	}()
 	cleanupMultiPartFlag, currentProjectFlag = false, false
 
-	name, err := gitutil.New(fake.X.NewSeq()).CurrentBranchName()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if name == "master" {
-		// The test cases below assume that they are run on a feature-branch,
-		// but this is not necessarily always the case when running under
-		// jenkins, so if it's run on a master branch it will create
-		// a feature branch.
-		if err := gitutil.New(fake.X.NewSeq()).CreateAndCheckoutBranch("feature-branch"); err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			git := gitutil.New(fake.X.NewSeq())
-			git.CheckoutBranch("master", gitutil.ForceOpt(true))
-			git.DeleteBranch("feature-branch", gitutil.ForceOpt(true))
-		}()
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Chdir(cwd)
-
-	relchdir := func(dir string) {
-		chdir(t, fake.X, dir)
-	}
 
 	initMP := func() *multiPart {
 		mp, err := initForMultiPart(fake.X)
@@ -1088,6 +1065,7 @@ func TestMultiPart(t *testing.T) {
 		return mp
 	}
 
+	// A no-op function to return the given mp.  Needed for the `got, want := fn(), other_fn()` pattern.
 	wr := func(mp *multiPart) *multiPart {
 		return mp
 	}
@@ -1096,11 +1074,28 @@ func TestMultiPart(t *testing.T) {
 		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
 	}
 
+	// Paths that contain the various test projects -- many functions in `jiri cl` depend on the current
+	// working directory (e.g. cl.go:projectStates), so when testing we must change to those directories.
+	ra := projects[0].Path
+	rb := projects[1].Path
+	rc := projects[2].Path
+	t1 := projects[3].Path
+
+	relchdir := func(dir string) {
+		chdir(t, fake.X, dir)
+	}
+
+	// This test checks whether the clean attribute is set when the cleanupMultiPartFlag is passed as true.
+	git(ra).CreateAndCheckoutBranch("a1")
+	relchdir(ra)
 	cleanupMultiPartFlag = true
-	if got, want := initMP(), wr(&multiPart{clean: true}); !reflect.DeepEqual(got, want) {
+	got := initMP()
+	want := &multiPart{clean: true, states: got.states, keys: got.keys}  // Don't care about the states/keys in this test, just pass them through.
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 
+	// This tests whether the current attribute is set when the currentProjectFlag is passed as true.
 	currentProjectFlag = true
 	if got, want := initMP(), wr(&multiPart{clean: true, current: true}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
@@ -1108,10 +1103,6 @@ func TestMultiPart(t *testing.T) {
 	cleanupMultiPartFlag, currentProjectFlag = false, false
 
 	// Test metadata generation.
-	ra := projects[0].Path
-	rb := projects[1].Path
-	rc := projects[2].Path
-	t1 := projects[3].Path
 	git(ra).CreateAndCheckoutBranch("a1")
 	relchdir(ra)
 
