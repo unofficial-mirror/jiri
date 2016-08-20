@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Copyright 2016 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+# Usage:
+#
+# Upload jiri prebuilt for the current OS.
+# > ./scripts/upload_jiri
+#
+# Upload cross-compiled jiri prebuilts for the given OSes.
+# > ./scripts/upload_jiri "darwin linux freebsd"
+
+# This script uploads jiri binaries to Google storage, therefore it expects to
+# be run in an environment with the credentials necessary for uploading to
+# gs://fuchsia-build.  The binaries stored in a convention which matches the
+# expectations of bootstrap_jiri.
+
+# There's a fundamental disagreement between the way Fuchsia organizes its
+# repos and the way Go wants to organize code: Fuchsia has a /jiri repo that
+# contains all the code, Go wants the code to live in a directory structure
+# that reflects the import paths (i.e. fuchsia.googlesource.com/jiri/...).
+#
+# To deal with that, and to keep your environment tidy, this script creates a
+# temporary directory and checks out a fresh copy of jiri into that structure.
+# This has the notable side-effect of only being able to upload jiri binaries
+# from source that's actually checked in.
+
+set -e
+set -x
+
+readonly PKG_PATH="fuchsia.googlesource.com/jiri"
+readonly GS_BUCKET="gs://fuchsia-build/jiri"
+
+# Accept the first argument as a list of OSes to build for.  Possible values
+# are valid GOOS strings from https://golang.org/doc/install/source#environment.
+if [[ $# -eq 1 ]]; then
+  readonly TARGETS="${1}"
+else
+  readonly TARGETS="linux darwin"
+fi
+
+# Do all our work in a temporary directory, then rm it when we're done.
+readonly TEMP_DIR="$(mktemp -d)"
+trap "rm -rf -- "${TEMP_DIR}"" EXIT
+
+# Check out the code into the kind of directory structure `go build` expects.
+readonly GIT_DIR="${TEMP_DIR}/src/${PKG_PATH}"
+git clone "https://${PKG_PATH}" "${GIT_DIR}"
+
+# Use the git SHA of the latest commit in the jiri repo as the version of the binaries.
+readonly VERSION="$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" log -1 --format=%H)"
+
+# For each target we support, build a jiri binary.
+for os in ${TARGETS}; do
+  if ! GOPATH="${TEMP_DIR}" GOOS="${os}" GOARCH="amd64" go build -a -o "${TEMP_DIR}/jiri-${os}" "${PKG_PATH}/cmd/jiri"; then
+    set +x
+    echo ""
+    echo "'go build' failed.  Ensure you have a standard, working Go toolchain"
+    echo "that is capable of cross compiling for the specified targets."
+    echo ""
+    echo "The latest packages from https://golang.org/dl should work."
+    exit 1
+  fi
+done
+
+# Upload all the binaries.
+for os in ${TARGETS}; do
+  gsutil cp "${TEMP_DIR}/jiri-${os}" "${GS_BUCKET}/${os}-amd64/${VERSION}"
+done
