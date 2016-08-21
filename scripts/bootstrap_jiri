@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2015 The Vanadium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
@@ -15,6 +15,15 @@
 # failure.
 
 set -euf -o pipefail
+
+# Jiri repo, from which we will download the jiri script wrapper.
+readonly JIRI_REPO_URL="https://fuchsia.googlesource.com/jiri"
+
+# Google Storage bucket that contains prebuilt versions of jiri.
+readonly GS_BUCKET_URL="https://fuchsia-build.storage.googleapis.com/jiri"
+
+# Location where we keep the version of jiri to download.
+readonly VERSION_BASE_URL="https://fuchsia.googlesource.com/jiri/version/+/master/bootstrap"
 
 # fatal prints an error message, followed by the usage string, and then exits.
 fatal() {
@@ -41,36 +50,79 @@ toabs() (
   echo ${PWD}/$(basename $1)
 )
 
-# Check the <root_dir> argument is supplied and doesn't already exist.
+# Check the <root_dir> argument is supplied.
 if [[ $# -ne 1 ]]; then
   fatal "need <root_dir> argument"
 fi
-mkdir -p $(dirname $1)
-root_dir=$(toabs $1)
-if [[ -e ${root_dir} ]]; then
-  fatal "${root_dir} already exists"
+
+# Ensure <root_dir> doesn't already exist: this is important since we trap this script and
+# rm -rf <root_dir> if anything fails.
+mkdir -p "$(dirname $1)"
+readonly ROOT_DIR="$(toabs $1)"
+if [[ -e "${ROOT_DIR}" ]]; then
+  fatal "${ROOT_DIR} already exists"
 fi
+
 # Check that go is on the PATH.
 if ! go version >& /dev/null ; then
   fatal 'ERROR: "go" tool not found, see https://golang.org/doc/install'
 fi
 
-trap "rm -rf ${root_dir}" INT TERM EXIT
+# Remove the root_dir if this script fails so as to not leave the environment in a strange half-state.
+trap "rm -rf ${ROOT_DIR}" INT TERM EXIT
 
 # Make the output directories.
-tmp_dir="${root_dir}/.jiri_root/tmp"
-bin_dir="${root_dir}/.jiri_root/bin"
-scripts_dir="${root_dir}/.jiri_root/scripts"
-mkdir -p "${tmp_dir}" "${bin_dir}" "${scripts_dir}"
+readonly BIN_DIR="${ROOT_DIR}/.jiri_root/bin"
+readonly SCRIPTS_DIR="${ROOT_DIR}/.jiri_root/scripts"
+mkdir -p "${BIN_DIR}" "${SCRIPTS_DIR}"
 
-# Go get the jiri source files, build the jiri binary, and copy the jiri shim
-# script from the sources.
-GOPATH="${tmp_dir}" go get -d fuchsia.googlesource.com/jiri/cmd/jiri
-GOPATH="${tmp_dir}" go build -o "${bin_dir}/jiri" fuchsia.googlesource.com/jiri/cmd/jiri
-cp "${tmp_dir}/src/fuchsia.googlesource.com/jiri/scripts/jiri" "${scripts_dir}/jiri"
+# Base64 takes different arguments on darwin.
+readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
+if [[ "${HOST_OS}" == "darwin" ]]; then
+  readonly BASE64_CMD="base64 -D"
+else
+  readonly BASE64_CMD="base64 -d"
+fi
 
-# Clean up the tmp_dir.
-rm -rf "${tmp_dir}"
+# Determine and validate the version of jiri.
+readonly TARGET="${HOST_OS}-amd64"
+readonly VERSION_URL="${VERSION_BASE_URL}/${TARGET}?format=TEXT"
+readonly ENCODED_VERSION="$(curl -sSf "${VERSION_URL}")"
+readonly BASE64_REGEX="^[0-9a-zA-Z+/=]+"
+if [[ ! "${ENCODED_VERSION}" =~ ${BASE64_REGEX} ]]; then
+  # This might happen if there's a server error, or maybe ${TARGET}/version.sha doesn't exist.
+  echo "Encoded jiri version does not look like base64" 1>&2
+  echo "URL: ${VERSION_URL}" 1>&2
+  echo "" 1>&2
+  echo "Maybe ${TARGET} isn't supported?" 1>&2
+  exit 1
+fi
 
-echo "Please add ${scripts_dir} to your PATH."
+readonly VERSION="$(echo "${ENCODED_VERSION}" | ${BASE64_CMD} | tr -d '[[:space:]]')"
+readonly SHA1_REGEX="[0-9a-f]{40}"
+if [[ ! "${VERSION}" =~ ${SHA1_REGEX} ]]; then
+  # This might happen if ${TARGET}/version.sha contains something other than a git SHA-1 hash.
+  echo "Decoded jiri version does not look like a git SHA-1 hash:" 1>&2
+  echo "${VERSION}" 1>&2
+  exit 1
+fi
+
+# Download the jiri binary.
+readonly BIN_URL="${GS_BUCKET_URL}/${TARGET}/${VERSION}"
+if ! curl -sf -o "${BIN_DIR}/jiri" "${BIN_URL}"; then
+  echo "Failed downloading prebuilt jiri binary." 1>&2
+  echo "URL: ${BIN_URL}" 1>&2
+  exit 1
+fi
+chmod 755 "${BIN_DIR}/jiri"
+
+# Download the jiri wrapper script.
+readonly SCRIPT_URL="${JIRI_REPO_URL}/+/${VERSION}/scripts/jiri?format=TEXT"
+if ! curl -sf "${SCRIPT_URL}" | ${BASE64_CMD} > "${SCRIPTS_DIR}/jiri"; then
+  echo "Failed downloading jiri wrapper script." 1>&2
+  echo "URL: ${SCRIPT_URL}" 1>&2
+  exit 1
+fi
+
+echo "Please add ${SCRIPTS_DIR} to your PATH"
 trap - EXIT
