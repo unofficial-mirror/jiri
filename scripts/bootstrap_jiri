@@ -123,6 +123,7 @@ if ! curl -sf "${SCRIPT_URL}" | ${BASE64_CMD} > "${SCRIPTS_DIR}/jiri"; then
   echo "URL: ${SCRIPT_URL}" 1>&2
   exit 1
 fi
+chmod 755 "${SCRIPTS_DIR}/jiri"
 
 echo "Please add ${SCRIPTS_DIR} to your PATH"
 trap - EXIT
