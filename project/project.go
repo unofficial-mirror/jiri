@@ -22,7 +22,6 @@ import (
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/googlesource"
 	"fuchsia.googlesource.com/jiri/runutil"
-	"fuchsia.googlesource.com/jiri/set"
 )
 
 var JiriProject = "release.go.jiri"
@@ -1651,11 +1650,16 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	}
 	gsHostsMap := groupByGoogleSourceHosts(projectsAtHead)
 	for host, projects := range gsHostsMap {
+		// Create a slice of branch names, with duplicates removed.
 		branchesMap := make(map[string]bool)
 		for _, p := range projects {
 			branchesMap[p.RemoteBranch] = true
 		}
-		branches := set.StringBool.ToSlice(branchesMap)
+		branches := make([]string, 0, len(branchesMap))
+		for b, _ := range branchesMap {
+			branches = append(branches, b)
+		}
+
 		repoStatuses, err := googlesource.GetRepoStatuses(jirix, host, branches)
 		if err != nil {
 			// Log the error but don't fail.
@@ -2187,32 +2191,6 @@ func computeOp(local, remote *Project, gc bool) operation {
 	default:
 		panic("jiri: computeOp called with nil local and remote")
 	}
-}
-
-// ParseNames identifies the set of projects that a jiri command should be
-// applied to.
-func ParseNames(jirix *jiri.X, args []string, defaultProjects map[string]struct{}) (Projects, error) {
-	localProjects, err := LocalProjects(jirix, FullScan)
-	if err != nil {
-		return nil, err
-	}
-	result := Projects{}
-	if len(args) == 0 {
-		// Use the default set of projects.
-		args = set.String.ToSlice(defaultProjects)
-	}
-	for _, name := range args {
-		projects := localProjects.Find(name)
-		if len(projects) == 0 {
-			// Issue a warning if the target project does not exist in the
-			// project manifest.
-			fmt.Fprintf(jirix.Stderr(), "project %q does not exist locally\n", name)
-		}
-		for _, project := range projects {
-			result[project.Key()] = project
-		}
-	}
-	return result, nil
 }
 
 // fmtRevision returns the first 8 chars of a revision hash.
