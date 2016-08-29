@@ -1313,58 +1313,6 @@ func updateJiriScript(jirix *jiri.X, jiriProject Project) error {
 	return jirix.NewSeq().Verbose(true).Call(updateFn, "update jiri script").Done()
 }
 
-// TransitionBinDir handles the transition from the old location
-// $JIRI_ROOT/devtools/bin to the new $JIRI_ROOT/.jiri_root/bin.  In
-// InstallTools above we've already installed the tools to the new location.
-//
-// For now we want $JIRI_ROOT/devtools/bin symlinked to the new location, so
-// that users won't perceive a difference in behavior.  In addition, we want to
-// save the old binaries to $JIRI_ROOT/.jiri_root/bin.BACKUP the first time this
-// is run.  That way if we screwed something up, the user can recover their old
-// binaries.
-//
-// TODO(toddw): Remove this logic after the transition to .jiri_root is done.
-func TransitionBinDir(jirix *jiri.X) error {
-	s := jirix.NewSeq()
-	oldDir, newDir := filepath.Join(jirix.Root, "devtools", "bin"), jirix.BinDir()
-	switch info, err := s.Lstat(oldDir); {
-	case runutil.IsNotExist(err):
-		// Drop down to create the symlink below.
-	case err != nil:
-		return fmt.Errorf("Failed to stat old bin dir: %v", err)
-	case info.Mode()&os.ModeSymlink != 0:
-		link, err := s.Readlink(oldDir)
-		if err != nil {
-			return fmt.Errorf("Failed to read link from old bin dir: %v", err)
-		}
-		if filepath.Clean(link) == newDir {
-			// The old dir is already correctly symlinked to the new dir.
-			return nil
-		}
-		fallthrough
-	default:
-		// The old dir exists, and either it's not a symlink, or it's a symlink that
-		// doesn't point to the new dir.  Move the old dir to the backup location.
-		backupDir := newDir + ".BACKUP"
-		switch _, err := s.Stat(backupDir); {
-		case runutil.IsNotExist(err):
-			if err := s.Rename(oldDir, backupDir).Done(); err != nil {
-				return fmt.Errorf("Failed to backup old bin dir %v to %v: %v", oldDir, backupDir, err)
-			}
-			// Drop down to create the symlink below.
-		case err != nil:
-			return fmt.Errorf("Failed to stat backup bin dir: %v", err)
-		default:
-			return fmt.Errorf("Backup bin dir %v already exists", backupDir)
-		}
-	}
-	// Create the symlink.
-	if err := s.MkdirAll(filepath.Dir(oldDir), 0755).Symlink(newDir, oldDir).Done(); err != nil {
-		return fmt.Errorf("Failed to symlink to new bin dir %v from %v: %v", newDir, oldDir, err)
-	}
-	return nil
-}
-
 // fetchProject fetches from the project remote.
 func fetchProject(jirix *jiri.X, project Project) error {
 	if project.Remote == "" {

@@ -57,11 +57,5 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 	if err := retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
-	if err := project.WriteUpdateHistorySnapshot(jirix, ""); err != nil {
-		return err
-	}
-
-	// Only attempt the bin dir transition after the update has succeeded, to
-	// avoid messy partial states.
-	return project.TransitionBinDir(jirix)
+	return project.WriteUpdateHistorySnapshot(jirix, "")
 }
