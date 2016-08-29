@@ -41,16 +41,6 @@ Run "jiri help manifest" for details on manifests.
 }
 
 func runUpdate(jirix *jiri.X, _ []string) error {
-	seq := jirix.NewSeq()
-	// Create the $JIRI_ROOT/.jiri_root directory if it doesn't already exist.
-	//
-	// TODO(toddw): Remove this logic after the transition to .jiri_root is done.
-	// The bootstrapping logic should create this directory, and jiri should fail
-	// if the directory doesn't exist.
-	if err := seq.MkdirAll(jirix.RootMetaDir(), 0755).Done(); err != nil {
-		return err
-	}
-
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
 	updateFn := func() error { return project.UpdateUniverse(jirix, gcFlag) }
