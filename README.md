@@ -66,10 +66,10 @@ Jiri makes it easy to "import" a remote manifest from your local
 `.jiri_manifest` file with the `jiri import` command.  For example, running the
 following command will create a `.jiri_manifest` file (or append to an existing
 one) with an `import` tag that imports the minimal manifest from the
-`https://fuchsia.googlesource.com/jiri` repo.
+`https://fuchsia.googlesource.com/manifest` repo.
 
 ```
-jiri import -name="manifest" minimal https://fuchsia.googlesource.com/jiri
+jiri import minimal https://fuchsia.googlesource.com/manifest
 ```
 
 The next time you run `jiri update`, jiri will sync all projects listed in the
@@ -112,15 +112,15 @@ export PATH="$MY_ROOT"/.jiri_root/scripts:$PATH
 ```
 
 Next, use the `jiri import` command to import the "minimal" manifest from the
-Jiri repo.  This manifest includes only the projects needed to
-build the jiri tool itself.
+Fuchsia repo.  This manifest includes only the projects needed to
+build the Jiri itself.
 
 You can see the minimal manifest [here][minimal manifest].  For more
 information on manifests, read the [manifest docs][manifests].
 
 ```
 cd "$MY_ROOT"
-jiri import -name=manifest minimal https://fuchsia.googlesource.com/jiri
+jiri import minimal https://fuchsia.googlesource.com/manifest
 ```
 
 You should now have a file in the root directory called `.jiri_manifest`, which
@@ -464,4 +464,4 @@ the next `jiri update`.
 [go contrib]: https://golang.org/doc/contribute.html#Code_review "Go Contribution Guidelines - Code Review"
 [jiri-wiki]: https://en.wikipedia.org/wiki/Ji%C5%99%C3%AD "Jiří"
 [manifests]: #manifests "manifests"
-[minimal manifest]: https://fuchsia.googlesource.com/jiri/+/refs/heads/master/minimal "minimal manifest"
+[minimal manifest]: https://fuchsia.googlesource.com/manifest/+/refs/heads/master/minimal "minimal manifest"
