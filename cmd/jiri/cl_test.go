@@ -851,7 +851,7 @@ func TestCLNew(t *testing.T) {
 }
 
 // TestDependentClsWithEditDelete exercises a previously observed failure case
-// where if a CL edits a file and a dependent CL deletes it, jiri cl mail after
+// where if a CL edits a file and a dependent CL deletes it, jiri cl upload after
 // the deletion failed with unrecoverable merge errors.
 func TestDependentClsWithEditDelete(t *testing.T) {
 	fake, repoPath, originPath, gerritPath, cleanup := setupTest(t, true)
@@ -916,7 +916,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	assertFilesDoNotExist(t, fake.X, []string{"B", "C"})
 }
 
-// TestParallelDev checks "jiri cl mail" behavior when parallel development has
+// TestParallelDev checks "jiri cl upload" behavior when parallel development has
 // been submitted upstream.
 func TestParallelDev(t *testing.T) {
 	fake, repoPath, originPath, gerritAPath, cleanup := setupTest(t, true)
@@ -1292,7 +1292,7 @@ func TestMultiPart(t *testing.T) {
 		"--projects=" + string(projects[0].Key()) + "," + string(projects[1].Key()) + "," + string(projects[2].Key()),
 		"jiri",
 		"cl",
-		"mail",
+		"upload",
 		"--current-project-only=true",
 		"-r=alice",
 	}

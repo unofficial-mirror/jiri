@@ -73,27 +73,11 @@ var (
 
 // init carries out the package initialization.
 func init() {
-	cmdCLMail = newCmdCLMail()
+	cmdCLUpload = newCmdCLUpload("upload", runCLUpload)
+	cmdCLMail = newCmdCLUpload("mail", runCLMail)
 	cmdCL = newCmdCL()
 	cmdCLCleanup.Flags.BoolVar(&forceFlag, "f", false, `Ignore unmerged changes.`)
 	cmdCLCleanup.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
-	cmdCLMail.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, `Automatically submit the changelist when feasible.`)
-	cmdCLMail.Flags.StringVar(&ccsFlag, "cc", "", `Comma-seperated list of emails or LDAPs to cc.`)
-	cmdCLMail.Flags.BoolVar(&draftFlag, "d", false, `Send a draft changelist.`)
-	cmdCLMail.Flags.BoolVar(&editFlag, "edit", true, `Open an editor to edit the CL description.`)
-	cmdCLMail.Flags.StringVar(&hostFlag, "host", "", `Gerrit host to use.  Defaults to gerrit host specified in manifest.`)
-	cmdCLMail.Flags.StringVar(&messageFlag, "m", "", `CL description.`)
-	cmdCLMail.Flags.StringVar(&commitMessageBodyFlag, "commit-message-body-file", "", `file containing the body of the CL description, that is, text without a ChangeID, MultiPart etc.`)
-	cmdCLMail.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
-		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
-	cmdCLMail.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
-	cmdCLMail.Flags.StringVar(&reviewersFlag, "r", "", `Comma-seperated list of emails or LDAPs to request review.`)
-	cmdCLMail.Flags.BoolVar(&setTopicFlag, "set-topic", true, `Set Gerrit CL topic.`)
-	cmdCLMail.Flags.StringVar(&topicFlag, "topic", "", `CL topic, defaults to <username>-<branchname>.`)
-	cmdCLMail.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, `Check that no uncommitted changes exist.`)
-	cmdCLMail.Flags.BoolVar(&verifyFlag, "verify", true, `Run pre-push git hooks.`)
-	cmdCLMail.Flags.BoolVar(&currentProjectFlag, "current-project-only", false, `Run mail in the current project only.`)
-	cmdCLMail.Flags.BoolVar(&cleanupMultiPartFlag, "clean-multipart-metadata", false, `Cleanup the metadata associated with multipart CLs pertaining the MultiPart: x/y message without mailing any CLs.`)
 	cmdCLPatch.Flags.StringVar(&branchFlag, "branch", "", "Name of the branch the patch will be applied to")
 	cmdCLPatch.Flags.BoolVar(&deleteFlag, "delete", false, "Delete the existing branch if already exists")
 	cmdCLPatch.Flags.BoolVar(&forceFlag, "force", false, "Use force when deleting the existing branch")
@@ -147,7 +131,7 @@ func newCmdCL() *cmdline.Command {
 		Name:     "cl",
 		Short:    "Manage changelists for multiple projects",
 		Long:     "Manage changelists for multiple projects.",
-		Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLPatch, cmdCLSync},
+		Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLPatch, cmdCLSync, cmdCLUpload},
 	}
 }
 
@@ -287,19 +271,20 @@ func runCLCleanup(jirix *jiri.X, args []string) error {
 	return cleanupCL(jirix, args)
 }
 
-// cmdCLMail represents the "jiri cl mail" command.
+// cmdCLUpload represents the "jiri cl upload" command.
+var cmdCLUpload *cmdline.Command
 var cmdCLMail *cmdline.Command
 
 // Use a factory to avoid an initialization loop between between the
 // Runner function and the ParsedFlags field in the Command.
-func newCmdCLMail() *cmdline.Command {
-	return &cmdline.Command{
-		Runner: jiri.RunnerFunc(runCLMail),
-		Name:   "mail",
-		Short:  "Mail a changelist for review",
+func newCmdCLUpload(name string, runner func(*jiri.X, []string) error) *cmdline.Command {
+	cmdCLUpload := &cmdline.Command{
+		Runner: jiri.RunnerFunc(runner),
+		Name:   name,
+		Short:  "Upload a changelist for review",
 		Long: `
-Command "mail" squashes all commits of a local branch into a single
-"changelist" and mails this changelist to Gerrit as a single
+Command "upload" squashes all commits of a local branch into a single
+"changelist" and uploads this changelist to Gerrit as a single
 commit. First time the command is invoked, it generates a Change-Id
 for the changelist, which is appended to the commit
 message. Consecutive invocations of the command use the same Change-Id
@@ -307,6 +292,24 @@ by default, informing Gerrit that the incomming commit is an update of
 an existing changelist.
 `,
 	}
+	cmdCLUpload.Flags.BoolVar(&autosubmitFlag, "autosubmit", false, `Automatically submit the changelist when feasible.`)
+	cmdCLUpload.Flags.StringVar(&ccsFlag, "cc", "", `Comma-seperated list of emails or LDAPs to cc.`)
+	cmdCLUpload.Flags.BoolVar(&draftFlag, "d", false, `Send a draft changelist.`)
+	cmdCLUpload.Flags.BoolVar(&editFlag, "edit", true, `Open an editor to edit the CL description.`)
+	cmdCLUpload.Flags.StringVar(&hostFlag, "host", "", `Gerrit host to use.  Defaults to gerrit host specified in manifest.`)
+	cmdCLUpload.Flags.StringVar(&messageFlag, "m", "", `CL description.`)
+	cmdCLUpload.Flags.StringVar(&commitMessageBodyFlag, "commit-message-body-file", "", `file containing the body of the CL description, that is, text without a ChangeID, MultiPart etc.`)
+	cmdCLUpload.Flags.StringVar(&presubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
+		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
+	cmdCLUpload.Flags.StringVar(&remoteBranchFlag, "remote-branch", "master", `Name of the remote branch the CL pertains to, without the leading "origin/".`)
+	cmdCLUpload.Flags.StringVar(&reviewersFlag, "r", "", `Comma-seperated list of emails or LDAPs to request review.`)
+	cmdCLUpload.Flags.BoolVar(&setTopicFlag, "set-topic", true, `Set Gerrit CL topic.`)
+	cmdCLUpload.Flags.StringVar(&topicFlag, "topic", "", `CL topic, defaults to <username>-<branchname>.`)
+	cmdCLUpload.Flags.BoolVar(&uncommittedFlag, "check-uncommitted", true, `Check that no uncommitted changes exist.`)
+	cmdCLUpload.Flags.BoolVar(&verifyFlag, "verify", true, `Run pre-push git hooks.`)
+	cmdCLUpload.Flags.BoolVar(&currentProjectFlag, "current-project-only", false, `Run upload in the current project only.`)
+	cmdCLUpload.Flags.BoolVar(&cleanupMultiPartFlag, "clean-multipart-metadata", false, `Cleanup the metadata associated with multipart CLs pertaining the MultiPart: x/y message without uploading any CLs.`)
+	return cmdCLUpload
 }
 
 type changeConflictError struct {
@@ -542,25 +545,25 @@ func (mp *multiPart) commandline(excludeKey project.ProjectKey, flags []string) 
 		"--interactive",
 		keyflag,
 	}
-	clargs = append(clargs, "jiri", "cl", "mail", "--current-project-only=true")
+	clargs = append(clargs, "jiri", "cl", "upload", "--current-project-only=true")
 	return append(clargs, flags...)
 }
 
-// clMailMultiFlags extracts flags from the invocation of cl mail
-// that should be passed on to the sub invocations of cl mail when
+// clUploadMultiFlags extracts flags from the invocation of cl upload
+// that should be passed on to the sub invocations of cl upload when
 // operating across multiple repos.
 // These are:
 // -autosubmit, -cc, -d, -edit, -host, -m, -presubmit, remote-branch, -r,
 // -set-topic, -topic, -check-uncommitted and -verify,
-func clMailMultiFlags() []string {
+func clUploadMultiFlags() []string {
 	flags := []string{}
 	stringFlag := func(name, value string) {
-		if isFlagSet(cmdCLMail.ParsedFlags, name) {
+		if isFlagSet(cmdCLUpload.ParsedFlags, name) {
 			flags = append(flags, fmt.Sprintf("--%s=%s", name, value))
 		}
 	}
 	boolFlag := func(name string, value bool) {
-		if isFlagSet(cmdCLMail.ParsedFlags, name) {
+		if isFlagSet(cmdCLUpload.ParsedFlags, name) {
 			flags = append(flags, fmt.Sprintf("--%s=%t", name, value))
 		}
 	}
@@ -572,7 +575,7 @@ func clMailMultiFlags() []string {
 	// is specifically set then that setting is used for all repos.
 	// So using --edit=true allows for a different CL message in
 	// each repo of a multipart CL.
-	if isFlagSet(cmdCLMail.ParsedFlags, "edit") {
+	if isFlagSet(cmdCLUpload.ParsedFlags, "edit") {
 		// if --edit is set on the command line, use that value
 		// for all subcommands
 		flags = append(flags, fmt.Sprintf("--edit=%t", editFlag))
@@ -596,9 +599,15 @@ func clMailMultiFlags() []string {
 	return flags
 }
 
-// runCLMail is a wrapper that sets up and runs a review instance across
+// runCLMail is a wrapper around runCLUpload
+func runCLMail(jirix *jiri.X, args []string) error {
+	fmt.Printf("WARNING: `jiri cl mail` command has been renamed to `jiri cl upload`\n")
+	return runCLUpload(jirix, args)
+}
+
+// runCLUpload is a wrapper that sets up and runs a review instance across
 // multiple projects.
-func runCLMail(jirix *jiri.X, _ []string) error {
+func runCLUpload(jirix *jiri.X, _ []string) error {
 	mp, err := initForMultiPart(jirix)
 	if err != nil {
 		return err
@@ -610,14 +619,14 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 		return nil
 	}
 	if mp.current {
-		return runCLMailCurrent(jirix, []string{})
+		return runCLUploadCurrent(jirix, []string{})
 	}
 	// multipart mode
 	if err := mp.writeMultiPartMetadata(jirix); err != nil {
 		mp.cleanMultiPartMetadata(jirix)
 		return err
 	}
-	if err := runCLMailCurrent(jirix, []string{}); err != nil {
+	if err := runCLUploadCurrent(jirix, []string{}); err != nil {
 		return err
 	}
 	git := gitutil.New(jirix.NewSeq())
@@ -643,12 +652,12 @@ func runCLMail(jirix *jiri.X, _ []string) error {
 	}
 	// Use Capture to make sure that all output from the subcommands is
 	// sent to stdout/stderr.
-	flags := clMailMultiFlags()
+	flags := clUploadMultiFlags()
 	flags = append(flags, "--commit-message-body-file="+tmp.Name())
 	return s.Capture(jirix.Stdout(), jirix.Stderr()).Last("jiri", mp.commandline(mp.currentKey, flags)...)
 }
 
-func runCLMailCurrent(jirix *jiri.X, _ []string) error {
+func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
 	// Check that working dir exist on remote branch.  Otherwise checking out
 	// remote branch will break the users working dir.
 	git := gitutil.New(jirix.NewSeq())
@@ -665,7 +674,7 @@ func runCLMailCurrent(jirix *jiri.X, _ []string) error {
 		return err
 	}
 	if !git.DirExistsOnBranch(relWd, remoteBranchFlag) {
-		return fmt.Errorf("directory %q does not exist on branch %q.\nPlease run 'jiri cl mail' from root directory of this repo.", relWd, remoteBranchFlag)
+		return fmt.Errorf("directory %q does not exist on branch %q.\nPlease run 'jiri cl upload' from root directory of this repo.", relWd, remoteBranchFlag)
 	}
 
 	// Sanity checks for the <presubmitFlag> flag.
@@ -770,7 +779,7 @@ func checkDependents(jirix *jiri.X) (e error) {
 			return fmt.Errorf(`Failed to export the branch %q to Gerrit because its ancestor %q has not been exported to Gerrit yet.
 The following steps are needed before the operation can be retried:
 $ git checkout %v
-$ jiri cl mail
+$ jiri cl upload
 $ git checkout %v
 # retry the original command
 `, originalBranch, branches[i], branches[i], originalBranch)
@@ -998,7 +1007,7 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		// it to create the squashed commit. This is needed to make sure
 		// that the commit hash of the squashed commit stays the same as
 		// long as the squashed sequence of commits does not change. If
-		// this was not the case, consecutive invocations of "jiri cl mail"
+		// this was not the case, consecutive invocations of "jiri cl upload"
 		// could fail if some, but not all, of the dependent CLs submitted
 		// to Gerrit have changed.
 		output, err := git.Log(branches[i], branches[i]+"^", "%ad%n%cd")
@@ -1164,7 +1173,7 @@ func (review *review) processLabelsAndCommitFile(message string) string {
 }
 
 // run implements checks that the review passes all local checks
-// and then mails it to Gerrit.
+// and then uploads it to Gerrit.
 func (review *review) run() (e error) {
 	git := gitutil.New(review.jirix.NewSeq())
 	if uncommittedFlag {
@@ -1243,7 +1252,7 @@ func (review *review) run() (e error) {
 	return nil
 }
 
-// send mails the current branch out for review.
+// send uploads the current branch out for review.
 func (review *review) send() error {
 	if err := review.ensureChangeID(); err != nil {
 		return err
@@ -1340,7 +1349,7 @@ particular, it forks a new branch with the given name from the current
 branch and records the relationship between the current branch and the
 new branch in the %v metadata directory. The information recorded in
 the %v metadata directory tracks dependencies between CLs and is used
-by the "jiri cl sync" and "jiri cl mail" commands.
+by the "jiri cl sync" and "jiri cl upload" commands.
 `, jiri.ProjectMetaDir, jiri.ProjectMetaDir),
 	ArgsName: "<name>",
 	ArgsLong: "<name> is the changelist name.",

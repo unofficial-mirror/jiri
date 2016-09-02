@@ -212,7 +212,7 @@ project will sync to.  If "revision" is  specified then the "remotebranch"
 attribute is ignored.
 
 * gerrithost (optional) - The url of the Gerrit host for the project.  If
-specified, then running "jiri cl mail" will upload a CL to this Gerrit host.
+specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 
 * githooks (optional) - The path (relative to $JIRI_ROOT) of a directory
 containing git hooks that will be installed in the projects .git/hooks

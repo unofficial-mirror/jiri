@@ -47,7 +47,7 @@ Usage:
 
 The jiri cl commands are:
    cleanup     Clean up changelists that have been merged
-   mail        Mail a changelist for review
+   upload      Upload a changelist for review
    new         Create a new local branch for a changelist
    sync        Bring a changelist up to date
 
@@ -80,19 +80,19 @@ The jiri cl cleanup flags are:
  -v=false
    Print verbose output.
 
-Jiri cl mail - Mail a changelist for review
+Jiri cl upload - Upload a changelist for review
 
-Command "mail" squashes all commits of a local branch into a single "changelist"
-and mails this changelist to Gerrit as a single commit. First time the command
+Command "upload" squashes all commits of a local branch into a single "changelist"
+and uploads this changelist to Gerrit as a single commit. First time the command
 is invoked, it generates a Change-Id for the changelist, which is appended to
 the commit message. Consecutive invocations of the command use the same
 Change-Id by default, informing Gerrit that the incomming commit is an update of
 an existing changelist.
 
 Usage:
-   jiri cl mail [flags]
+   jiri cl upload [flags]
 
-The jiri cl mail flags are:
+The jiri cl upload flags are:
  -autosubmit=false
    Automatically submit the changelist when feasible.
  -cc=
@@ -101,12 +101,12 @@ The jiri cl mail flags are:
    Check that no uncommitted changes exist.
  -clean-multipart-metadata=false
    Cleanup the metadata associated with multipart CLs pertaining the MultiPart:
-   x/y message without mailing any CLs.
+   x/y message without uploading any CLs.
  -commit-message-body-file=
    file containing the body of the CL description, that is, text without a
    ChangeID, MultiPart etc.
  -current-project-only=false
-   Run mail in the current project only.
+   Run upload in the current project only.
  -d=false
    Send a draft changelist.
  -edit=true
@@ -139,7 +139,7 @@ Command "new" creates a new local branch for a changelist. In particular, it
 forks a new branch with the given name from the current branch and records the
 relationship between the current branch and the new branch in the .jiri metadata
 directory. The information recorded in the .jiri metadata directory tracks
-dependencies between CLs and is used by the "jiri cl sync" and "jiri cl mail"
+dependencies between CLs and is used by the "jiri cl sync" and "jiri cl upload"
 commands.
 
 Usage:
@@ -754,7 +754,7 @@ project will sync to.  If "revision" is  specified then the "remotebranch"
 attribute is ignored.
 
 * gerrithost (optional) - The url of the Gerrit host for the project.  If
-specified, then running "jiri cl mail" will upload a CL to this Gerrit host.
+specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 
 * githooks (optional) - The path (relative to $JIRI_ROOT) of a directory
 containing git hooks that will be installed in the projects .git/hooks directory

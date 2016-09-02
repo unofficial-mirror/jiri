@@ -340,7 +340,7 @@ this change lands. -->
   ```
 2.  Upload the CL to Gerrit.
   ```
-  jiri cl mail
+  jiri cl upload
   ```
 
 If the CL upload is  successful, this will print the URL of the CL hosted on
@@ -368,7 +368,7 @@ by running `jiri cl --help`.
 3. Reply to each Gerrit comment and click the "Reply" button to send them.
 4. Send the updated CL to Gerrit.
   ```
-  jiri cl mail
+  jiri cl upload
   ```
 
 ### Submitting a CL
@@ -377,7 +377,7 @@ by running `jiri cl --help`.
    the CL can be submitted.  To do so, follow the steps in the "Syncing a CL
    with the remote" section above and then upload the updated CL to Gerrit.
   ```
-  jiri cl mail
+  jiri cl upload
   ```
 2. Once a CL meets the conditions for being submitted, it can be merged into
    the remote master branch by clicking the "Submit" button on the Gerrit web
@@ -426,7 +426,7 @@ jiri update # fetch update that includes feature A
 git checkout feature-B
 jiri cl cleanup feature-A
 git merge master # merge feature A into feature B branch
-jiri cl mail # send new patch set for feature B
+jiri cl upload # send new patch set for feature B
 ```
 The CL for feature B can now be submitted.
 
