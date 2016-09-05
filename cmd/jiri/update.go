@@ -5,6 +5,8 @@
 package main
 
 import (
+	"fmt"
+
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/project"
@@ -15,6 +17,7 @@ import (
 var (
 	gcFlag       bool
 	attemptsFlag int
+	autoupdateFlag bool
 )
 
 func init() {
@@ -22,6 +25,7 @@ func init() {
 
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
+	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -41,6 +45,14 @@ Run "jiri help manifest" for details on manifests.
 }
 
 func runUpdate(jirix *jiri.X, _ []string) error {
+	if autoupdateFlag {
+		// Try to update Jiri itself.
+		err := jiri.Update()
+		if err != nil {
+			fmt.Printf("warning: automatic update failed: %v\n", err)
+		}
+	}
+
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
 	updateFn := func() error { return project.UpdateUniverse(jirix, gcFlag) }
