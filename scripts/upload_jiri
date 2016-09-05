@@ -51,9 +51,13 @@ git clone "https://${PKG_PATH}" "${GIT_DIR}"
 # Use the git SHA of the latest commit in the jiri repo as the version of the binaries.
 readonly VERSION="$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" log -1 --format=%H)"
 
+# These are embedded directly into jiri itself and are available through `jiri version`.
+readonly GIT_COMMIT=$(git rev-parse HEAD)
+readonly BUILD_TIME="$(date --rfc-3339=seconds)"
+
 # For each target we support, build a jiri binary.
 for os in ${TARGETS}; do
-  if ! GOPATH="${TEMP_DIR}" GOOS="${os}" GOARCH="amd64" go build -a -o "${TEMP_DIR}/jiri-${os}" "${PKG_PATH}/cmd/jiri"; then
+  if ! GOPATH="${TEMP_DIR}" GOOS="${os}" GOARCH="amd64" go build -ldflags "-X \"fuchsia.googlesource.com/jiri/version.GitCommit=${GIT_COMMIT}\" -X \"fuchsia.googlesource.com/jiri/version.BuildTime=${BUILD_TIME}\"" -a -o "${TEMP_DIR}/jiri-${os}" "${PKG_PATH}/cmd/jiri"; then
     set +x
     echo ""
     echo "'go build' failed.  Ensure you have a standard, working Go toolchain"
