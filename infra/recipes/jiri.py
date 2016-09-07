@@ -61,5 +61,5 @@ def GenTests(api):
         repository='https://fuchsia.googlesource.com/jiri',
     )
     yield api.test('cq_try') + api.properties.tryserver_gerrit(
-        full_project_name='magenta',
+        full_project_name='jiri',
     )

@@ -46,7 +46,7 @@
     "cmd": [
       "git",
       "fetch",
-      "https://chromium-review.googlesource.com/magenta",
+      "https://chromium-review.googlesource.com/jiri",
       "refs/changes/11/338811/3"
     ],
     "cwd": "[CWD]/go/src/fuchsia.googlesource.com/jiri",
