@@ -60,7 +60,9 @@ fi
 mkdir -p "$(dirname $1)"
 readonly ROOT_DIR="$(toabs $1)"
 if [[ -e "${ROOT_DIR}" ]]; then
-  fatal "${ROOT_DIR} already exists"
+  if ! [[ -z "$(ls -A "$ROOT_DIR")" ]]; then
+    fatal "${ROOT_DIR} is not empty"
+  fi
 fi
 
 # Check that go is on the PATH.
