@@ -1665,14 +1665,13 @@ func runHooks(jirix *jiri.X, ops []operation) error {
 		if op.Project().RunHook == "" {
 			continue
 		}
-		if op.Kind() != "create" && op.Kind() != "move" && op.Kind() != "update" {
-			continue
+		// Don't want to run hooks when repo is deleted
+		if op.Kind() == "delete" {
+			continue;
 		}
 		s := jirix.NewSeq()
 		s.Verbose(true).Output([]string{fmt.Sprintf("running hook for project %q", op.Project().Name)})
-		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(op.Project().RunHook, op.Kind()); err != nil {
-			// TODO(nlacasse): Should we delete projectDir or perform some
-			// other cleanup in the event of a hook failure?
+		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(op.Project().RunHook); err != nil {
 			return fmt.Errorf("error running hook for project %q: %v", op.Project().Name, err)
 		}
 	}
@@ -1700,7 +1699,8 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 		if op.Project().GitHooks == "" {
 			continue
 		}
-		if op.Kind() != "create" && op.Kind() != "move" && op.Kind() != "update" {
+		// Don't want to run hooks when repo is deleted
+		if op.Kind() == "delete" {
 			continue
 		}
 		// Apply git hooks, overwriting any existing hooks.  Jiri is in control of
