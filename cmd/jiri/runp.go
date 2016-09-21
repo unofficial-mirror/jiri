@@ -193,7 +193,7 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 		if runpFlags.collateOutput {
 			// Write standard output to a file, stderr
 			// is not collated.
-			f, err := ioutil.TempFile("", mi.ProjectState.Project.Name+"-")
+			f, err := ioutil.TempFile("", "jiri-runp-")
 			if err != nil {
 				return err
 			}
