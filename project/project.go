@@ -1252,7 +1252,15 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 			return err
 		}
 		if path != project.Path {
-			return fmt.Errorf("project %v has path %v but was found in %v", project.Name, project.Path, path)
+			s := jirix.NewSeq()
+			lines := []string{
+				fmt.Sprintf("NOTE: project %v has path %v ", project.Name, project.Path),
+				fmt.Sprintf("but was found in %v.", path),
+				"jiri will treat it as a stale project. To remove this warning",
+				"please delete this or move it out of your root folder",
+			}
+			s.Verbose(true).Output(lines)
+			return nil
 		}
 		if p, ok := projects[project.Key()]; ok {
 			return fmt.Errorf("name conflict: both %v and %v contain project with key %v", p.Path, project.Path, project.Key())
