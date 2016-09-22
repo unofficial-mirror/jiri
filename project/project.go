@@ -1083,6 +1083,25 @@ func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string)
 	}
 	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpPkgDir).Done() }, &e)
 
+	args := []string{"install", "-pkgdir", tmpPkgDir}
+	ldflags := ""
+
+	for _, tool := range tools {
+		if tool.Name == "jiri" {
+			toolProject, err := projects.FindUnique(tool.Project)
+			if err != nil {
+				return err
+			}
+			git := gitutil.New(s, gitutil.RootDirOpt(toolProject.Path))
+			revision, err := git.CurrentRevision()
+			if err != nil {
+				return err
+			}
+			ldflags = fmt.Sprintf(`-X "fuchsia.googlesource.com/jiri/version.GitCommit=%s" -X "fuchsia.googlesource.com/jiri/version.BuildTime=%s"`, revision, time.Now().Format(time.RFC3339))
+			args = append(args, []string{"-ldflags", ldflags}...)
+		}
+	}
+
 	// We unset GOARCH and GOOS because jiri update should always build for the
 	// native architecture and OS.  Also, as of go1.5, setting GOBIN is not
 	// compatible with GOARCH or GOOS.
@@ -1092,7 +1111,7 @@ func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string)
 		"GOBIN":  outputDir,
 		"GOPATH": strings.Join(workspaces, string(filepath.ListSeparator)),
 	}
-	args := append([]string{"install", "-pkgdir", tmpPkgDir}, toolPkgs...)
+	args = append(args, toolPkgs...)
 	var stderr bytes.Buffer
 	if err := s.Env(env).Capture(ioutil.Discard, &stderr).Last("go", args...); err != nil {
 		return fmt.Errorf("tool build failed\n%v", stderr.String())
