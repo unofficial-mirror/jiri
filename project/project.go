@@ -1686,7 +1686,7 @@ func runHooks(jirix *jiri.X, ops []operation) error {
 		}
 		// Don't want to run hooks when repo is deleted
 		if op.Kind() == "delete" {
-			continue;
+			continue
 		}
 		s := jirix.NewSeq()
 		s.Verbose(true).Output([]string{fmt.Sprintf("running hook for project %q", op.Project().Name)})
@@ -1702,7 +1702,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 	defer jirix.TimerPop()
 	s := jirix.NewSeq()
 	for _, op := range ops {
-		if op.Kind() == "create" || op.Kind() == "move" {
+		if op.Kind() != "delete" {
 			// Apply exclusion for /.jiri/. Ideally we'd only write this file on
 			// create, but the remote manifest import is move from the temp directory
 			// into the final spot, so we need this to apply to both.
@@ -1710,9 +1710,17 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 			// TODO(toddw): Find a better way to do this.
 			excludeDir := filepath.Join(op.Project().Path, ".git", "info")
 			excludeFile := filepath.Join(excludeDir, "exclude")
+			b, err := ioutil.ReadFile(excludeFile)
+			if err != nil {
+				if !os.IsNotExist(err) {
+					return err
+				}
+			}
 			excludeString := "/.jiri/\n"
-			if err := s.MkdirAll(excludeDir, 0755).WriteFile(excludeFile, []byte(excludeString), 0644).Done(); err != nil {
-				return err
+			if !strings.Contains(string(b), excludeString) {
+				if err := s.MkdirAll(excludeDir, 0755).WriteFile(excludeFile, []byte(excludeString), 0644).Done(); err != nil {
+					return err
+				}
 			}
 		}
 		if op.Project().GitHooks == "" {

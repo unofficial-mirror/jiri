@@ -230,6 +230,41 @@ func TestUpdateUniverseSimple(t *testing.T) {
 	}
 }
 
+// TestJiriExcludeForRepoUpdate tests that .git/info/exclude contains
+// /.jiri/ after every update
+func TestJiriExcludeForRepoUpdate(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	p := localProjects[0]
+	if _, err := s.Stat(p.Path); err != nil {
+		t.Fatalf("%v", err)
+	}
+	gitInfoExcludeFile := filepath.Join(p.Path, ".git", "info", "exclude")
+
+	// Test when exclude doesn't exist
+	if err := os.RemoveAll(gitInfoExcludeFile); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	checkMetadataIsIgnored(t, fake.X, p)
+
+	// Check when exclude doesn't have /.jiri/
+	if err := ioutil.WriteFile(gitInfoExcludeFile, []byte(""), 0644); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	checkMetadataIsIgnored(t, fake.X, p)
+}
+
 // TestUpdateUniverseWithRevision checks that UpdateUniverse will pull remote
 // projects at the specified revision.
 func TestUpdateUniverseWithRevision(t *testing.T) {
