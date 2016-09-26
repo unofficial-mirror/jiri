@@ -659,6 +659,13 @@ Manifests have the following XML schema:
     />
     ...
   </projects>
+  <hooks>
+    <hook name="update"
+          project="mojo/public"
+          action="update.sh"/>
+    ...
+  </hooks>
+
 </manifest>
 
 The <import> and <localimport> tags can be used to share common projects across
@@ -714,5 +721,15 @@ each update.
 
 * runhook (optional) - The path (relate to [root]) of a script that will be run
 during each update.
+
+The <hook> tag describes the hooks that must be executed after every 'jiri update'
+They are configured via the following attributes:
+
+* name (required) - The name of the of the hook to identify it
+
+* project (required) - The name of the project where the hook is present
+
+* action (required) - Action to be performed inside the project.
+It is mostly identified by a script
 */
 package main

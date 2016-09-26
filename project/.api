@@ -7,8 +7,8 @@ pkg project, func CreateSnapshot(*jiri.X, string, string) error
 pkg project, func CurrentProjectKey(*jiri.X) (ProjectKey, error)
 pkg project, func GetProjectState(*jiri.X, ProjectKey, bool) (*ProjectState, error)
 pkg project, func GetProjectStates(*jiri.X, bool) (map[ProjectKey]*ProjectState, error)
-pkg project, func LoadManifest(*jiri.X) (Projects, error)
-pkg project, func LoadSnapshotFile(*jiri.X, string) (Projects, error)
+pkg project, func LoadManifest(*jiri.X) (Projects, Hooks, error)
+pkg project, func LoadSnapshotFile(*jiri.X, string) (Projects, Hooks, error)
 pkg project, func LocalProjects(*jiri.X, ScanMode) (Projects, error)
 pkg project, func MakeProjectKey(string, string) ProjectKey
 pkg project, func ManifestFromBytes([]byte) (*Manifest, error)
@@ -49,6 +49,7 @@ pkg project, type Manifest struct
 pkg project, type Manifest struct, Imports []Import
 pkg project, type Manifest struct, LocalImports []LocalImport
 pkg project, type Manifest struct, Projects []Project
+pkg project, type Manifest struct, Hooks []Hook
 pkg project, type Manifest struct, SnapshotPath string
 pkg project, type Manifest struct, XMLName struct{}
 pkg project, type Project struct
@@ -71,13 +72,15 @@ pkg project, type ProjectState struct, HasUntracked bool
 pkg project, type ProjectState struct, Project Project
 pkg project, type Projects map[ProjectKey]Project
 pkg project, type ScanMode bool
-pkg project, type Tool struct
-pkg project, type Tool struct, Data string
-pkg project, type Tool struct, Name string
-pkg project, type Tool struct, Package string
-pkg project, type Tool struct, Project string
-pkg project, type Tool struct, XMLName struct{}
 pkg project, type Update map[string][]CL
 pkg project, var JiriName string
 pkg project, var JiriPackage string
 pkg project, var JiriProject string
+pkg project, type Hook struct
+pkg project, type Hook struct, Name string
+pkg project, type Hook struct, Action string
+pkg project, type Hook struct, ProjectName string
+pkg project, type Hook struct, XMLName struct{}
+pkg project, type Hook struct, ActionPath string
+pkg project, type Hooks map[string]Hook
+pkg project, type HookKey string

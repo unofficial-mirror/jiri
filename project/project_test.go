@@ -230,6 +230,48 @@ func TestUpdateUniverseSimple(t *testing.T) {
 	}
 }
 
+// TestHookLoadSimple tests that manifest is loaded correctly
+// with correct project path in hook
+func TestHookLoadSimple(t *testing.T) {
+	p, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	err := fake.AddHook(project.Hook{Name: "hook1",
+		Action:      "action.sh",
+		ProjectName: p[0].Name})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fake.UpdateUniverse(false)
+	if err == nil {
+		t.Fatal("run hook should throw error as there is no action.sh script")
+	}
+	if !strings.Contains(err.Error(), "no such file or directory") || !strings.Contains(err.Error(), "action.sh") {
+		t.Fatal(err)
+	}
+}
+
+// TestHookLoadError tests that manifest load
+// throws error for invalid hook
+func TestHookLoadError(t *testing.T) {
+	_, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	err := fake.AddHook(project.Hook{Name: "hook1",
+		Action:      "action",
+		ProjectName: "non-existant"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fake.UpdateUniverse(false)
+	if err == nil {
+		t.Fatal("Update universe should throw error for the hook")
+	}
+	if !strings.Contains(err.Error(), "invalid hook") {
+		t.Fatal(err)
+	}
+}
+
 // TestJiriExcludeForRepoUpdate tests that .git/info/exclude contains
 // /.jiri/ after every update
 func TestJiriExcludeForRepoUpdate(t *testing.T) {
@@ -752,6 +794,13 @@ func TestManifestToFromBytes(t *testing.T) {
 						Revision:     "rev2",
 					},
 				},
+				Hooks: []project.Hook{
+					{
+						Name:        "testhook",
+						ProjectName: "project1",
+						Action:      "action.sh",
+					},
+				},
 			},
 			`<manifest>
   <imports>
@@ -763,6 +812,9 @@ func TestManifestToFromBytes(t *testing.T) {
     <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" runhook="path/to/hook"/>
     <project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
   </projects>
+  <hooks>
+    <hook name="testhook" action="action.sh" project="project1"/>
+  </hooks>
 </manifest>
 `,
 		},

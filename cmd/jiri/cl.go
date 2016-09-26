@@ -1538,7 +1538,7 @@ func patchCL(jirix *jiri.X, arg string) (e error) {
 			ref = c.Reference()
 		}
 
-		projects, err := project.LoadManifest(jirix)
+		projects, _, err := project.LoadManifest(jirix)
 		if err != nil {
 			return err
 		}
