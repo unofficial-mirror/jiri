@@ -40,7 +40,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	}
 
 	s := jirix.NewSeq()
-	// Create fake remote manifest and tools projects.
+	// Create fake remote manifest projects.
 	remoteDir, err := s.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
@@ -99,19 +99,6 @@ func (fake FakeJiriRoot) AddProject(project project.Project) error {
 		return err
 	}
 	manifest.Projects = append(manifest.Projects, project)
-	if err := fake.WriteRemoteManifest(manifest); err != nil {
-		return err
-	}
-	return nil
-}
-
-// AddTool adds the given tool to a remote manifest.
-func (fake FakeJiriRoot) AddTool(tool project.Tool) error {
-	manifest, err := fake.ReadRemoteManifest()
-	if err != nil {
-		return err
-	}
-	manifest.Tools = append(manifest.Tools, tool)
 	if err := fake.WriteRemoteManifest(manifest); err != nil {
 		return err
 	}

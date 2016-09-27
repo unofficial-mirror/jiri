@@ -43,7 +43,6 @@ type Manifest struct {
 	Imports      []Import      `xml:"imports>import"`
 	LocalImports []LocalImport `xml:"imports>localimport"`
 	Projects     []Project     `xml:"projects>project"`
-	Tools        []Tool        `xml:"tools>tool"`
 	// SnapshotPath is the relative path to the snapshot file from JIRI_ROOT.
 	// It is only set when creating a snapshot.
 	SnapshotPath string   `xml:"snapshotpath,attr,omitempty"`
@@ -87,13 +86,11 @@ var (
 	newlineBytes       = []byte("\n")
 	emptyImportsBytes  = []byte("\n  <imports></imports>\n")
 	emptyProjectsBytes = []byte("\n  <projects></projects>\n")
-	emptyToolsBytes    = []byte("\n  <tools></tools>\n")
 
 	endElemBytes        = []byte("/>\n")
 	endImportBytes      = []byte("></import>\n")
 	endLocalImportBytes = []byte("></localimport>\n")
 	endProjectBytes     = []byte("></project>\n")
-	endToolBytes        = []byte("></tool>\n")
 
 	endImportSoloBytes  = []byte("></import>")
 	endProjectSoloBytes = []byte("></project>")
@@ -107,7 +104,6 @@ func (m *Manifest) deepCopy() *Manifest {
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.LocalImports = append([]LocalImport(nil), m.LocalImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
-	x.Tools = append([]Tool(nil), m.Tools...)
 	return x
 }
 
@@ -125,11 +121,9 @@ func (m *Manifest) ToBytes() ([]byte, error) {
 	// elements, or produce short empty elements, so we post-process the data.
 	data = bytes.Replace(data, emptyImportsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyProjectsBytes, newlineBytes, -1)
-	data = bytes.Replace(data, emptyToolsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, endImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endLocalImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endProjectBytes, endElemBytes, -1)
-	data = bytes.Replace(data, endToolBytes, endElemBytes, -1)
 	if !bytes.HasSuffix(data, newlineBytes) {
 		data = append(data, '\n')
 	}
@@ -181,11 +175,6 @@ func (m *Manifest) fillDefaults() error {
 			return err
 		}
 	}
-	for index := range m.Tools {
-		if err := m.Tools[index].fillDefaults(); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -202,11 +191,6 @@ func (m *Manifest) unfillDefaults() error {
 	}
 	for index := range m.Projects {
 		if err := m.Projects[index].unfillDefaults(); err != nil {
-			return err
-		}
-	}
-	for index := range m.Tools {
-		if err := m.Tools[index].unfillDefaults(); err != nil {
 			return err
 		}
 	}
@@ -514,56 +498,6 @@ func (ps Projects) FindUnique(keyOrName string) (Project, error) {
 	return p, nil
 }
 
-// Tools maps jiri tool names, to their detailed description.
-type Tools map[string]Tool
-
-// toSlice returns a slice of Tools in the Tools map.
-func (ts Tools) toSlice() []Tool {
-	var tSlice []Tool
-	for _, t := range ts {
-		tSlice = append(tSlice, t)
-	}
-	return tSlice
-}
-
-// Tool represents a jiri tool.
-type Tool struct {
-	// Data is a relative path to a directory for storing tool data
-	// (e.g. tool configuration files). The purpose of this field is to
-	// decouple the configuration of the data directory from the tool
-	// itself so that the location of the data directory can change
-	// without the need to change the tool.
-	Data string `xml:"data,attr,omitempty"`
-	// Name is the name of the tool binary.
-	Name string `xml:"name,attr,omitempty"`
-	// Package is the package path of the tool.
-	Package string `xml:"package,attr,omitempty"`
-	// Project identifies the project that contains the tool. If not
-	// set, "https://fuchsia.googlesource.com/<JiriProject>" is
-	// used as the default.
-	Project string   `xml:"project,attr,omitempty"`
-	XMLName struct{} `xml:"tool"`
-}
-
-func (t *Tool) fillDefaults() error {
-	if t.Data == "" {
-		t.Data = "data"
-	}
-	if t.Project == "" {
-		t.Project = "https://fuchsia.googlesource.com/" + JiriProject
-	}
-	return nil
-}
-
-func (t *Tool) unfillDefaults() error {
-	if t.Data == "data" {
-		t.Data = ""
-	}
-	// Don't unfill the jiri project setting, since that's not meant to be
-	// optional.
-	return nil
-}
-
 // ScanMode determines whether LocalProjects should scan the local filesystem
 // for projects (FullScan), or optimistically assume that the local projects
 // will match those in the manifest (FastScan).
@@ -611,18 +545,6 @@ func CreateSnapshot(jirix *jiri.X, file, snapshotPath string) error {
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	// Add all tools from the current manifest to the snapshot manifest.
-	// We can't just call LoadManifest here, since that determines the
-	// local projects using FastScan, but if we're calling CreateSnapshot
-	// during "jiri update" and we added some new projects, they won't be
-	// found anymore.
-	_, tools, err := loadManifestFile(jirix, jirix.JiriManifestFile(), localProjects)
-	if err != nil {
-		return err
-	}
-	for _, tool := range tools {
-		manifest.Tools = append(manifest.Tools, tool)
-	}
 	return manifest.ToFile(jirix, file)
 }
 
@@ -638,11 +560,11 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 	if err != nil {
 		return err
 	}
-	remoteProjects, remoteTools, err := LoadSnapshotFile(jirix, snapshot)
+	remoteProjects, err := LoadSnapshotFile(jirix, snapshot)
 	if err != nil {
 		return err
 	}
-	if err := updateTo(jirix, localProjects, remoteProjects, remoteTools, gc); err != nil {
+	if err := updateProjects(jirix, localProjects, remoteProjects, gc); err != nil {
 		return err
 	}
 	return WriteUpdateHistorySnapshot(jirix, snapshot)
@@ -650,7 +572,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 
 // LoadSnapshotFile loads the specified snapshot manifest.  If the snapshot
 // manifest contains a remote import, an error will be returned.
-func LoadSnapshotFile(jirix *jiri.X, file string) (Projects, Tools, error) {
+func LoadSnapshotFile(jirix *jiri.X, file string) (Projects, error) {
 	return loadManifestFile(jirix, file, nil)
 }
 
@@ -709,7 +631,7 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 		// An error will be returned if the snapshot contains remote imports, since
 		// that would cause an infinite loop; we'd need local projects, in order to
 		// load the snapshot, in order to determine the local projects.
-		snapshotProjects, _, err := LoadSnapshotFile(jirix, latestSnapshot)
+		snapshotProjects, err := LoadSnapshotFile(jirix, latestSnapshot)
 		if err != nil {
 			return nil, err
 		}
@@ -773,7 +695,7 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	if err != nil {
 		return nil, err
 	}
-	remoteProjects, _, err := LoadManifest(jirix)
+	remoteProjects, err := LoadManifest(jirix)
 	if err != nil {
 		return nil, err
 	}
@@ -829,20 +751,20 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 }
 
 // LoadManifest loads the manifest, starting with the .jiri_manifest file,
-// resolving remote and local imports.  Returns the projects and tools specified
-// by the manifest.
+// resolving remote and local imports.  Returns the projects specified by
+// the manifest.
 //
 // WARNING: LoadManifest cannot be run multiple times in parallel!  It invokes
 // git operations which require a lock on the filesystem.  If you see errors
 // about ".git/index.lock exists", you are likely calling LoadManifest in
 // parallel.
-func LoadManifest(jirix *jiri.X) (Projects, Tools, error) {
+func LoadManifest(jirix *jiri.X) (Projects, error) {
 	jirix.TimerPush("load manifest")
 	defer jirix.TimerPop()
 	file := jirix.JiriManifestFile()
 	localProjects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	return loadManifestFile(jirix, file, localProjects)
 }
@@ -855,12 +777,12 @@ func LoadManifest(jirix *jiri.X) (Projects, Tools, error) {
 // invokes git operations which require a lock on the filesystem.  If you see
 // errors about ".git/index.lock exists", you are likely calling
 // loadManifestFile in parallel.
-func loadManifestFile(jirix *jiri.X, file string, localProjects Projects) (Projects, Tools, error) {
+func loadManifestFile(jirix *jiri.X, file string, localProjects Projects) (Projects, error) {
 	ld := newManifestLoader(localProjects, false)
 	if err := ld.Load(jirix, "", file, ""); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return ld.Projects, ld.Tools, nil
+	return ld.Projects, nil
 }
 
 // getManifestRemote returns the remote url of the origin from the manifest
@@ -877,14 +799,14 @@ func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
 		}, "get manifest origin").Done()
 }
 
-func loadUpdatedManifest(jirix *jiri.X, localProjects Projects) (Projects, Tools, string, error) {
+func loadUpdatedManifest(jirix *jiri.X, localProjects Projects) (Projects, string, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
 	ld := newManifestLoader(localProjects, true)
 	if err := ld.Load(jirix, "", jirix.JiriManifestFile(), ""); err != nil {
-		return nil, nil, ld.TmpDir, err
+		return nil, ld.TmpDir, err
 	}
-	return ld.Projects, ld.Tools, ld.TmpDir, nil
+	return ld.Projects, ld.TmpDir, nil
 }
 
 // UpdateUniverse updates all local projects and tools to match the remote
@@ -908,45 +830,14 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 	// Load the manifest, updating all manifest projects to match their remote
 	// counterparts.
 	s := jirix.NewSeq()
-	remoteProjects, remoteTools, tmpLoadDir, err := loadUpdatedManifest(jirix, localProjects)
+	remoteProjects, tmpLoadDir, err := loadUpdatedManifest(jirix, localProjects)
 	if tmpLoadDir != "" {
 		defer collect.Error(func() error { return s.RemoveAll(tmpLoadDir).Done() }, &e)
 	}
 	if err != nil {
 		return err
 	}
-	return updateTo(jirix, localProjects, remoteProjects, remoteTools, gc)
-}
-
-// updateTo updates the local projects and tools to the state specified in
-// remoteProjects and remoteTools.
-func updateTo(jirix *jiri.X, localProjects, remoteProjects Projects, remoteTools Tools, gc bool) (e error) {
-	s := jirix.NewSeq()
-	// 1. Update all local projects to match the specified projects argument.
-	if err := updateProjects(jirix, localProjects, remoteProjects, gc); err != nil {
-		return err
-	}
-	// 2. Build all tools in a temporary directory.
-	tmpToolsDir, err := s.TempDir("", "tmp-jiri-tools-build")
-	if err != nil {
-		return fmt.Errorf("TempDir() failed: %v", err)
-	}
-	defer collect.Error(func() error { return s.RemoveAll(tmpToolsDir).Done() }, &e)
-	if err := buildToolsFromMaster(jirix, remoteProjects, remoteTools, tmpToolsDir); err != nil {
-		return err
-	}
-	// 3. Install the tools into $JIRI_ROOT/.jiri_root/bin.
-	if err := InstallTools(jirix, tmpToolsDir); err != nil {
-		return err
-	}
-	// 4. If we have the jiri project, then update the jiri script in
-	// $JIRI_ROOT/.jiri_root/scripts.
-	jiriProject, err := remoteProjects.FindUnique(JiriProject)
-	if err != nil {
-		// jiri project not found.  This happens often in tests.  Ok to ignore.
-		return nil
-	}
-	return updateJiriScript(jirix, jiriProject)
+	return updateProjects(jirix, localProjects, remoteProjects, gc)
 }
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
@@ -1030,125 +921,6 @@ func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e er
 		}, &e)
 	}
 	return fn()
-}
-
-// BuildTools builds the given tools and places the resulting binaries into the
-// given directory.
-func BuildTools(jirix *jiri.X, projects Projects, tools Tools, outputDir string) (e error) {
-	jirix.TimerPush("build tools")
-	defer jirix.TimerPop()
-	if len(tools) == 0 {
-		// Nothing to do here...
-		return nil
-	}
-	toolPkgs := []string{}
-	workspaceSet := map[string]bool{}
-	for _, tool := range tools {
-		toolPkgs = append(toolPkgs, tool.Package)
-		toolProject, err := projects.FindUnique(tool.Project)
-		if err != nil {
-			return err
-		}
-		// Identify the Go workspace the tool is in. To this end we use a
-		// heuristic that identifies the maximal suffix of the project path
-		// that corresponds to a prefix of the package name.
-		workspace := ""
-		for i := 0; i < len(toolProject.Path); i++ {
-			if toolProject.Path[i] == filepath.Separator {
-				if strings.HasPrefix("src/"+tool.Package, filepath.ToSlash(toolProject.Path[i+1:])) {
-					workspace = toolProject.Path[:i]
-					break
-				}
-			}
-		}
-		if workspace == "" {
-			return fmt.Errorf("could not identify go workspace for tool %v", tool.Name)
-		}
-		workspaceSet[workspace] = true
-	}
-	workspaces := []string{}
-	for workspace := range workspaceSet {
-		workspaces = append(workspaces, workspace)
-	}
-	if envGoPath := os.Getenv("GOPATH"); envGoPath != "" {
-		workspaces = append(workspaces, strings.Split(envGoPath, string(filepath.ListSeparator))...)
-	}
-	s := jirix.NewSeq()
-	// Put pkg files in a tempdir.  BuildTools uses the system go, and if
-	// jiri-go uses a different go version than the system go, then you can get
-	// weird errors when they share a pkgdir.
-	tmpPkgDir, err := s.TempDir("", "tmp-pkg-dir")
-	if err != nil {
-		return fmt.Errorf("TempDir() failed: %v", err)
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpPkgDir).Done() }, &e)
-
-	args := []string{"install", "-pkgdir", tmpPkgDir}
-	ldflags := ""
-
-	for _, tool := range tools {
-		if tool.Name == "jiri" {
-			toolProject, err := projects.FindUnique(tool.Project)
-			if err != nil {
-				return err
-			}
-			git := gitutil.New(s, gitutil.RootDirOpt(toolProject.Path))
-			revision, err := git.CurrentRevision()
-			if err != nil {
-				return err
-			}
-			ldflags = fmt.Sprintf(`-X "fuchsia.googlesource.com/jiri/version.GitCommit=%s" -X "fuchsia.googlesource.com/jiri/version.BuildTime=%s"`, revision, time.Now().Format(time.RFC3339))
-			args = append(args, []string{"-ldflags", ldflags}...)
-		}
-	}
-
-	// We unset GOARCH and GOOS because jiri update should always build for the
-	// native architecture and OS.  Also, as of go1.5, setting GOBIN is not
-	// compatible with GOARCH or GOOS.
-	env := map[string]string{
-		"GOARCH": "",
-		"GOOS":   "",
-		"GOBIN":  outputDir,
-		"GOPATH": strings.Join(workspaces, string(filepath.ListSeparator)),
-	}
-	args = append(args, toolPkgs...)
-	var stderr bytes.Buffer
-	if err := s.Env(env).Capture(ioutil.Discard, &stderr).Last("go", args...); err != nil {
-		return fmt.Errorf("tool build failed\n%v", stderr.String())
-	}
-	return nil
-}
-
-// buildToolsFromMaster builds and installs all jiri tools using the version
-// available in the local master branch of the tools repository. Notably, this
-// function does not perform any version control operation on the master
-// branch.
-func buildToolsFromMaster(jirix *jiri.X, projects Projects, tools Tools, outputDir string) error {
-	toolsToBuild := Tools{}
-	toolNames := []string{} // Used for logging purposes.
-	for _, tool := range tools {
-		// Skip tools with no package specified. Besides increasing
-		// robustness, this step also allows us to create jiri root
-		// fakes without having to provide an implementation for the "jiri"
-		// tool, which every manifest needs to specify.
-		if tool.Package == "" {
-			continue
-		}
-		toolsToBuild[tool.Name] = tool
-		toolNames = append(toolNames, tool.Name)
-	}
-
-	updateFn := func() error {
-		return ApplyToLocalMaster(jirix, projects, func() error {
-			return BuildTools(jirix, projects, toolsToBuild, outputDir)
-		})
-	}
-
-	// Always log the output of updateFn, irrespective of the value of the
-	// verbose flag.
-	return jirix.NewSeq().Verbose(true).
-		Call(updateFn, "build tools: %v", strings.Join(toolNames, " ")).
-		Done()
 }
 
 // CleanupProjects restores the given jiri projects back to their master
@@ -1283,63 +1055,6 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 	return nil
 }
 
-// InstallTools installs the tools from the given directory into
-// $JIRI_ROOT/.jiri_root/bin.
-func InstallTools(jirix *jiri.X, dir string) error {
-	jirix.TimerPush("install tools")
-	defer jirix.TimerPop()
-	fis, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("ReadDir(%v) failed: %v", dir, err)
-	}
-	binDir := jirix.BinDir()
-	if err := jirix.NewSeq().MkdirAll(binDir, 0755).Done(); err != nil {
-		return fmt.Errorf("MkdirAll(%v) failed: %v", binDir, err)
-	}
-	s := jirix.NewSeq()
-	for _, fi := range fis {
-		installFn := func() error {
-			src := filepath.Join(dir, fi.Name())
-			dst := filepath.Join(binDir, fi.Name())
-			return jirix.NewSeq().Rename(src, dst).Done()
-		}
-		if err := s.Verbose(true).Call(installFn, "install tool %q", fi.Name()).Done(); err != nil {
-			return fmt.Errorf("error installing tool %q: %v", fi.Name(), err)
-		}
-	}
-	return nil
-}
-
-// updateJiriScript copies the scripts/jiri script from the jiri repo to
-// JIRI_ROOT/.jiri_root/scripts/jiri.
-func updateJiriScript(jirix *jiri.X, jiriProject Project) error {
-	s := jirix.NewSeq()
-	updateFn := func() error {
-		return ApplyToLocalMaster(jirix, Projects{jiriProject.Key(): jiriProject}, func() error {
-			newJiriScriptPath := filepath.Join(jiriProject.Path, "scripts", "jiri")
-			newJiriScript, err := s.Open(newJiriScriptPath)
-			if err != nil {
-				return err
-			}
-			s.MkdirAll(jirix.ScriptsDir(), 0755)
-			jiriScriptOutPath := filepath.Join(jirix.ScriptsDir(), "jiri")
-			jiriScriptOut, err := s.Create(jiriScriptOutPath)
-			if err != nil {
-				return err
-			}
-			if _, err := s.Copy(jiriScriptOut, newJiriScript); err != nil {
-				return err
-			}
-			if err := s.Chmod(jiriScriptOutPath, 0750).Done(); err != nil {
-				return err
-			}
-
-			return nil
-		})
-	}
-	return jirix.NewSeq().Verbose(true).Call(updateFn, "update jiri script").Done()
-}
-
 // fetchProject fetches from the project remote.
 func fetchProject(jirix *jiri.X, project Project) error {
 	if project.Remote == "" {
@@ -1387,7 +1102,6 @@ func syncProjectMaster(jirix *jiri.X, project Project) error {
 func newManifestLoader(localProjects Projects, update bool) *loader {
 	return &loader{
 		Projects:      make(Projects),
-		Tools:         make(Tools),
 		localProjects: localProjects,
 		update:        update,
 	}
@@ -1395,7 +1109,6 @@ func newManifestLoader(localProjects Projects, update bool) *loader {
 
 type loader struct {
 	Projects      Projects
-	Tools         Tools
 	TmpDir        string
 	localProjects Projects
 	update        bool
@@ -1533,15 +1246,6 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 			return fmt.Errorf("duplicate project %q found in %v", key, shortFileName(jirix.Root, file))
 		}
 		ld.Projects[key] = project
-	}
-	// Collect tools.
-	for _, tool := range m.Tools {
-		name := tool.Name
-		if dup, ok := ld.Tools[name]; ok && dup != tool {
-			// TODO(toddw): Tell the user the other conflicting file.
-			return fmt.Errorf("duplicate tool %q found in %v", name, shortFileName(jirix.Root, file))
-		}
-		ld.Tools[name] = tool
 	}
 	return nil
 }

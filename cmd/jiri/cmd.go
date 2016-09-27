@@ -43,7 +43,6 @@ Command jiri is a multi-purpose tool for multi-repo development.
 			cmdCL,
 			cmdImport,
 			cmdProject,
-			cmdRebuild,
 			cmdSnapshot,
 			cmdUpdate,
 			cmdVersion,
@@ -66,7 +65,7 @@ looks like this:
 
  [root]                              # root directory (name picked by user)
  [root]/.jiri_root                   # root metadata directory
- [root]/.jiri_root/bin               # contains tool binaries (jiri, etc.)
+ [root]/.jiri_root/bin               # contains jiri tool binary
  [root]/.jiri_root/update_history    # contains history of update snapshots
  [root]/.manifest                    # contains jiri manifests
  [root]/[project1]                   # project directory (name picked by user)
@@ -100,8 +99,8 @@ The point of the shim script is to make it easy to use the jiri tool with
 multiple [root] directories on your file system.  Keep in mind that when "jiri
 update" is run, the jiri tool itself is automatically updated along with all
 projects.  By using the shim script, you only need to remember to invoke the
-jiri tool from within the appropriate [root] directory, and the projects and
-tools under that [root] directory will be updated.
+jiri tool from within the appropriate [root] directory, and the projects under
+that [root] directory will be updated.
 
 The shim script is located at [root]/release/go/src/fuchsia.googlesource.com/jiri/scripts/jiri
 
@@ -125,15 +124,15 @@ var topicManifest = cmdline.Topic{
 	Name:  "manifest",
 	Short: "Description of manifest files",
 	Long: `
-Jiri manifest files describe the set of projects that get synced and tools that
-get built when running "jiri update".
+Jiri manifest files describe the set of projects that get synced when running
+"jiri update".
 
 The first manifest file that jiri reads is in $JIRI_ROOT/.jiri_manifest.  This
 manifest **must** exist for the jiri tool to work.
 
 Usually the manifest in $JIRI_ROOT/.jiri_manifest will import other manifests
 from remote repositories via <import> tags, but it can contain its own list of
-projects and tools as well.
+projects as well.
 
 Manifests have the following XML schema:
 
@@ -159,17 +158,10 @@ Manifests have the following XML schema:
     />
     ...
   </projects>
-  <tools>
-    <tool name="jiri"
-          package="fuchsia.googlesource.com/jiri"
-          project="release.go.jiri"
-    />
-    ...
-  </tools>
 </manifest>
 
-The <import> and <localimport> tags can be used to share common projects and
-tools across multiple manifests.
+The <import> and <localimport> tags can be used to share common projects across
+multiple manifests.
 
 A <localimport> tag should be used when the manifest being imported and the
 importing manifest are both in the same repository, or when neither one is in a
@@ -221,19 +213,5 @@ directory during each update.
 
 * runhook (optional) - The path (relate to $JIRI_ROOT) of a script that will be
 run during each update.
-
-The <tool> tags describe the tools that will be compiled and installed in
-$JIRI_ROOT/.jiri_root/bin after each update.  The tools must be written in go,
-and are identified by their package name and the project that contains their
-code.  They are configured via the following attributes:
-
-* name (required) - The name of the binary that will be installed in
-  JIRI_ROOT/.jiri_root/bin
-
-* package (required) - The name of the Go package that will be passed to "go
-  build".
-
-* project (required) - The name of the project that contains the source code
-  for the tool.
 `,
 }

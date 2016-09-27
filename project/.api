@@ -1,16 +1,14 @@
 pkg project, const FastScan ScanMode
 pkg project, const FullScan ScanMode
 pkg project, func ApplyToLocalMaster(*jiri.X, Projects, func() error) error
-pkg project, func BuildTools(*jiri.X, Projects, Tools, string) error
 pkg project, func CheckoutSnapshot(*jiri.X, string, bool) error
 pkg project, func CleanupProjects(*jiri.X, Projects, bool) error
 pkg project, func CreateSnapshot(*jiri.X, string, string) error
 pkg project, func CurrentProjectKey(*jiri.X) (ProjectKey, error)
 pkg project, func GetProjectState(*jiri.X, ProjectKey, bool) (*ProjectState, error)
 pkg project, func GetProjectStates(*jiri.X, bool) (map[ProjectKey]*ProjectState, error)
-pkg project, func InstallTools(*jiri.X, string) error
-pkg project, func LoadManifest(*jiri.X) (Projects, Tools, error)
-pkg project, func LoadSnapshotFile(*jiri.X, string) (Projects, Tools, error)
+pkg project, func LoadManifest(*jiri.X) (Projects, error)
+pkg project, func LoadSnapshotFile(*jiri.X, string) (Projects, error)
 pkg project, func LocalProjects(*jiri.X, ScanMode) (Projects, error)
 pkg project, func MakeProjectKey(string, string) ProjectKey
 pkg project, func ManifestFromBytes([]byte) (*Manifest, error)
@@ -52,7 +50,6 @@ pkg project, type Manifest struct, Imports []Import
 pkg project, type Manifest struct, LocalImports []LocalImport
 pkg project, type Manifest struct, Projects []Project
 pkg project, type Manifest struct, SnapshotPath string
-pkg project, type Manifest struct, Tools []Tool
 pkg project, type Manifest struct, XMLName struct{}
 pkg project, type Project struct
 pkg project, type Project struct, GerritHost string
@@ -80,7 +77,6 @@ pkg project, type Tool struct, Name string
 pkg project, type Tool struct, Package string
 pkg project, type Tool struct, Project string
 pkg project, type Tool struct, XMLName struct{}
-pkg project, type Tools map[string]Tool
 pkg project, type Update map[string][]CL
 pkg project, var JiriName string
 pkg project, var JiriPackage string

@@ -707,13 +707,6 @@ func TestManifestToFromBytes(t *testing.T) {
 						Revision:     "rev2",
 					},
 				},
-				Tools: []project.Tool{
-					{
-						Data:    "tooldata",
-						Name:    "tool",
-						Project: "toolproject",
-					},
-				},
 			},
 			`<manifest>
   <imports>
@@ -725,9 +718,6 @@ func TestManifestToFromBytes(t *testing.T) {
     <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" runhook="path/to/hook"/>
     <project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
   </projects>
-  <tools>
-    <tool data="tooldata" name="tool" project="toolproject"/>
-  </tools>
 </manifest>
 `,
 		},

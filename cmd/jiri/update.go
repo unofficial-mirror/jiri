@@ -32,13 +32,11 @@ func init() {
 var cmdUpdate = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runUpdate),
 	Name:   "update",
-	Short:  "Update all jiri tools and projects",
+	Short:  "Update all jiri projects",
 	Long: `
-Updates all projects, builds the latest version of all tools, and installs the
-resulting binaries into $JIRI_ROOT/.jiri_root/bin. The sequence in which the
-individual updates happen guarantees that we end up with a consistent set of
-tools and source code. The set of projects and tools to update is described in
-the manifest.
+Updates all projects. The sequence in which the individual updates happen
+guarantees that we end up with a consistent workspace. The set of projects
+to update is described in the manifest.
 
 Run "jiri help manifest" for details on manifests.
 `,

@@ -1227,7 +1227,11 @@ func TestMultiPart(t *testing.T) {
 
 	gitCommit("oh multipart test\n", ra, rb, rc)
 	bodyMessage := "xyz\n\na simple message\n"
-	messageFile := filepath.Join(fake.X.Root, jiri.RootMetaDir, "message-body")
+	metaDir := filepath.Join(fake.X.Root, jiri.RootMetaDir)
+	if err := os.MkdirAll(metaDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	messageFile := filepath.Join(metaDir, "message-body")
 	if err := ioutil.WriteFile(messageFile, []byte(bodyMessage), 0666); err != nil {
 		t.Fatal(err)
 	}

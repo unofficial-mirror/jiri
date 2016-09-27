@@ -15,9 +15,8 @@ The jiri commands are:
    cl          Manage changelists for multiple projects
    import      Adds imports to .jiri_manifest file
    project     Manage the jiri projects
-   rebuild     Rebuild all jiri tools
    snapshot    Manage project snapshots
-   update      Update all jiri tools and projects
+   update      Update all jiri projects
    which       Show path to the jiri tool
    runp        Run a command in parallel across jiri projects
    help        Display help for commands or topics
@@ -337,24 +336,6 @@ The jiri project shell-prompt flags are:
  -v=false
    Print verbose output.
 
-Jiri rebuild - Rebuild all jiri tools
-
-Rebuilds all jiri tools and installs the resulting binaries into
-$JIRI_ROOT/.jiri_root/bin. This is similar to "jiri update", but does not update
-any projects before building the tools. The set of tools to rebuild is described
-in the manifest.
-
-Run "jiri help manifest" for details on manifests.
-
-Usage:
-   jiri rebuild [flags]
-
-The jiri rebuild flags are:
- -color=true
-   Use color to format output.
- -v=false
-   Print verbose output.
-
 Jiri snapshot - Manage project snapshots
 
 The "jiri snapshot" command can be used to manage project snapshots. In
@@ -463,13 +444,11 @@ The jiri snapshot list flags are:
  -v=false
    Print verbose output.
 
-Jiri update - Update all jiri tools and projects
+Jiri update - Update all jiri projects
 
-Updates all projects, builds the latest version of all tools, and installs the
-resulting binaries into $JIRI_ROOT/.jiri_root/bin. The sequence in which the
-individual updates happen guarantees that we end up with a consistent set of
-tools and source code. The set of projects and tools to update is described in
-the manifest.
+Updates all projects. The sequence in which the individual updates happen
+guarantees that we end up with a consistent workspace. The set of projects
+to update is described in the manifest.
 
 Run "jiri help manifest" for details on manifests.
 
@@ -645,8 +624,8 @@ The point of the shim script is to make it easy to use the jiri tool with
 multiple [root] directories on your file system.  Keep in mind that when "jiri
 update" is run, the jiri tool itself is automatically updated along with all
 projects.  By using the shim script, you only need to remember to invoke the
-jiri tool from within the appropriate [root] directory, and the projects and
-tools under that [root] directory will be updated.
+jiri tool from within the appropriate [root] directory, and the projects under
+that [root] directory will be updated.
 
 The shim script is located at [root]/release/go/src/fuchsia.googlesource.com/jiri/scripts/jiri
 
@@ -666,15 +645,15 @@ The jiri binary is located at [root]/.jiri_root/bin/jiri
 
 Jiri manifest - Description of manifest files
 
-Jiri manifest files describe the set of projects that get synced and tools that
-get built when running "jiri update".
+Jiri manifest files describe the set of projects that get synced when running
+"jiri update".
 
 The first manifest file that jiri reads is in $JIRI_ROOT/.jiri_manifest.  This
 manifest **must** exist for the jiri tool to work.
 
 Usually the manifest in $JIRI_ROOT/.jiri_manifest will import other manifests
 from remote repositories via <import> tags, but it can contain its own list of
-projects and tools as well.
+projects as well.
 
 Manifests have the following XML schema:
 
@@ -700,17 +679,10 @@ Manifests have the following XML schema:
     />
     ...
   </projects>
-  <tools>
-    <tool name="jiri"
-          package="fuchsia.googlesource.com/jiri"
-          project="release.go.jiri"
-    />
-    ...
-  </tools>
 </manifest>
 
-The <import> and <localimport> tags can be used to share common projects and
-tools across multiple manifests.
+The <import> and <localimport> tags can be used to share common projects across
+multiple manifests.
 
 A <localimport> tag should be used when the manifest being imported and the
 importing manifest are both in the same repository, or when neither one is in a
@@ -762,19 +734,5 @@ during each update.
 
 * runhook (optional) - The path (relate to $JIRI_ROOT) of a script that will be
 run during each update.
-
-The <tool> tags describe the tools that will be compiled and installed in
-$JIRI_ROOT/.jiri_root/bin after each update.  The tools must be written in go,
-and are identified by their package name and the project that contains their
-code.  They are configured via the following attributes:
-
-* name (required) - The name of the binary that will be installed in
-  JIRI_ROOT/.jiri_root/bin
-
-* package (required) - The name of the Go package that will be passed to "go
-  build".
-
-* project (required) - The name of the project that contains the source code
-  for the tool.
 */
 package main
