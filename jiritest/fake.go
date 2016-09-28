@@ -154,7 +154,7 @@ func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
 // UpdateUniverse synchronizes the content of the Vanadium fake based
 // on the content of the remote manifest.
 func (fake FakeJiriRoot) UpdateUniverse(gc bool) error {
-	if err := project.UpdateUniverse(fake.X, gc); err != nil {
+	if err := project.UpdateUniverse(fake.X, gc, false); err != nil {
 		return err
 	}
 	return nil

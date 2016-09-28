@@ -578,7 +578,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool) error {
 	if err != nil {
 		return err
 	}
-	if err := updateProjects(jirix, localProjects, remoteProjects, gc); err != nil {
+	if err := updateProjects(jirix, localProjects, remoteProjects, gc, true); err != nil {
 		return err
 	}
 	return WriteUpdateHistorySnapshot(jirix, snapshot)
@@ -848,7 +848,10 @@ func matchLocalWithRemote(localProjects, remoteProjects Projects) {
 // counterparts identified in the manifest. Optionally, the 'gc' flag can be
 // used to indicate that local projects that no longer exist remotely should be
 // removed.
-func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
+func UpdateUniverse(jirix *jiri.X, gc bool, showUpdateLogs bool) (e error) {
+	s := jirix.NewSeq()
+	s.Verbose(true).Output([]string{"Updating all projects"})
+
 	updateFn := func(scanMode ScanMode) error {
 		jirix.TimerPush(fmt.Sprintf("update universe: %s", scanMode))
 		defer jirix.TimerPop()
@@ -874,7 +877,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
 		}
 
 		// Actually update the projects.
-		return updateProjects(jirix, localProjects, remoteProjects, gc)
+		return updateProjects(jirix, localProjects, remoteProjects, gc, showUpdateLogs)
 	}
 
 	// Specifying gc should always force a full filesystem scan.
@@ -1342,7 +1345,7 @@ func reportNonMaster(jirix *jiri.X, project Project) (e error) {
 		return err
 	}
 	if current != "master" {
-		line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch is %q`, current)
+		line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch of project %q is %q`, project.Name, current)
 		line2 := fmt.Sprintf(`to update the %q branch once the master branch is updated, run "git merge master"`, current)
 		s.Verbose(true).Output([]string{line1, line2})
 	}
@@ -1414,7 +1417,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	}
 }
 
-func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bool) error {
+func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bool, showUpdateLogs bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
@@ -1429,9 +1432,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, gc bo
 	s := jirix.NewSeq()
 	for _, op := range ops {
 		updateFn := func() error { return op.Run(jirix) }
-		// Always log the output of updateFn, irrespective of
-		// the value of the verbose flag.
-		if err := s.Verbose(true).Call(updateFn, "%v", op).Done(); err != nil {
+		if err := s.Verbose(showUpdateLogs).Call(updateFn, "%v", op).Done(); err != nil {
 			return fmt.Errorf("error updating project %q: %v", op.Project().Name, err)
 		}
 	}

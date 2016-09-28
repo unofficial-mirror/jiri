@@ -19,12 +19,14 @@ var (
 	attemptsFlag        int
 	autoupdateFlag      bool
 	forceAutoupdateFlag bool
+	verboseUpdateFlag   bool
 )
 
 func init() {
 	tool.InitializeProjectFlags(&cmdUpdate.Flags)
 
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
+	cmdUpdate.Flags.BoolVar(&verboseUpdateFlag, "verbose", false, "Show all update logs.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
 	cmdUpdate.Flags.BoolVar(&forceAutoupdateFlag, "force-autoupdate", false, "Always update to the current version.")
@@ -55,7 +57,7 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
-	updateFn := func() error { return project.UpdateUniverse(jirix, gcFlag) }
+	updateFn := func() error { return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag) }
 	if err := retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
