@@ -1607,7 +1607,11 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 			continue
 		}
 		for _, p := range projects {
-			status, ok := repoStatuses[p.Name]
+			u, err := url.Parse(p.Remote)
+			if err != nil {
+				continue
+			}
+			status, ok := repoStatuses[strings.Trim(u.Path, "/")]
 			if !ok {
 				continue
 			}
