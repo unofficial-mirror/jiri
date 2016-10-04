@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 
 	"fuchsia.googlesource.com/jiri/osutil"
 	"fuchsia.googlesource.com/jiri/version"
@@ -51,6 +52,11 @@ func Update() error {
 			return err
 		}
 		if err := updateExecutable(path, b); err != nil {
+			return err
+		}
+
+		// Run the update version.
+		if err := syscall.Exec(path, os.Args, os.Environ()); err != nil {
 			return err
 		}
 	}
