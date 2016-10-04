@@ -380,6 +380,51 @@ func TestUpdateUniverseMovedProject(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "initial readme")
 }
 
+// TestUpdateUniverseRenamedProject checks that UpdateUniverse can update
+// renamed project.
+func TestUpdateUniverseRenamedProject(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldProjectName := localProjects[1].Name
+	localProjects[1].Name = localProjects[1].Name + "new"
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == oldProjectName {
+			p.Name = localProjects[1].Name
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	newLocalProjects, err := project.LocalProjects(fake.X, project.FullScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectFound := false
+	for _, p := range newLocalProjects {
+		if p.Name == localProjects[1].Name {
+			projectFound = true
+		}
+	}
+	if !projectFound {
+		t.Fatalf("Project with updated name(%v) not found", localProjects[1].Name)
+	}
+}
+
 // TestUpdateUniverseDeletedProject checks that UpdateUniverse will delete a
 // project iff gc=true.
 func TestUpdateUniverseDeletedProject(t *testing.T) {
