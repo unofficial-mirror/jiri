@@ -19,27 +19,9 @@ func TestGetCurrentCommit(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `)]}'
 {
-  "log": [
-    {
-      "commit": "68661f351339107f397749c9689334fe9893bcea",
-      "tree": "505df3f0370434ce02437e67b6d50208fa1b10b0",
-      "parents": [
-        "c96fe08c1ee898a19b0c4517e563a74f272a167a"
-      ],
-      "author": {
-        "name": "John Doe",
-        "email": "john.doe@example.com",
-        "time": "Thu Sep 22 00:22:34 2016 -0700"
-      },
-      "committer": {
-        "name": "John Doe",
-        "email": "john.doe@example.com",
-        "time": "Thu Sep 22 12:04:39 2016 -0700"
-      },
-      "message": "Test message"
-    }
-  ],
-  "next": "c96fe08c1ee898a19b0c4517e563a74f272a167a"
+  "refs/heads/master": {
+    "value": "68661f351339107f397749c9689334fe9893bcea"
+  }
 }`)
 	}))
 	defer ts.Close()

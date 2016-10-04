@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	gcFlag       bool
-	attemptsFlag int
-	autoupdateFlag bool
+	gcFlag              bool
+	attemptsFlag        int
+	autoupdateFlag      bool
+	forceAutoupdateFlag bool
 )
 
 func init() {
@@ -26,6 +27,7 @@ func init() {
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
+	cmdUpdate.Flags.BoolVar(&forceAutoupdateFlag, "force-autoupdate", false, "Always update to the current version.")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -45,7 +47,7 @@ Run "jiri help manifest" for details on manifests.
 func runUpdate(jirix *jiri.X, _ []string) error {
 	if autoupdateFlag {
 		// Try to update Jiri itself.
-		err := jiri.Update()
+		err := jiri.Update(forceAutoupdateFlag)
 		if err != nil {
 			fmt.Printf("warning: automatic update failed: %v\n", err)
 		}

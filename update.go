@@ -8,10 +8,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"syscall"
@@ -27,12 +28,15 @@ const (
 
 // Update checks whether a new version of Jiri is available and if so,
 // it will download it and replace the current version with the new one.
-func Update() error {
-	commit, err := getCurrentCommit(JiriRepository)
-	if err != nil {
+func Update(force bool) error {
+	if !force && version.GitCommit == "" {
 		return nil
 	}
-	if commit != version.GitCommit {
+	commit, err := getCurrentCommit(JiriRepository)
+	if err != nil {
+		return err
+	}
+	if force || commit != version.GitCommit {
 		// Check if the prebuilt for new version exsits.
 		has, err := hasPrebuilt(JiriStorageBucket, commit)
 		if err != nil {
@@ -64,11 +68,20 @@ func Update() error {
 }
 
 func getCurrentCommit(repository string) (string, error) {
-	url := fmt.Sprintf("%s/+log/master?n=1", repository)
+	u, err := url.Parse(repository)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("remote host scheme is not http(s): %s", repository)
+	}
+	u.Path = path.Join(u.Path, "+refs/heads/master")
+	q := u.Query()
+	q.Set("format", "json")
+	u.RawQuery = q.Encode()
+
 	// Use Gitiles to find out the latest revision.
-	var body io.Reader
-	method, body := "GET", nil
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -77,10 +90,10 @@ func getCurrentCommit(repository string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP request failed: %v", http.StatusText(res.StatusCode))
 	}
-	defer res.Body.Close()
 
 	r := bufio.NewReader(res.Body)
 
@@ -89,20 +102,17 @@ func getCurrentCommit(repository string) (string, error) {
 		return "", err
 	}
 
-	result := struct {
-		Log []struct {
-			Commit string `json:"commit"`
-		} `json:"log"`
-	}{}
-
+	var result map[string]struct {
+		Value string `json:"value"`
+	}
 	if err := json.NewDecoder(r).Decode(&result); err != nil {
 		return "", err
 	}
-	if len(result.Log) == 0 {
-		return "", fmt.Errorf("no log entries")
+	if v, ok := result["refs/heads/master"]; ok {
+		return v.Value, nil
+	} else {
+		return "", fmt.Errorf("cannot find current commit")
 	}
-
-	return result.Log[0].Commit, nil
 }
 
 func hasPrebuilt(bucket, version string) (bool, error) {
