@@ -40,7 +40,13 @@ func Executable() (string, error) {
 	if n == 0 {
 		return "", nil
 	}
-	p := string(buf[:n-1])
+	for i, v := range buf {
+		if v == 0 {
+			buf = buf[:i]
+			break
+		}
+	}
+	p := string(buf)
 	if !filepath.IsAbs(p) {
 		wd, err := os.Getwd()
 		if err != nil {
