@@ -515,6 +515,14 @@ const (
 	FullScan = ScanMode(true)
 )
 
+func (sm ScanMode) String() string {
+	if sm == FastScan {
+		return "FastScan"
+	} else {
+		return "FullScan"
+	}
+}
+
 // Update represents an update of projects as a map from
 // project names to a collections of commits.
 type Update map[string][]CL
@@ -856,31 +864,48 @@ func matchLocalWithRemote(localProjects, remoteProjects Projects) {
 // used to indicate that local projects that no longer exist remotely should be
 // removed.
 func UpdateUniverse(jirix *jiri.X, gc bool) (e error) {
-	jirix.TimerPush("update universe")
-	defer jirix.TimerPop()
+	updateFn := func(scanMode ScanMode) error {
+		jirix.TimerPush(fmt.Sprintf("update universe: %s", scanMode))
+		defer jirix.TimerPop()
 
-	// Find all local projects.
-	scanMode := FastScan
+		// Find all local projects.
+		localProjects, err := LocalProjects(jirix, scanMode)
+		if err != nil {
+			return err
+		}
+
+		// Determine the set of remote projects and match them up with the locals.
+		remoteProjects, tmpLoadDir, err := loadUpdatedManifest(jirix, localProjects)
+		matchLocalWithRemote(localProjects, remoteProjects)
+
+		// Make sure we clean up the tmp dir used to load remote manifest projects.
+		if tmpLoadDir != "" {
+			s := jirix.NewSeq()
+			defer collect.Error(func() error { return s.RemoveAll(tmpLoadDir).Done() }, &e)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		// Actually update the projects.
+		return updateProjects(jirix, localProjects, remoteProjects, gc)
+	}
+
+	// Specifying gc should always force a full filesystem scan.
 	if gc {
-		scanMode = FullScan
-	}
-	localProjects, err := LocalProjects(jirix, scanMode)
-	if err != nil {
-		return err
+		return updateFn(FullScan)
 	}
 
-	// Load the manifest, updating all manifest projects to match their remote
-	// counterparts.
-	s := jirix.NewSeq()
-	remoteProjects, tmpLoadDir, err := loadUpdatedManifest(jirix, localProjects)
-	matchLocalWithRemote(localProjects, remoteProjects)
-	if tmpLoadDir != "" {
-		defer collect.Error(func() error { return s.RemoveAll(tmpLoadDir).Done() }, &e)
-	}
+	// Attempt a fast update, which uses the latest snapshot to avoid doing
+	// a filesystem scan.  Sometimes the latest snapshot can have problems, so if
+	// any errors come up, fallback to the slow path.
+	err := updateFn(FastScan)
 	if err != nil {
-		return err
+		return updateFn(FullScan)
 	}
-	return updateProjects(jirix, localProjects, remoteProjects, gc)
+
+	return nil
 }
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
