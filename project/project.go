@@ -486,6 +486,45 @@ func (p *Project) validate() error {
 	return nil
 }
 
+// cacheDirPath returns a generated path to a directory that can be used as a reference repo
+// for the given project.
+func (p *Project) cacheDirPath(jirix *jiri.X) (string, error) {
+	if jirix.Cache != "" {
+		url, err := url.Parse(p.Remote)
+		if err != nil {
+			return "", err
+		}
+		dirname := url.Host + strings.Replace(strings.Replace(url.Path, "-", "--", -1), "/", "-", -1)
+		referenceDir := filepath.Join(jirix.Cache, dirname)
+		return referenceDir, nil
+	}
+	return "", nil
+}
+
+func isPathDir(dir string) bool {
+	if dir != "" {
+		if fi, err := os.Stat(dir); err == nil {
+			return fi.IsDir()
+		}
+	}
+	return false
+}
+
+// cacheDir returns a path to a directory that can be used as a reference repo
+// for the given project.  It expects to find a directory that matches
+// [cache]/remote with "/" replaced with "-".
+func (p *Project) cacheDir(jirix *jiri.X) (string, error) {
+	if referenceDir, err := p.cacheDirPath(jirix); err == nil {
+		if isPathDir(referenceDir) {
+			return referenceDir, nil
+		} else {
+			return "", nil
+		}
+	} else {
+		return "", err
+	}
+}
+
 // Projects maps ProjectKeys to Projects.
 type Projects map[ProjectKey]Project
 
@@ -1303,7 +1342,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 			if err := jirix.NewSeq().MkdirAll(path, 0755).Done(); err != nil {
 				return err
 			}
-			if err := gitutil.New(jirix.NewSeq()).Clone(p.Remote, path); err != nil {
+			if err := gitutil.New(jirix.NewSeq()).Clone(p.Remote, path, ""); err != nil {
 				return err
 			}
 			ld.localProjects[key] = p
@@ -1682,7 +1721,11 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 		return err
 	}
 	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpDir).Done() }, &e)
-	if err := gitutil.New(jirix.NewSeq()).Clone(op.project.Remote, tmpDir); err != nil {
+	cache, err := op.project.cacheDir(jirix)
+	if err != nil {
+		return err
+	}
+	if err := gitutil.New(jirix.NewSeq()).Clone(op.project.Remote, tmpDir, cache); err != nil {
 		return err
 	}
 	cwd, err := os.Getwd()

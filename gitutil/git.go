@@ -39,11 +39,11 @@ func (ge GitError) Error() string {
 }
 
 type Git struct {
-	s			runutil.Sequence
-	opts		map[string]string
-	rootDir		string
-	userName	string
-	userEmail	string
+	s         runutil.Sequence
+	opts      map[string]string
+	rootDir   string
+	userName  string
+	userEmail string
 }
 
 type gitOpt interface {
@@ -58,8 +58,8 @@ type UserEmailOpt string
 func (AuthorDateOpt) gitOpt()    {}
 func (CommitterDateOpt) gitOpt() {}
 func (RootDirOpt) gitOpt()       {}
-func (UserNameOpt) gitOpt() {}
-func (UserEmailOpt) gitOpt() {}
+func (UserNameOpt) gitOpt()      {}
+func (UserEmailOpt) gitOpt()     {}
 
 // New is the Git factory.
 func New(s runutil.Sequence, opts ...gitOpt) *Git {
@@ -82,11 +82,11 @@ func New(s runutil.Sequence, opts ...gitOpt) *Git {
 		}
 	}
 	return &Git{
-		s:			s,
-		opts:		env,
-		rootDir:	rootDir,
-		userName:	userName,
-		userEmail:	userEmail,
+		s:         s,
+		opts:      env,
+		rootDir:   rootDir,
+		userName:  userName,
+		userEmail: userEmail,
 	}
 }
 
@@ -137,8 +137,12 @@ func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 	return g.run(args...)
 }
 
-// Clone clones the given repository to the given local path.
-func (g *Git) Clone(repo, path string) error {
+// Clone clones the given repository to the given local path.  If reference is
+// not empty it uses the given path as a reference repo.
+func (g *Git) Clone(repo, path string, reference string) error {
+	if reference != "" {
+		return g.run("clone", "--reference", reference, repo, path)
+	}
 	return g.run("clone", repo, path)
 }
 
