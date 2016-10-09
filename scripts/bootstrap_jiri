@@ -8,7 +8,6 @@
 #   <root_dir>                         - root directory (picked by user)
 #   <root_dir>/.jiri_root              - root metadata directory
 #   <root_dir>/.jiri_root/bin/jiri     - jiri binary
-#   <root_dir>/.jiri_root/scripts/jiri - jiri script
 #
 # The jiri sources are downloaded and built into a temp directory, which is
 # always deleted when this script finishes.  The <root_dir> is deleted on any
@@ -35,7 +34,7 @@ Usage:
 A typical bootstrap workflow looks like this:
 
 $ curl -s https://raw.githubusercontent.com/fuchsia-mirror/jiri/master/scripts/bootstrap_jiri | bash -s myroot
-$ export PATH=myroot/.jiri_root/scripts:$PATH
+$ export PATH=myroot/.jiri_root/bin:$PATH
 $ cd myroot
 $ jiri import manifest https://example.com/manifest
 $ jiri update'
@@ -75,18 +74,10 @@ trap "rm -rf ${ROOT_DIR}" INT TERM EXIT
 
 # Make the output directories.
 readonly BIN_DIR="${ROOT_DIR}/.jiri_root/bin"
-readonly SCRIPTS_DIR="${ROOT_DIR}/.jiri_root/scripts"
-mkdir -p "${BIN_DIR}" "${SCRIPTS_DIR}"
-
-# Base64 takes different arguments on darwin.
-readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
-if [[ "${HOST_OS}" == "darwin" ]]; then
-  readonly BASE64_CMD="base64 -D"
-else
-  readonly BASE64_CMD="base64 -d"
-fi
+mkdir -p "${BIN_DIR}"
 
 # Determine and validate the version of jiri.
+readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
 readonly TARGET="${HOST_OS}-amd64"
 readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/master?format=JSON"
 readonly VERSION=$(curl -sSf "${COMMIT_URL}" | sed -n 's/.*"value": "\([0-9a-f]\{40\}\)"/\1/p')
@@ -104,14 +95,5 @@ if ! curl -sf -o "${BIN_DIR}/jiri" "${BIN_URL}"; then
 fi
 chmod 755 "${BIN_DIR}/jiri"
 
-# Download the jiri wrapper script.
-readonly SCRIPT_URL="${JIRI_REPO_URL}/+/${VERSION}/scripts/jiri?format=TEXT"
-if ! curl -sf "${SCRIPT_URL}" | ${BASE64_CMD} > "${SCRIPTS_DIR}/jiri"; then
-  echo "Failed downloading jiri wrapper script." 1>&2
-  echo "URL: ${SCRIPT_URL}" 1>&2
-  exit 1
-fi
-chmod 755 "${SCRIPTS_DIR}/jiri"
-
-echo "Please add ${SCRIPTS_DIR} to your PATH"
+echo "Please add ${BIN_DIR} to your PATH"
 trap - EXIT

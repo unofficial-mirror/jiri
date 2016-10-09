@@ -9,6 +9,7 @@ package jiri
 // fuchsia.googlesource.com/jiri/cmd/jiri
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,7 +21,6 @@ import (
 )
 
 const (
-	RootEnv          = "JIRI_ROOT"
 	RootMetaDir      = ".jiri_root"
 	ProjectMetaDir   = ".jiri"
 	ProjectMetaFile  = "metadata.v2"
@@ -44,7 +44,7 @@ type X struct {
 }
 
 // NewX returns a new execution environment, given a cmdline env.
-// It also prepends $JIRI_ROOT/.jiri_root/bin to the PATH.
+// It also prepends .jiri_root/bin to the PATH.
 func NewX(env *cmdline.Env) (*X, error) {
 	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())
@@ -57,7 +57,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 		Usage:   env.UsageErrorf,
 	}
 	if ctx.Env()[PreservePathEnv] == "" {
-		// Prepend $JIRI_ROOT/.jiri_root/bin to the PATH, so execing a binary will
+		// Prepend .jiri_root/bin to the PATH, so execing a binary will
 		// invoke the one in that directory, if it exists.  This is crucial for jiri
 		// subcommands, where we want to invoke the binary that jiri installed, not
 		// whatever is in the user's PATH.
@@ -74,32 +74,67 @@ func NewX(env *cmdline.Env) (*X, error) {
 	return x, nil
 }
 
+var (
+	rootFlag string
+)
+
+func init() {
+	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
+}
+
 func findJiriRoot(timer *timing.Timer) (string, error) {
 	if timer != nil {
-		timer.Push("find JIRI_ROOT")
+		timer.Push("find .jiri_root")
 		defer timer.Pop()
 	}
-	if root := os.Getenv(RootEnv); root != "" {
-		// Always use JIRI_ROOT if it's set.
-		result, err := filepath.EvalSymlinks(root)
+
+	if rootFlag != "" {
+		result, err := filepath.EvalSymlinks(rootFlag)
 		if err != nil {
-			return "", fmt.Errorf("%v EvalSymlinks(%v) failed: %v", RootEnv, root, err)
+			return "", fmt.Errorf("%s is an invalid symlink: %v", rootFlag, err)
 		}
 		if !filepath.IsAbs(result) {
-			return "", fmt.Errorf("%v isn't an absolute path: %v", RootEnv, result)
+			return "", fmt.Errorf("%s isn't an absolute path: %s", rootFlag, result)
 		}
 		return filepath.Clean(result), nil
 	}
-	// TODO(toddw): Try to find the root by walking up the filesystem.
-	return "", fmt.Errorf("%v is not set", RootEnv)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	path, err := filepath.Abs(wd)
+	if err != nil {
+		return "", err
+	}
+
+	paths := []string{path}
+	for i := len(path) - 1; i >= 0; i-- {
+		if os.IsPathSeparator(path[i]) {
+			path = path[:i]
+			if path == "" {
+				path = "/"
+			}
+			paths = append(paths, path)
+		}
+	}
+
+	for _, path := range paths {
+		fi, err := os.Stat(filepath.Join(path, RootMetaDir))
+		if err == nil && fi.IsDir() {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("cannot find %v", RootMetaDir)
 }
 
 // FindRoot returns the root directory of the jiri environment.  All state
 // managed by jiri resides under this root.
 //
-// If the RootEnv environment variable is non-empty, we always attempt to use
-// it.  It must point to an absolute path, after symlinks are evaluated.
-// TODO(toddw): Walk up the filesystem too.
+// If the rootFlag variable is non-empty, we always attempt to use it.
+// It must point to an absolute path, after symlinks are evaluated.
 //
 // Returns an empty string if the root directory cannot be determined, or if any
 // errors are encountered.

@@ -16,8 +16,7 @@ Jiri is open-source.  See the contributor guidelines [here][contributing].
 ## Jiri Basics
 Jiri organizes a set of repositories on your local filesystem according to a
 [manifest][manifests].  These repositories are referred to as "projects", and
-are all contained within a single directory called the "jiri root" which is
-assumed to be set in the `JIRI_ROOT` environment variable.
+are all contained within a single directory called the "jiri root".
 
 The manifest file specifies the relative location of each project within the
 jiri root, and also includes other metadata about the project such as its
@@ -49,9 +48,9 @@ and "bar", which are hosted on github and bitbucket respectively.
 </manifest>
 ```
 When you run `jiri update` for the first time, the "foo" and "bar" repos will
-be cloned into `$JIRI_ROOT/foo` and `$JIRI_ROOT/bar` respectively.  Running
-`jiri update` again will sync the master branch of these repos with the remote
-master branch.
+be cloned into `foo` and `bar` respectively.  Running `jiri update`
+again will sync the master branch of these repos with the remote master
+branch.
 
 Note that the project paths do not need to be immediate children of the jiri
 root.  We could have decided to set the `path` attribute for the "bar" project

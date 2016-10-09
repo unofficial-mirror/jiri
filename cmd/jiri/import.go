@@ -27,7 +27,7 @@ func init() {
 	cmdImport.Flags.StringVar(&flagImportRoot, "root", "", `Root to store the manifest project locally.`)
 
 	cmdImport.Flags.BoolVar(&flagImportOverwrite, "overwrite", false, `Write a new .jiri_manifest file with the given specification.  If it already exists, the existing content will be ignored and the file will be overwritten.`)
-	cmdImport.Flags.StringVar(&flagImportOut, "out", "", `The output file.  Uses $JIRI_ROOT/.jiri_manifest if unspecified.  Uses stdout if set to "-".`)
+	cmdImport.Flags.StringVar(&flagImportOut, "out", "", `The output file.  Uses <root>/.jiri_manifest if unspecified.  Uses stdout if set to "-".`)
 }
 
 var cmdImport = &cmdline.Command{
@@ -35,10 +35,9 @@ var cmdImport = &cmdline.Command{
 	Name:   "import",
 	Short:  "Adds imports to .jiri_manifest file",
 	Long: `
-Command "import" adds imports to the $JIRI_ROOT/.jiri_manifest file, which
-specifies manifest information for the jiri tool.  The file is created if it
-doesn't already exist, otherwise additional imports are added to the existing
-file.
+Command "import" adds imports to the [root]/.jiri_manifest file, which specifies
+manifest information for the jiri tool.  The file is created if it doesn't
+already exist, otherwise additional imports are added to the existing file.
 
 An <import> element is added to the manifest representing a remote manifest
 import.  The manifest file path is relative to the root directory of the remote

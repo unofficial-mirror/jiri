@@ -166,9 +166,12 @@ func testImport(t *testing.T, jiriTool string, test importTestCase) error {
 	}
 	defer os.Chdir(cwd)
 
-	// Create and cd into a JIRI_ROOT directory in which to do the actual import.
+	// Create and cd into a root directory in which to do the actual import.
 	jiriRoot := filepath.Join(tmpDir, "root")
 	if err := os.Mkdir(jiriRoot, 0755); err != nil {
+		return err
+	}
+	if err := os.Mkdir(filepath.Join(jiriRoot, jiri.RootMetaDir), 0755); err != nil {
 		return err
 	}
 	if err := os.Chdir(jiriRoot); err != nil {
@@ -198,7 +201,6 @@ func testImport(t *testing.T, jiriTool string, test importTestCase) error {
 
 	// Run import and check the results.
 	importCmd := exec.Command(jiriTool, append([]string{"import"}, test.Args...)...)
-	importCmd.Env = []string{fmt.Sprintf("%s=%s", jiri.RootEnv, jiriRoot)}
 	stdout, stderr := runCmd(t, importCmd, test.Stderr != "")
 	if got, want := stdout, test.Stdout; !strings.Contains(got, want) || (got != "" && want == "") {
 		return fmt.Errorf("stdout got %q, want substr %q", got, want)

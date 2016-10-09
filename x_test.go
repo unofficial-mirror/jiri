@@ -13,8 +13,8 @@ import (
 )
 
 // TestFindRootEnvSymlink checks that FindRoot interprets the value of the
-// JIRI_ROOT environment variable as a path, evaluates any symlinks the path
-// might contain, and returns the result.
+// -root flag as a path, evaluates any symlinks the path might contain, and
+// returns the result.
 func TestFindRootEnvSymlink(t *testing.T) {
 	ctx := tool.NewDefaultContext()
 
@@ -39,13 +39,9 @@ func TestFindRootEnvSymlink(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	// Set the JIRI_ROOT to the symlink created above and check that FindRoot()
-	// evaluates the symlink.
-	oldRoot := os.Getenv(RootEnv)
-	if err := os.Setenv(RootEnv, symRoot); err != nil {
-		t.Fatalf("%v", err)
-	}
-	defer os.Setenv(RootEnv, oldRoot)
+	// Set the -root flag to the symlink created above and check that
+	// FindRoot() evaluates the symlink.
+	rootFlag = symRoot
 	if got, want := FindRoot(), root; got != want {
 		t.Fatalf("unexpected output: got %v, want %v", got, want)
 	}

@@ -373,7 +373,7 @@ var defaultMessageHeader = `
 `
 
 // currentProject returns the Project containing the current working directory.
-// The current working directory must be inside JIRI_ROOT.
+// The current working directory must be inside root.
 func currentProject(jirix *jiri.X) (project.Project, error) {
 	dir, err := os.Getwd()
 	if err != nil {

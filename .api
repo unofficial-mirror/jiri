@@ -2,7 +2,6 @@ pkg jiri, const JiriManifestFile ideal-string
 pkg jiri, const PreservePathEnv ideal-string
 pkg jiri, const ProjectMetaDir ideal-string
 pkg jiri, const ProjectMetaFile ideal-string
-pkg jiri, const RootEnv ideal-string
 pkg jiri, const RootMetaDir ideal-string
 pkg jiri, func ExpandEnv(*X, *envvar.Vars)
 pkg jiri, func FindRoot() string

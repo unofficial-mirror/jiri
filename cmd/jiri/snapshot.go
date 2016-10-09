@@ -31,7 +31,7 @@ var (
 )
 
 func init() {
-	cmdSnapshot.Flags.StringVar(&snapshotDirFlag, "dir", "", "Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.")
+	cmdSnapshot.Flags.StringVar(&snapshotDirFlag, "dir", "", "Directory where snapshot are stored.  Defaults to [root]/.snapshot.")
 	cmdSnapshotCheckout.Flags.BoolVar(&snapshotGcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
 }

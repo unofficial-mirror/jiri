@@ -5,7 +5,6 @@
 package jiritest
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +14,7 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
-// FakeJiriRoot sets up a fake JIRI_ROOT under a tmp directory.
+// FakeJiriRoot sets up a fake root under a tmp directory.
 type FakeJiriRoot struct {
 	X        *jiri.X
 	Projects map[string]string
@@ -78,8 +77,8 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		t.Fatal(err)
 	}
 
-	// Update the contents of the fake JIRI_ROOT instance based on
-	// the information recorded in the remote manifest.
+	// Update the contents of the fake instance based on  the information
+	// recorded in the remote manifest.
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
@@ -155,11 +154,6 @@ func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
 // UpdateUniverse synchronizes the content of the Vanadium fake based
 // on the content of the remote manifest.
 func (fake FakeJiriRoot) UpdateUniverse(gc bool) error {
-	oldRoot := os.Getenv(jiri.RootEnv)
-	if err := os.Setenv(jiri.RootEnv, fake.X.Root); err != nil {
-		return fmt.Errorf("Setenv() failed: %v", err)
-	}
-	defer os.Setenv(jiri.RootEnv, oldRoot)
 	if err := project.UpdateUniverse(fake.X, gc); err != nil {
 		return err
 	}

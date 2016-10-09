@@ -43,7 +43,7 @@ type Manifest struct {
 	Imports      []Import      `xml:"imports>import"`
 	LocalImports []LocalImport `xml:"imports>localimport"`
 	Projects     []Project     `xml:"projects>project"`
-	// SnapshotPath is the relative path to the snapshot file from JIRI_ROOT.
+	// SnapshotPath is the relative path to the snapshot file from root.
 	// It is only set when creating a snapshot.
 	SnapshotPath string   `xml:"snapshotpath,attr,omitempty"`
 	XMLName      struct{} `xml:"manifest"`
@@ -143,7 +143,7 @@ func safeWriteFile(jirix *jiri.X, filename string, data []byte) error {
 // defaults unfilled and all project paths relative to the jiri root.
 func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
 	// Replace absolute paths with relative paths to make it possible to move
-	// the $JIRI_ROOT directory locally.
+	// the root directory locally.
 	projects := []Project{}
 	for _, project := range m.Projects {
 		if err := project.relativizePaths(jirix.Root); err != nil {
@@ -313,11 +313,10 @@ type Project struct {
 	// Name is the project name.
 	Name string `xml:"name,attr,omitempty"`
 	// Path is the path used to store the project locally. Project
-	// manifest uses paths that are relative to the $JIRI_ROOT
-	// environment variable. When a manifest is parsed (e.g. in
-	// RemoteProjects), the program logic converts the relative
-	// paths to an absolute paths, using the current value of the
-	// $JIRI_ROOT environment variable as a prefix.
+	// manifest uses paths that are relative to the root directory.
+	// When a manifest is parsed (e.g. in RemoteProjects), the program
+	// logic converts the relative paths to an absolute paths, using
+	// the current root as a prefix.
 	Path string `xml:"path,attr,omitempty"`
 	// Remote is the project remote.
 	Remote string `xml:"remote,attr,omitempty"`
@@ -370,7 +369,7 @@ func (p Project) ToFile(jirix *jiri.X, filename string) error {
 		return err
 	}
 	// Replace absolute paths with relative paths to make it possible to move
-	// the $JIRI_ROOT directory locally.
+	// the root directory locally.
 	if err := p.relativizePaths(jirix.Root); err != nil {
 		return err
 	}
@@ -661,7 +660,7 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 
 	// Slow path: Either full scan was requested, or projects exist in manifest
 	// that were not found locally.  Do a recursive scan of all projects under
-	// JIRI_ROOT.
+	// the root.
 	projects := Projects{}
 	jirix.TimerPush("scan fs")
 	err = findLocalProjects(jirix, jirix.Root, projects)
@@ -1290,7 +1289,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 	}
 	// Collect projects.
 	for _, project := range m.Projects {
-		// Make paths absolute by prepending JIRI_ROOT/<root>.
+		// Make paths absolute by prepending <root>.
 		project.absolutizePaths(filepath.Join(jirix.Root, root))
 		// Prepend the root to the project name.  This will be a noop if the import is not rooted.
 		project.Name = filepath.Join(root, project.Name)
@@ -1618,7 +1617,7 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
-	// $JIRI_ROOT directory in an inconsistent state.
+	// root directory in an inconsistent state.
 	tmpDir, err := s.MkdirAll(path, perm).TempDir(path, tmpDirPrefix)
 	if err != nil {
 		return err
