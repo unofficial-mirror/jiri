@@ -247,9 +247,7 @@ type Import struct {
 	Name string `xml:"name,attr,omitempty"`
 	// Remote is the remote manifest project to import.
 	Remote string `xml:"remote,attr,omitempty"`
-	// RemoteBranch is the name of the remote branch to track. It doesn't affect
-	// the name of the local branch that jiri maintains, which is always
-	// "master". If not set, "master" is used as the default.
+	// RemoteBranch is the name of the remote branch to track.
 	RemoteBranch string `xml:"remotebranch,attr,omitempty"`
 	// Root path, prepended to all project paths specified in the manifest file.
 	Root    string   `xml:"root,attr,omitempty"`
@@ -361,8 +359,7 @@ type Project struct {
 	Path string `xml:"path,attr,omitempty"`
 	// Remote is the project remote.
 	Remote string `xml:"remote,attr,omitempty"`
-	// RemoteBranch is the name of the remote branch to track.  It doesn't affect
-	// the name of the local branch that jiri maintains, which is always "master".
+	// RemoteBranch is the name of the remote branch to track.
 	RemoteBranch string `xml:"remotebranch,attr,omitempty"`
 	// Revision is the revision the project should be advanced to during "jiri
 	// update".  If Revision is set, RemoteBranch will be ignored.  If Revision
@@ -593,8 +590,8 @@ func (sm ScanMode) String() string {
 // project names to a collections of commits.
 type Update map[string][]CL
 
-// CreateSnapshot creates a manifest that encodes the current state of master
-// branches of all projects and writes this snapshot out to the given file.
+// CreateSnapshot creates a manifest that encodes the current state of
+// HEAD of all projects and writes this snapshot out to the given file.
 func CreateSnapshot(jirix *jiri.X, file, snapshotPath string) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
@@ -684,11 +681,14 @@ func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
 	return "", nil
 }
 
-// setProjectRevisions sets the current project revision from the master for
+// setProjectRevisions sets the current project revision for
 // each project as found on the filesystem
-func setProjectRevisions(jirix *jiri.X, projects Projects) (_ Projects, e error) {
+func setProjectRevisions(jirix *jiri.X, projects Projects) (Projects, error) {
+	jirix.TimerPush("set revisions")
+	defer jirix.TimerPop()
 	for name, project := range projects {
-		revision, err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).CurrentRevisionOfBranch("master")
+		git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+		revision, err := git.CurrentRevision()
 		if err != nil {
 			return nil, err
 		}
@@ -792,7 +792,11 @@ func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e er
 	// Compute difference between local and remote.
 	update := Update{}
 	matchLocalWithRemote(localProjects, remoteProjects)
-	ops := computeOperations(localProjects, remoteProjects, false)
+	states, err := GetProjectStates(jirix, localProjects, false)
+	if err != nil {
+		return nil, err
+	}
+	ops := computeOperations(localProjects, remoteProjects, states, false)
 	s := jirix.NewSeq()
 	for _, op := range ops {
 		name := op.Project().Name
@@ -1006,64 +1010,11 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string) error {
 	return seq.RemoveAll(latestLink).Symlink(snapshotFile, latestLink).Done()
 }
 
-// ApplyToLocalMaster applies an operation expressed as the given function to
-// the local master branch of the given projects.
-func ApplyToLocalMaster(jirix *jiri.X, projects Projects, fn func() error) (e error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-
-	s := jirix.NewSeq()
-	git := gitutil.New(s)
-
-	// Loop through all projects, checking out master and stashing any unstaged
-	// changes.
-	for _, project := range projects {
-		p := project
-		if err := s.Chdir(p.Path).Done(); err != nil {
-			return err
-		}
-		branch, err := git.CurrentBranchName()
-		if err != nil {
-			return err
-		}
-		stashed, err := git.Stash()
-		if err != nil {
-			return err
-		}
-		if err := git.CheckoutBranch("master"); err != nil {
-			return err
-		}
-		// After running the function, return to this project's directory,
-		// checkout the original branch, and stash pop if necessary.
-		defer collect.Error(func() error {
-			if err := s.Chdir(p.Path).Done(); err != nil {
-				return err
-			}
-			if err := git.CheckoutBranch(branch); err != nil {
-				return err
-			}
-			if stashed {
-				return git.StashPop()
-			}
-			return nil
-		}, &e)
-	}
-	return fn()
-}
-
-// CleanupProjects restores the given jiri projects back to their master
-// branches, resets to the specified revision if there is one, and gets rid of
+// CleanupProjects restores the given jiri projects back to their detached
+// heads, resets to the specified revision if there is one, and gets rid of
 // all the local changes. If "cleanupBranches" is true, it will also delete all
 // the non-master branches.
 func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("Getwd() failed: %v", err)
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(wd).Done() }, &e)
 	for _, project := range projects {
 		if err := resetLocalProject(jirix, project, cleanupBranches); err != nil {
 			return err
@@ -1072,28 +1023,16 @@ func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e 
 	return nil
 }
 
-// resetLocalProject checks out the master branch, cleans up untracked files
-// and uncommitted changes, and optionally deletes all the other branches.
+// resetLocalProject checks out the detached_head, cleans up untracked files
+// and uncommitted changes, and optionally deletes all the branches except master.
 func resetLocalProject(jirix *jiri.X, project Project, cleanupBranches bool) error {
-	git := gitutil.New(jirix.NewSeq())
-	if err := jirix.NewSeq().Chdir(project.Path).Done(); err != nil {
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+
+	if err := checkoutHeadRevision(jirix, project, true); err != nil {
 		return err
-	}
-	// Check out master.
-	curBranchName, err := git.CurrentBranchName()
-	if err != nil {
-		return err
-	}
-	if curBranchName != "master" {
-		if err := git.CheckoutBranch("master", gitutil.ForceOpt(true)); err != nil {
-			return err
-		}
 	}
 	// Cleanup changes.
 	if err := git.RemoveUntrackedFiles(); err != nil {
-		return err
-	}
-	if err := resetProjectCurrentBranch(jirix, project); err != nil {
 		return err
 	}
 	if !cleanupBranches {
@@ -1101,8 +1040,7 @@ func resetLocalProject(jirix *jiri.X, project Project, cleanupBranches bool) err
 	}
 
 	// Delete all the other branches.
-	// At this point we should be at the master branch.
-	branches, _, err := gitutil.New(jirix.NewSeq()).GetBranches()
+	branches, _, err := git.GetBranches()
 	if err != nil {
 		return err
 	}
@@ -1199,26 +1137,94 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	return err
 }
 
-// resetProjectCurrentBranch resets the current branch to the revision and
-// branch specified on the project.
-func resetProjectCurrentBranch(jirix *jiri.X, project Project) error {
+func getHeadRevision(jirix *jiri.X, project Project) (string, error) {
 	if err := project.fillDefaults(); err != nil {
-		return err
+		return "", err
 	}
 	// Having a specific revision trumps everything else.
 	if project.Revision != "HEAD" {
-		return gitutil.New(jirix.NewSeq()).Reset(project.Revision)
+		return project.Revision, nil
 	}
-	// If no revision, reset to the configured remote branch.
-	return gitutil.New(jirix.NewSeq()).Reset("origin/" + project.RemoteBranch)
+	return "origin/" + project.RemoteBranch, nil
 }
 
-// syncProjectMaster fetches from the project remote and resets the local master
-// branch to the revision and branch specified on the project.
+func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) error {
+	revision, err := getHeadRevision(jirix, project)
+	if err != nil {
+		return err
+	}
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	return git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
+}
+
+func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
+
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	changes, err := git.HasUncommittedChanges()
+	if err != nil {
+		return false, err
+	}
+	if changes {
+		return false, nil
+	}
+	err = git.Rebase(branch)
+	if err != nil {
+		err := git.RebaseAbort()
+		return false, err
+	}
+	return true, nil
+}
+
+// syncProjectMaster checks out latest detached head if project is on one
+// else it rebases current branch onto its tracking branch
 func syncProjectMaster(jirix *jiri.X, project Project) error {
-	return ApplyToLocalMaster(jirix, Projects{project.Key(): project}, func() error {
-		return resetProjectCurrentBranch(jirix, project)
-	})
+	s := jirix.NewSeq()
+	git := gitutil.New(s, gitutil.RootDirOpt(project.Path))
+	if !git.IsOnBranch() {
+		err := checkoutHeadRevision(jirix, project, false)
+		if err != nil {
+			revision, err2 := getHeadRevision(jirix, project)
+			if err2 != nil {
+				return err2
+			}
+			line1 := fmt.Sprintf("Note: For project (%v), not able to cheackout latest, error: %v", project.Name, err)
+			line2 := fmt.Sprintf("Please checkout manually to: %v, use 'git checkout --detach %v'", err, revision, revision)
+			s.Verbose(true).Output([]string{line1, line2})
+		}
+		return nil
+	} else {
+		branch, err := git.CurrentBranchName()
+		if err != nil {
+			return err
+		}
+		trackingBranch, err := git.TrackingBranchName()
+		if err != nil {
+			return err
+		}
+		if trackingBranch != "" {
+			rebaseSuccess, err := tryRebase(jirix, project, trackingBranch)
+			if err != nil {
+				return err
+			}
+			var line string
+			if rebaseSuccess {
+				line = fmt.Sprintf("NOTE: For project (%v), rebased your local branch %v on %v", project.Name, branch, trackingBranch)
+			} else {
+				line = fmt.Sprintf("NOTE: For project (%v), not able to rebase your local branch onto %v. Please do it manually", project.Name, trackingBranch)
+			}
+			s.Verbose(true).Output([]string{line})
+			return nil
+		} else {
+			revision, err2 := getHeadRevision(jirix, project)
+			if err2 != nil {
+				return err2
+			}
+			line1 := fmt.Sprintf("NOTE: For Project (%v), branch %v does not track any remote branch.", project.Name, branch)
+			line2 := fmt.Sprintf("Not rebasing it. To rebase it run 'git rebase %v'", revision)
+			s.Verbose(true).Output([]string{line1, line2})
+		}
+		return nil
+	}
 }
 
 // newManifestLoader returns a new manifest loader.  The localProjects are used
@@ -1345,6 +1351,11 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 			if err := gitutil.New(jirix.NewSeq()).Clone(p.Remote, path, ""); err != nil {
 				return err
 			}
+			p.Revision = "HEAD"
+			p.RemoteBranch = remote.RemoteBranch
+			if err := checkoutHeadRevision(jirix, p, false); err != nil {
+				return err
+			}
 			ld.localProjects[key] = p
 		}
 		// Reset the project to its specified branch and load the next file.  Note
@@ -1409,49 +1420,44 @@ func (ld *loader) load(jirix *jiri.X, root, file string) error {
 }
 
 func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, project Project) (e error) {
-	// Change to the project.Path directory, and revert when done.
-	pushd := jirix.NewSeq().Pushd(project.Path)
-	defer collect.Error(pushd.Done, &e)
-	// Reset the local master branch to what's specified on the project.  We only
+	// Reset the local branch to what's specified on the project.  We only
 	// fetch on updates; non-updates just perform the reset.
-	//
-	// TODO(toddw): Support "jiri update -local=p1,p2" by simply calling ld.Load
-	// for the given projects, rather than ApplyToLocalMaster(fetch+reset+load).
-	return ApplyToLocalMaster(jirix, Projects{project.Key(): project}, func() error {
-		if ld.update {
-			if err := fetchAll(jirix, project); err != nil {
-				return err
-			}
-		}
-		if err := resetProjectCurrentBranch(jirix, project); err != nil {
+	if ld.update {
+		if err := fetchAll(jirix, project); err != nil {
 			return err
 		}
-		return ld.Load(jirix, root, file, cycleKey)
-	})
-}
+	}
 
-// reportNonMaster checks if the given project is on master branch and
-// if not, reports this fact along with information on how to update it.
-func reportNonMaster(jirix *jiri.X, project Project) (e error) {
-	cwd, err := os.Getwd()
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	var currentRevision string
+	var err error
+	if git.IsOnBranch() {
+		currentRevision, err = git.CurrentBranchName()
+	} else {
+		currentRevision, err = git.CurrentRevision()
+	}
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-	s := jirix.NewSeq()
-	if err := s.Chdir(project.Path).Done(); err != nil {
-		return err
-	}
-	current, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	stashed, err := git.Stash()
 	if err != nil {
 		return err
 	}
-	if current != "master" {
-		line1 := fmt.Sprintf(`NOTE: "jiri update" only updates the "master" branch and the current branch of project %q is %q`, project.Name, current)
-		line2 := fmt.Sprintf(`to update the %q branch once the master branch is updated, run "git merge master"`, current)
-		s.Verbose(true).Output([]string{line1, line2})
+	// After running the function, checkout the original branch,
+	// and stash pop if necessary.
+	defer collect.Error(func() error {
+		if err := git.CheckoutBranch(currentRevision); err != nil {
+			return err
+		}
+		if stashed {
+			return git.StashPop()
+		}
+		return nil
+	}, &e)
+	if err := checkoutHeadRevision(jirix, project, false); err != nil {
+		return err
 	}
-	return nil
+	return ld.Load(jirix, root, file, cycleKey)
 }
 
 // groupByGoogleSourceHosts returns a map of googlesource host to a Projects
@@ -1479,6 +1485,8 @@ func groupByGoogleSourceHosts(ps Projects) map[string]Projects {
 // projects at HEAD so we can detect when a local project is already
 // up-to-date.
 func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
+	jirix.TimerPush("get remote revision")
+	defer jirix.TimerPop()
 	projectsAtHead := Projects{}
 	for _, rp := range remoteProjects {
 		if rp.Revision == "HEAD" {
@@ -1545,7 +1553,11 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	}
 
 	getRemoteHeadRevisions(jirix, remoteProjects)
-	ops := computeOperations(localProjects, remoteProjects, gc)
+	states, err := GetProjectStates(jirix, localProjects, false)
+	if err != nil {
+		return err
+	}
+	ops := computeOperations(localProjects, remoteProjects, states, gc)
 	updates := newFsUpdates()
 	for _, op := range ops {
 		if err := op.Test(jirix, updates); err != nil {
@@ -1746,14 +1758,14 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	if err != nil {
 		return err
 	}
-	if err := gitutil.New(jirix.NewSeq()).Clone(op.project.Remote, tmpDir, cache); err != nil {
+	if err := gitutil.New(s).Clone(op.project.Remote, tmpDir, cache); err != nil {
 		return err
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
+	defer collect.Error(func() error { return s.Chdir(cwd).Done() }, &e)
 	if err := s.Chdir(tmpDir).Done(); err != nil {
 		return err
 	}
@@ -1764,7 +1776,7 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 		Rename(tmpDir, op.destination).Done(); err != nil {
 		return err
 	}
-	return syncProjectMaster(jirix, op.project)
+	return checkoutHeadRevision(jirix, op.project, false)
 }
 
 func (op createOperation) String() string {
@@ -1812,7 +1824,14 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 		if err != nil {
 			return err
 		}
-		if len(branches) != 1 || uncommitted || untracked {
+		extraBranches := false
+		for _, branch := range branches {
+			if !strings.Contains(branch, "HEAD detached") && branch != "master" {
+				extraBranches = true
+				break
+			}
+		}
+		if extraBranches || uncommitted || untracked {
 			lines := []string{
 				fmt.Sprintf("NOTE: project %v was not found in the project manifest", op.project.Name),
 				"however this project either contains non-master branches, uncommitted",
@@ -1862,9 +1881,6 @@ func (op moveOperation) Run(jirix *jiri.X) error {
 	if err := s.MkdirAll(path, perm).Rename(op.source, op.destination).Done(); err != nil {
 		return err
 	}
-	if err := reportNonMaster(jirix, op.project); err != nil {
-		return err
-	}
 	if err := syncProjectMaster(jirix, op.project); err != nil {
 		return err
 	}
@@ -1903,9 +1919,6 @@ func (op updateOperation) Kind() string {
 	return "update"
 }
 func (op updateOperation) Run(jirix *jiri.X) error {
-	if err := reportNonMaster(jirix, op.project); err != nil {
-		return err
-	}
 	if err := syncProjectMaster(jirix, op.project); err != nil {
 		return err
 	}
@@ -1913,7 +1926,7 @@ func (op updateOperation) Run(jirix *jiri.X) error {
 }
 
 func (op updateOperation) String() string {
-	return fmt.Sprintf("advance project %q located in %q to %q", op.project.Name, op.source, fmtRevision(op.project.Revision))
+	return fmt.Sprintf("advance/rebase project %q located in %q to %q", op.project.Name, op.source, fmtRevision(op.project.Revision))
 }
 
 func (op updateOperation) Test(jirix *jiri.X, _ *fsUpdates) error {
@@ -1991,7 +2004,7 @@ func (ops operations) Swap(i, j int) {
 // system and manifest file respectively) and outputs a collection of
 // operations that describe the actions needed to update the target
 // projects.
-func computeOperations(localProjects, remoteProjects Projects, gc bool) operations {
+func computeOperations(localProjects, remoteProjects Projects, states map[ProjectKey]*ProjectState, gc bool) operations {
 	result := operations{}
 	allProjects := map[ProjectKey]bool{}
 	for _, p := range localProjects {
@@ -2002,19 +2015,23 @@ func computeOperations(localProjects, remoteProjects Projects, gc bool) operatio
 	}
 	for key, _ := range allProjects {
 		var local, remote *Project
+		var state *ProjectState
 		if project, ok := localProjects[key]; ok {
 			local = &project
 		}
 		if project, ok := remoteProjects[key]; ok {
 			remote = &project
 		}
-		result = append(result, computeOp(local, remote, gc))
+		if s, ok := states[key]; ok {
+			state = s
+		}
+		result = append(result, computeOp(local, remote, state, gc))
 	}
 	sort.Sort(result)
 	return result
 }
 
-func computeOp(local, remote *Project, gc bool) operation {
+func computeOp(local, remote *Project, state *ProjectState, gc bool) operation {
 	switch {
 	case local == nil && remote != nil:
 		return createOperation{commonOperation{
@@ -2038,14 +2055,20 @@ func computeOp(local, remote *Project, gc bool) operation {
 				project:     *remote,
 				source:      local.Path,
 			}}
-		case local.Revision != remote.Revision:
-			return updateOperation{commonOperation{
+		case state.CurrentBranch == "" && local.Revision == remote.Revision:
+			return nullOperation{commonOperation{
+				destination: remote.Path,
+				project:     *remote,
+				source:      local.Path,
+			}}
+		case local.Revision == state.CurrentTrackingBranchRev:
+			return nullOperation{commonOperation{
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,
 			}}
 		default:
-			return nullOperation{commonOperation{
+			return updateOperation{commonOperation{
 				destination: remote.Path,
 				project:     *remote,
 				source:      local.Path,

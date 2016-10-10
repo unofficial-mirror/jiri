@@ -36,6 +36,10 @@ func (ForceOpt) checkoutOpt()     {}
 func (ForceOpt) deleteBranchOpt() {}
 func (ForceOpt) pushOpt()         {}
 
+type DetachOpt bool
+
+func (DetachOpt) checkoutOpt() {}
+
 type MessageOpt string
 
 func (MessageOpt) commitOpt() {}

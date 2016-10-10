@@ -457,7 +457,11 @@ func projectStates(jirix *jiri.X, allowdirty bool) (map[project.ProjectKey]*proj
 	if err != nil {
 		return nil, nil, err
 	}
-	states, err := project.GetProjectStates(jirix, false)
+	projects, err := project.LocalProjects(jirix, project.FastScan)
+	if err != nil {
+		return nil, nil, err
+	}
+	states, err := project.GetProjectStates(jirix, projects, false)
 	if err != nil {
 		return nil, nil, err
 	}

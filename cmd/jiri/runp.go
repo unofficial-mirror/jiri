@@ -339,8 +339,12 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 			keysRE = regexp.MustCompile(".*")
 		}
 	}
+	projects, err := project.LocalProjects(jirix, project.FastScan)
+	if err != nil {
+		return err
+	}
 
-	states, err := project.GetProjectStates(jirix, runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted)
+	states, err := project.GetProjectStates(jirix, projects, runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted)
 	if err != nil {
 		return err
 	}
@@ -352,7 +356,8 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 				continue
 			}
 		} else {
-			if state.CurrentBranch != homeBranch {
+			// Run on all projects if current project has detached head
+			if git.IsOnBranch() && state.CurrentBranch != homeBranch {
 				continue
 			}
 		}

@@ -69,12 +69,16 @@ func projectName(i int) string {
 	return fmt.Sprintf("project-%d", i)
 }
 
-func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
-	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
+func writeFile(t *testing.T, jirix *jiri.X, projectDir, fileName, message string) {
+	path, perm := filepath.Join(projectDir, fileName), os.FileMode(0644)
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", path, perm, err)
 	}
-	commitFile(t, jirix, projectDir, path, "creating README")
+	commitFile(t, jirix, projectDir, path, "creating "+fileName)
+}
+
+func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
+	writeFile(t, jirix, projectDir, "README", message)
 }
 
 func checkProjectsMatchPaths(t *testing.T, gotProjects project.Projects, wantProjectPaths []string) {
@@ -508,7 +512,7 @@ func TestUpdateUniverseDeletedProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.AssertDirExists(localProjects[1].Path).Done(); err == nil {
-		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, localProjects[3].Path)
+		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, localProjects[1].Path)
 	}
 }
 
@@ -585,6 +589,126 @@ func TestUpdateUniverseRemoteBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkReadme(t, fake.X, localProjects[1], "non-master commit")
+}
+
+// TestUpdateWhenRemoteChangesRebased checks that UpdateUniverse can pull from a
+// non-master remote branch if the local changes were rebased somewhere else(gerrit)
+// before being pushed to remote
+func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitRemote := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+	if err := gitLocal.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	// checkout branch in local repo
+	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create commits in remote repo
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "non-master commit")
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
+	file1CommitRev, _ := gitRemote.CurrentRevision()
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file2", "file2")
+	file2CommitRev, _ := gitRemote.CurrentRevision()
+
+	if err := gitLocal.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Cherry pick creation of file1, so that it acts like been rebased on remote repo
+	// As there is a commit creating README on remote not in local repo
+	if err := gitLocal.CherryPick(file1CommitRev); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// It rebased properly and pulled latest changes
+	localRev, _ := gitLocal.CurrentRevision()
+	if file2CommitRev != localRev {
+		t.Fatalf("Current commit is %v, it should be %v\n", localRev, file2CommitRev)
+	}
+}
+
+// TestUpdateWhenRemoteChangesMerged checks that UpdateUniverse can pull from a
+// non-master remote branch if the local changes were merged somehwere else(gerrit)
+// before being pushed to remote
+func TestUpdateWhenRemoteChangesMerged(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitRemote := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+	if err := gitLocal.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	// checkout branch in local repo
+	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// creating two sepearte commit and merging them in remote
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
+	file1CommitRev, _ := gitRemote.CurrentRevision()
+	if err := gitRemote.CheckoutBranch("master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := gitRemote.CreateAndCheckoutBranch("branchToMerge"); err != nil {
+		t.Fatal(err)
+	}
+
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file2", "file2")
+
+	if err := gitRemote.CheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := gitRemote.Merge("branchToMerge"); err != nil {
+		t.Fatal(err)
+	}
+	mergeCommitRev, _ := gitRemote.CurrentRevision()
+
+	if err := gitLocal.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Cherry pick creation of file1
+	if err := gitLocal.CherryPick(file1CommitRev); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// It rebased properly and pulled latest changes
+	localRev, _ := gitLocal.CurrentRevision()
+	if mergeCommitRev != localRev {
+		t.Fatalf("Current commit is %v, it should be %v\n", localRev, mergeCommitRev)
+	}
 }
 
 func TestFileImportCycle(t *testing.T) {

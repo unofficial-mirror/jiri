@@ -20,11 +20,13 @@ type BranchState struct {
 }
 
 type ProjectState struct {
-	Branches       []BranchState
-	CurrentBranch  string
-	HasUncommitted bool
-	HasUntracked   bool
-	Project        Project
+	Branches                 []BranchState
+	CurrentBranch            string
+	CurrentTrackingBranch    string
+	CurrentTrackingBranchRev string
+	HasUncommitted           bool
+	HasUntracked             bool
+	Project                  Project
 }
 
 func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch chan<- error) {
@@ -35,6 +37,18 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 	if err != nil {
 		ch <- err
 		return
+	}
+	if state.CurrentBranch != "" {
+		if state.CurrentTrackingBranch, err = scm.TrackingBranchName(); err != nil {
+			ch <- err
+			return
+		}
+		if state.CurrentTrackingBranch != "" {
+			if state.CurrentTrackingBranchRev, err = scm.CurrentRevisionOfBranch(state.CurrentTrackingBranch); err != nil {
+				ch <- err
+				return
+			}
+		}
 	}
 	for _, branch := range branches {
 		file := filepath.Join(state.Project.Path, jiri.ProjectMetaDir, branch, ".gerrit_commit_message")
@@ -66,11 +80,7 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 	ch <- nil
 }
 
-func GetProjectStates(jirix *jiri.X, checkDirty bool) (map[ProjectKey]*ProjectState, error) {
-	projects, err := LocalProjects(jirix, FastScan)
-	if err != nil {
-		return nil, err
-	}
+func GetProjectStates(jirix *jiri.X, projects Projects, checkDirty bool) (map[ProjectKey]*ProjectState, error) {
 	states := make(map[ProjectKey]*ProjectState, len(projects))
 	sem := make(chan error, len(projects))
 	for key, project := range projects {

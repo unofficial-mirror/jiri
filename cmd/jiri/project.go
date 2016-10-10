@@ -95,7 +95,11 @@ var cmdProjectList = &cmdline.Command{
 
 // runProjectList generates a listing of local projects.
 func runProjectList(jirix *jiri.X, _ []string) error {
-	states, err := project.GetProjectStates(jirix, noPristineFlag)
+	projects, err := project.LocalProjects(jirix, project.FastScan)
+	if err != nil {
+		return err
+	}
+	states, err := project.GetProjectStates(jirix, projects, noPristineFlag)
 	if err != nil {
 		return err
 	}
@@ -150,12 +154,12 @@ the -template flag.`,
 
 // infoOutput defines JSON format for 'project info' output.
 type infoOutput struct {
-	Name			string `json:"name"`
-	Path			string `json:"path"`
-	Remote			string `json:"remote"`
-	Revision		string `json:"revision"`
-	CurrentBranch   string `json:"current_branch"`
-	Branches		[]string `json:"branches"`
+	Name          string   `json:"name"`
+	Path          string   `json:"path"`
+	Remote        string   `json:"remote"`
+	Revision      string   `json:"revision"`
+	CurrentBranch string   `json:"current_branch"`
+	Branches      []string `json:"branches"`
 }
 
 // runProjectInfo provides structured info on local projects.
@@ -183,6 +187,10 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 
 	var states map[project.ProjectKey]*project.ProjectState
 	var keys project.ProjectKeys
+	projects, err := project.LocalProjects(jirix, project.FastScan)
+	if err != nil {
+		return err
+	}
 	if len(args) == 0 {
 		currentProjectKey, err := project.CurrentProjectKey(jirix)
 		if err != nil {
@@ -192,7 +200,7 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		if err != nil {
 			// jiri was run from outside of a project so let's
 			// use all available projects.
-			states, err = project.GetProjectStates(jirix, false)
+			states, err = project.GetProjectStates(jirix, projects, false)
 			if err != nil {
 				return err
 			}
@@ -207,7 +215,7 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		}
 	} else {
 		var err error
-		states, err = project.GetProjectStates(jirix, false)
+		states, err = project.GetProjectStates(jirix, projects, false)
 		if err != nil {
 			return err
 		}
@@ -235,10 +243,10 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 	for i, key := range keys {
 		state := states[key]
 		info[i] = infoOutput{
-			Name: state.Project.Name,
-			Path: state.Project.Path,
-			Remote: state.Project.Remote,
-			Revision: state.Project.Revision,
+			Name:          state.Project.Name,
+			Path:          state.Project.Path,
+			Remote:        state.Project.Remote,
+			Revision:      state.Project.Revision,
 			CurrentBranch: state.CurrentBranch,
 		}
 		for _, b := range state.Branches {
@@ -316,7 +324,11 @@ indication of each project's status:
 }
 
 func runProjectShellPrompt(jirix *jiri.X, args []string) error {
-	states, err := project.GetProjectStates(jirix, checkDirtyFlag)
+	projects, err := project.LocalProjects(jirix, project.FastScan)
+	if err != nil {
+		return err
+	}
+	states, err := project.GetProjectStates(jirix, projects, checkDirtyFlag)
 	if err != nil {
 		return err
 	}

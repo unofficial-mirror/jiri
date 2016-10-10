@@ -119,7 +119,7 @@ func TestRunP(t *testing.T) {
 	setDefaultRunpFlags()
 	runpFlags.interactive = false
 	got = executeRunp(t, fake, "git", "rev-parse", "--abbrev-ref", "HEAD")
-	if want := "master\nmaster\nmaster\nmaster\nmaster\nmaster"; got != want {
+	if want := "HEAD\nHEAD\nHEAD\nHEAD\nHEAD\nHEAD"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
@@ -127,7 +127,7 @@ func TestRunP(t *testing.T) {
 	runpFlags.showKeyPrefix = true
 	runpFlags.interactive = false
 	got = executeRunp(t, fake, "git", "rev-parse", "--abbrev-ref", "HEAD")
-	if want := strings.Join(keys, ": master\n") + ": master"; got != want {
+	if want := strings.Join(keys, ": HEAD\n") + ": HEAD"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
@@ -139,7 +139,7 @@ func TestRunP(t *testing.T) {
 	split := strings.Split(uncollated, "\n")
 	sort.Strings(split)
 	got = strings.TrimSpace(strings.Join(split, "\n"))
-	if want := "manifest: master\nr.a: master\nr.b: master\nr.c: master\nsub/r.t1: master\nsub/sub2/r.t2: master"; got != want {
+	if want := "manifest: HEAD\nr.a: HEAD\nr.b: HEAD\nr.c: HEAD\nsub/r.t1: HEAD\nsub/sub2/r.t2: HEAD"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 

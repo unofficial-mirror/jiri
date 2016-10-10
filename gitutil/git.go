@@ -123,15 +123,21 @@ func (g *Git) BranchesDiffer(branch1, branch2 string) (bool, error) {
 // CheckoutBranch checks out the given branch.
 func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 	args := []string{"checkout"}
-	force := false
+	var force ForceOpt = false
+	var detach DetachOpt = false
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case ForceOpt:
-			force = bool(typedOpt)
+			force = typedOpt
+		case DetachOpt:
+			detach = typedOpt
 		}
 	}
 	if force {
 		args = append(args, "-f")
+	}
+	if detach {
+		args = append(args, "--detach")
 	}
 	args = append(args, branch)
 	return g.run(args...)
@@ -275,6 +281,38 @@ func (g *Git) CurrentBranchName() (string, error) {
 	return out[0], nil
 }
 
+func (g *Git) GetSymbolicRef() (string, error) {
+	out, err := g.runOutput("symbolic-ref", "-q", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+	}
+	return out[0], nil
+}
+
+// TrackingBranchName returns the name of the tracking branch.
+func (g *Git) TrackingBranchName() (string, error) {
+	currentRef, err := g.GetSymbolicRef()
+	if err != nil {
+		return "", err
+	}
+	out, err := g.runOutput("for-each-ref", "--format", "%(upstream:short)", currentRef)
+	if err != nil || len(out) == 0 {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+	}
+	return out[0], nil
+}
+
+func (g *Git) IsOnBranch() bool {
+	_, err := g.runOutput("symbolic-ref", "-q", "HEAD")
+	return err == nil
+}
+
 // CurrentRevision returns the current revision.
 func (g *Git) CurrentRevision() (string, error) {
 	return g.CurrentRevisionOfBranch("HEAD")
@@ -290,6 +328,11 @@ func (g *Git) CurrentRevisionOfBranch(branch string) (string, error) {
 		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
 	}
 	return out[0], nil
+}
+
+func (g *Git) CherryPick(rev string) error {
+	err := g.run("cherry-pick", rev)
+	return err
 }
 
 // DeleteBranch deletes the given branch.
@@ -393,7 +436,9 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	for _, branch := range out {
 		if strings.HasPrefix(branch, "*") {
 			branch = strings.TrimSpace(strings.TrimPrefix(branch, "*"))
-			current = branch
+			if g.IsOnBranch() {
+				current = branch
+			}
 		}
 		branches = append(branches, strings.TrimSpace(branch))
 	}
