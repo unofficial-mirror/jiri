@@ -1,2 +1,5 @@
 /.jiri
 /infra/.recipe_deps
+
+# Ignore the binary
+/jiri
