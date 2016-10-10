@@ -801,20 +801,6 @@ func loadManifestFile(jirix *jiri.X, file string, localProjects Projects) (Proje
 	return ld.Projects, nil
 }
 
-// getManifestRemote returns the remote url of the origin from the manifest
-// repo.
-// TODO(nlacasse,toddw): Once the manifest project is specified in the
-// manifest, we should get the remote directly from the manifest, and not from
-// the filesystem.
-func getManifestRemote(jirix *jiri.X, manifestPath string) (string, error) {
-	var remote string
-	return remote, jirix.NewSeq().Pushd(manifestPath).Call(
-		func() (e error) {
-			remote, e = gitutil.New(jirix.NewSeq()).RemoteUrl("origin")
-			return
-		}, "get manifest origin").Done()
-}
-
 func loadUpdatedManifest(jirix *jiri.X, localProjects Projects) (Projects, string, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
