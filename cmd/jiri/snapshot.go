@@ -15,8 +15,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/collect"
-	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/runutil"
 )
@@ -35,7 +33,6 @@ var (
 func init() {
 	cmdSnapshot.Flags.StringVar(&snapshotDirFlag, "dir", "", "Directory where snapshot are stored.  Defaults to $JIRI_ROOT/.snapshot.")
 	cmdSnapshotCheckout.Flags.BoolVar(&snapshotGcFlag, "gc", false, "Garbage collect obsolete repositories.")
-	cmdSnapshotCreate.Flags.BoolVar(&pushRemoteFlag, "push-remote", false, "Commit and push snapshot upstream.")
 	cmdSnapshotCreate.Flags.StringVar(&timeFormatFlag, "time-format", time.RFC3339, "Time format for snapshot file name.")
 }
 
@@ -96,34 +93,7 @@ func runSnapshotCreate(jirix *jiri.X, args []string) error {
 	}
 	snapshotFile := filepath.Join(snapshotDir, "labels", label, time.Now().Format(timeFormatFlag))
 
-	if !pushRemoteFlag {
-		// No git operations necessary.  Just create the snapshot file.
-		return createSnapshot(jirix, snapshotDir, snapshotFile, label)
-	}
-
-	// Attempt to create a snapshot on a clean master branch.  If snapshot
-	// creation fails, return to the state we were in before.
-	createFn := func() error {
-		git := gitutil.New(jirix.NewSeq())
-		revision, err := git.CurrentRevision()
-		if err != nil {
-			return err
-		}
-		if err := createSnapshot(jirix, snapshotDir, snapshotFile, label); err != nil {
-			git.Reset(revision)
-			git.RemoveUntrackedFiles()
-			return err
-		}
-		return commitAndPushChanges(jirix, snapshotDir, snapshotFile, label)
-	}
-
-	// Execute the above function in the snapshot directory on a clean master branch.
-	p := project.Project{
-		Path:         snapshotDir,
-		RemoteBranch: "master",
-		Revision:     "HEAD",
-	}
-	return project.ApplyToLocalMaster(jirix, project.Projects{p.Key(): p}, createFn)
+	return createSnapshot(jirix, snapshotDir, snapshotFile, label)
 }
 
 // getSnapshotDir returns the path to the snapshot directory, creating it if
@@ -165,40 +135,6 @@ func createSnapshot(jirix *jiri.X, snapshotDir, snapshotFile, label string) erro
 	return s.RemoveAll(newSymlink).
 		Symlink(relativeSnapshotPath, newSymlink).
 		Rename(newSymlink, symlink).Done()
-}
-
-// commitAndPushChanges commits changes identified by the given manifest file
-// and label to the containing repository and pushes these changes to the
-// remote repository.
-func commitAndPushChanges(jirix *jiri.X, snapshotDir, snapshotFile, label string) (e error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-	if err := jirix.NewSeq().Chdir(snapshotDir).Done(); err != nil {
-		return err
-	}
-	relativeSnapshotPath := strings.TrimPrefix(snapshotFile, snapshotDir+string(os.PathSeparator))
-	git := gitutil.New(jirix.NewSeq())
-	// Pull from master so we are up-to-date.
-	if err := git.Pull("origin", "master"); err != nil {
-		return err
-	}
-	if err := git.Add(relativeSnapshotPath); err != nil {
-		return err
-	}
-	if err := git.Add(label); err != nil {
-		return err
-	}
-	name := strings.TrimPrefix(snapshotFile, snapshotDir)
-	if err := git.CommitNoVerify(fmt.Sprintf("adding snapshot %q for label %q", name, label)); err != nil {
-		return err
-	}
-	if err := git.Push("origin", "master", gitutil.VerifyOpt(false)); err != nil {
-		return err
-	}
-	return nil
 }
 
 // cmdSnapshotCheckout represents the "jiri snapshot checkout" command.
