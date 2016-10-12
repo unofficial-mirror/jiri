@@ -39,6 +39,7 @@ for os in ${TARGETS}; do
     echo "${GS_BUCKET_URL}/${os}/${VERSION}"
     exit 1
   fi
+  chmod 755 "${TEMP_DIR}/jiri-${os}/jiri"
 
   # Upload the jiri binary to CIPD
   cipd create -name "fuchsia/tools/jiri/${os}-amd64" -in "${TEMP_DIR}/jiri-${os}" -ref latest -tag "git_repository:https://fuchsia.googlesource.com/jiri" -tag "git_revision:${VERSION}"
