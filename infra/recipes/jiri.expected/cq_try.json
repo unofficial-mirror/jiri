@@ -108,7 +108,7 @@
     "~followup_annotations": [
       "@@@STEP_TEXT@Go version: go1.7@@@",
       "@@@STEP_LOG_LINE@json.output@{@@@",
-      "@@@STEP_LOG_LINE@json.output@  \"executable\": \"[SLAVE_BUILD]/go/go/bin/go\", @@@",
+      "@@@STEP_LOG_LINE@json.output@  \"path\": \"[SLAVE_BUILD]/go/go\", @@@",
       "@@@STEP_LOG_LINE@json.output@  \"version\": \"go1.7\"@@@",
       "@@@STEP_LOG_LINE@json.output@}@@@",
       "@@@STEP_LOG_END@json.output@@@"
@@ -146,7 +146,8 @@
     "env": {
       "GOARCH": "amd64",
       "GOOS": "linux",
-      "GOPATH": "[SLAVE_BUILD]/go"
+      "GOPATH": "[SLAVE_BUILD]/go",
+      "GOROOT": "[SLAVE_BUILD]/go/go"
     },
     "name": "go build"
   },
@@ -157,7 +158,8 @@
       "fuchsia.googlesource.com/jiri/cmd/jiri"
     ],
     "env": {
-      "GOPATH": "[SLAVE_BUILD]/go"
+      "GOPATH": "[SLAVE_BUILD]/go",
+      "GOROOT": "[SLAVE_BUILD]/go/go"
     },
     "name": "go test"
   },

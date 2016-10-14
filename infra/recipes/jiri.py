@@ -73,13 +73,11 @@ def RunSteps(api, category, repo_url, refspec, gerrit_host, gerrit_project,
     goos, goarch = target.split("-", 2)
 
     with api.step.context({'env': {'GOPATH': gopath, 'GOOS': goos, 'GOARCH': goarch}}):
-        api.go.build(['fuchsia.googlesource.com/jiri/cmd/jiri'],
-                     ldflags=ldflags,
-                     force=True)
+        api.go('build', '-ldflags', ldflags, '-a',
+               'fuchsia.googlesource.com/jiri/cmd/jiri')
 
     with api.step.context({'env': {'GOPATH': gopath}}):
-        api.go.test(['fuchsia.googlesource.com/jiri/cmd/jiri'],
-                    env={'GOPATH': gopath})
+        api.go('test', 'fuchsia.googlesource.com/jiri/cmd/jiri')
 
 
 def GenTests(api):
