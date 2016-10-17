@@ -60,7 +60,7 @@ func commitFile(t *testing.T, jirix *jiri.X, dir, file, msg string) {
 	if err := jirix.NewSeq().Chdir(dir).Done(); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitutil.New(jirix.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).CommitFile(file, msg); err != nil {
+	if err := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(file, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,7 +107,7 @@ func TestLocalProjects(t *testing.T) {
 
 		// Initialize empty git repository.  The commit is necessary, otherwise
 		// "git rev-parse master" fails.
-		git := gitutil.New(s, gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(path))
+		git := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(path))
 		if err := git.Init(path); err != nil {
 			t.Fatal(err)
 		}

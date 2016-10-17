@@ -16,19 +16,6 @@ import (
 	"fuchsia.googlesource.com/jiri/runutil"
 )
 
-// PlatformSpecificGitArgs returns a git command line with platform specific,
-// if any, modifications. The code is duplicated here because of the dependency
-// structure in the jiri tool.
-// TODO(cnicolaou,bprosnitz): remove this once ssl certs are installed.
-func platformSpecificGitArgs(args ...string) []string {
-	if os.Getenv("FNL_SYSTEM") != "" {
-		// TODO(bprosnitz) Remove this after certificates are installed on FNL
-		// Disable SSL verification because certificates are not present on FNL.func
-		return append([]string{"-c", "http.sslVerify=false"}, args...)
-	}
-	return args
-}
-
 type GitError struct {
 	args        []string
 	output      string
@@ -52,56 +39,54 @@ func (ge GitError) Error() string {
 }
 
 type Git struct {
-	s       runutil.Sequence
-	opts    map[string]string
-	rootDir string
+	s			runutil.Sequence
+	opts		map[string]string
+	rootDir		string
+	userName	string
+	userEmail	string
 }
 
 type gitOpt interface {
 	gitOpt()
 }
-type AuthorNameOpt string
-type AuthorEmailOpt string
 type AuthorDateOpt string
-type CommitterNameOpt string
-type CommitterEmailOpt string
 type CommitterDateOpt string
 type RootDirOpt string
+type UserNameOpt string
+type UserEmailOpt string
 
-func (AuthorNameOpt) gitOpt()    {}
-func (AuthorEmailOpt) gitOpt()    {}
 func (AuthorDateOpt) gitOpt()    {}
-func (CommitterNameOpt) gitOpt() {}
-func (CommitterEmailOpt) gitOpt() {}
 func (CommitterDateOpt) gitOpt() {}
 func (RootDirOpt) gitOpt()       {}
+func (UserNameOpt) gitOpt() {}
+func (UserEmailOpt) gitOpt() {}
 
 // New is the Git factory.
 func New(s runutil.Sequence, opts ...gitOpt) *Git {
 	rootDir := ""
+	userName := ""
+	userEmail := ""
 	env := map[string]string{}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
-		case AuthorNameOpt:
-			env["GIT_AUTHOR_NAME"] = string(typedOpt)
-		case AuthorEmailOpt:
-			env["GIT_AUTHOR_EMAIL"] = string(typedOpt)
 		case AuthorDateOpt:
 			env["GIT_AUTHOR_DATE"] = string(typedOpt)
-		case CommitterNameOpt:
-			env["GIT_COMMITTER_NAME"] = string(typedOpt)
-		case CommitterEmailOpt:
-			env["GIT_COMMITTER_EMAIL"] = string(typedOpt)
 		case CommitterDateOpt:
 			env["GIT_COMMITTER_DATE"] = string(typedOpt)
 		case RootDirOpt:
 			rootDir = string(typedOpt)
+		case UserNameOpt:
+			userName = string(typedOpt)
+		case UserEmailOpt:
+			userEmail = string(typedOpt)
 		}
 	}
 	return &Git{
-		s:       s,
-		opts:    env,
-		rootDir: rootDir,
+		s:			s,
+		opts:		env,
+		rootDir:	rootDir,
+		userName:	userName,
+		userEmail:	userEmail,
 	}
 }
 
@@ -773,7 +758,12 @@ func (g *Git) runInteractive(args ...string) error {
 
 func (g *Git) runWithFn(fn func(s runutil.Sequence) runutil.Sequence, args ...string) error {
 	g.s.Dir(g.rootDir)
-	args = platformSpecificGitArgs(args...)
+	if g.userName != "" {
+		args = append([]string{"-c", fmt.Sprintf("user.name=%s", g.userName)}, args...)
+	}
+	if g.userEmail != "" {
+		args = append([]string{"-c", fmt.Sprintf("user.email=%s", g.userEmail)}, args...)
+	}
 	if fn == nil {
 		fn = func(s runutil.Sequence) runutil.Sequence { return s }
 	}
