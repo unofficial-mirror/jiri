@@ -60,11 +60,19 @@ type Git struct {
 type gitOpt interface {
 	gitOpt()
 }
+type AuthorNameOpt string
+type AuthorEmailOpt string
 type AuthorDateOpt string
+type CommitterNameOpt string
+type CommitterEmailOpt string
 type CommitterDateOpt string
 type RootDirOpt string
 
+func (AuthorNameOpt) gitOpt()    {}
+func (AuthorEmailOpt) gitOpt()    {}
 func (AuthorDateOpt) gitOpt()    {}
+func (CommitterNameOpt) gitOpt() {}
+func (CommitterEmailOpt) gitOpt() {}
 func (CommitterDateOpt) gitOpt() {}
 func (RootDirOpt) gitOpt()       {}
 
@@ -74,8 +82,16 @@ func New(s runutil.Sequence, opts ...gitOpt) *Git {
 	env := map[string]string{}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
+		case AuthorNameOpt:
+			env["GIT_AUTHOR_NAME"] = string(typedOpt)
+		case AuthorEmailOpt:
+			env["GIT_AUTHOR_EMAIL"] = string(typedOpt)
 		case AuthorDateOpt:
 			env["GIT_AUTHOR_DATE"] = string(typedOpt)
+		case CommitterNameOpt:
+			env["GIT_COMMITTER_NAME"] = string(typedOpt)
+		case CommitterEmailOpt:
+			env["GIT_COMMITTER_EMAIL"] = string(typedOpt)
 		case CommitterDateOpt:
 			env["GIT_COMMITTER_DATE"] = string(typedOpt)
 		case RootDirOpt:

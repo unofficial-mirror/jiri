@@ -138,7 +138,7 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	if err := gitutil.New(fake.X.NewSeq()).Init(projectDir); err != nil {
 		return err
 	}
-	if err := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
 		return err
 	}
 	fake.Projects[name] = projectDir
@@ -179,7 +179,7 @@ func (fake FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
 }
 
 func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path string) error {
-	git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+	git := gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
 	if err := manifest.ToFile(fake.X, path); err != nil {
 		return err
 	}

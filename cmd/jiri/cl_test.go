@@ -126,7 +126,7 @@ func commitFile(t *testing.T, jirix *jiri.X, filename string, content string) {
 		t.Fatalf("%v", err)
 	}
 	commitMessage := "Commit " + filename
-	if err := gitutil.New(jirix.NewSeq()).CommitFile(filename, commitMessage); err != nil {
+	if err := gitutil.New(jirix.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).CommitFile(filename, commitMessage); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -204,7 +204,7 @@ func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	// Create origin.
 	originPath := createRepo(t, jirix, "origin")
 	chdir(t, jirix, originPath)
-	if err := gitutil.New(jirix.NewSeq()).CommitWithMessage("initial commit"); err != nil {
+	if err := gitutil.New(jirix.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).CommitWithMessage("initial commit"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	// Create test repo.
@@ -660,7 +660,7 @@ func TestDirtyBranch(t *testing.T) {
 	assertFileContent(t, fake.X, untrackedFile, untrackedFileContent)
 	// As of git 2.4.3 "git stash pop" fails if there are uncommitted
 	// changes in the index. So we need to commit them first.
-	if err := gitutil.New(fake.X.NewSeq()).Commit(); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).Commit(); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertStashSize(t, fake.X, 1)
@@ -872,7 +872,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	if err := gitutil.New(fake.X.NewSeq()).Add("B"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := gitutil.New(fake.X.NewSeq()).CommitWithMessage("editing stuff"); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).CommitWithMessage("editing stuff"); err != nil {
 		t.Fatalf("git commit failed: %v", err)
 	}
 	review, err := newReview(fake.X, project.Project{}, gerrit.CLOpts{
@@ -893,7 +893,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	if err := gitutil.New(fake.X.NewSeq()).Remove("B", "C"); err != nil {
 		t.Fatalf("git rm B C failed: %v", err)
 	}
-	if err := gitutil.New(fake.X.NewSeq()).CommitWithMessage("deleting stuff"); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).CommitWithMessage("deleting stuff"); err != nil {
 		t.Fatalf("git commit failed: %v", err)
 	}
 	review, err = newReview(fake.X, project.Project{}, gerrit.CLOpts{
@@ -981,7 +981,7 @@ func TestParallelDev(t *testing.T) {
 	if err := gitutil.New(fake.X.NewSeq()).Add("B"); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := gitutil.New(fake.X.NewSeq()).CommitWithMessage("Conflict resolution"); err != nil {
+	if err := gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com")).CommitWithMessage("Conflict resolution"); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -1071,7 +1071,7 @@ func TestMultiPart(t *testing.T) {
 	}
 
 	git := func(dir string) *gitutil.Git {
-		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+		return gitutil.New(fake.X.NewSeq(), gitutil.CommitterNameOpt("John Doe"), gitutil.CommitterEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
 	}
 
 	// Paths that contain the various test projects -- many functions in `jiri cl` depend on the current
