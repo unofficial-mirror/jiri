@@ -238,6 +238,29 @@ func (m *Manifest) unfillDefaults() error {
 	return nil
 }
 
+type MultiError []error
+
+func (m MultiError) Error() string {
+	s, n := "", 0
+	for _, e := range m {
+		if e != nil {
+			if n == 0 {
+				s = e.Error()
+			}
+			n++
+		}
+	}
+	switch n {
+	case 0:
+		return "(0 errors)"
+	case 1:
+		return s
+	case 2:
+		return s + " (and 1 other error)"
+	}
+	return fmt.Sprintf("%s (and %d other errors)", s, n-1)
+}
+
 // Import represents a remote manifest import.
 type Import struct {
 	// Manifest file to use from the remote manifest project.
@@ -1485,8 +1508,6 @@ func groupByGoogleSourceHosts(ps Projects) map[string]Projects {
 // projects at HEAD so we can detect when a local project is already
 // up-to-date.
 func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
-	jirix.TimerPush("get remote revision")
-	defer jirix.TimerPop()
 	projectsAtHead := Projects{}
 	for _, rp := range remoteProjects {
 		if rp.Revision == "HEAD" {
@@ -1527,10 +1548,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 	}
 }
 
-func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, showUpdateLogs bool) error {
-	jirix.TimerPush("update projects")
-	defer jirix.TimerPop()
-
+func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) error {
 	errs := make(chan error, len(localProjects))
 	var wg sync.WaitGroup
 	for key, project := range localProjects {
@@ -1538,24 +1556,62 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 			wg.Add(1)
 			go func(project Project) {
 				defer wg.Done()
-				err := fetchAll(jirix, project)
-				if err != nil {
+				if err := fetchAll(jirix, project); err != nil {
 					errs <- fmt.Errorf("fetch failed for %v: %v", project.Name, err)
+					return
 				}
 			}(project)
 		}
 	}
 	wg.Wait()
 	close(errs)
+
+	multiErr := make(MultiError, 0)
 	for err := range errs {
-		// Return first error
-		return err
+		multiErr = append(multiErr, err)
+	}
+	if len(multiErr) != 0 {
+		return multiErr
 	}
 
-	getRemoteHeadRevisions(jirix, remoteProjects)
-	states, err := GetProjectStates(jirix, localProjects, false)
-	if err != nil {
-		return err
+	return nil
+}
+
+func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, showUpdateLogs bool) error {
+	jirix.TimerPush("update projects")
+	defer jirix.TimerPop()
+
+	jirix.TimerPush("Fetch local projects and get remote revisions")
+	errs := make(chan error)
+	states := make(map[ProjectKey]*ProjectState, len(localProjects))
+	go func() {
+		if err := fetchLocalProjects(jirix, localProjects, remoteProjects); err != nil {
+			errs <- err
+			return
+		}
+		s, err := GetProjectStates(jirix, localProjects, false)
+		if err != nil {
+			errs <- err
+			return
+		}
+		for k, v := range s {
+			states[k] = v
+		}
+		errs <- nil
+	}()
+	go func() {
+		getRemoteHeadRevisions(jirix, remoteProjects)
+		errs <- nil
+	}()
+	multiErr := make(MultiError, 0)
+	for i := 1; i <= 2; i++ {
+		if err := <-errs; err != nil {
+			multiErr = append(multiErr, err)
+		}
+	}
+	jirix.TimerPop()
+	if len(multiErr) != 0 {
+		return multiErr
 	}
 	ops := computeOperations(localProjects, remoteProjects, states, gc)
 	updates := newFsUpdates()
