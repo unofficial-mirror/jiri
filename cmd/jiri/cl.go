@@ -707,7 +707,7 @@ func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
 	gerritRemote.Path = projectRemoteUrl.Path
 
 	// Create and run the review.
-	review, err := newReview(jirix, p, gerrit.CLOpts{
+	review, err := newReview(jirix, git, p, gerrit.CLOpts{
 		Autosubmit:   autosubmitFlag,
 		Ccs:          parseEmails(ccsFlag),
 		Draft:        draftFlag,
@@ -727,7 +727,7 @@ func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
 	} else if !confirmed {
 		return nil
 	}
-	err = review.run()
+	err = review.run(git)
 	// Ignore the error that is returned when there are no differences
 	// between the local and gerrit branches.
 	if err != nil && noChangesRE.MatchString(err.Error()) {
@@ -797,10 +797,10 @@ type review struct {
 	gerrit.CLOpts
 }
 
-func newReview(jirix *jiri.X, project project.Project, opts gerrit.CLOpts) (*review, error) {
+func newReview(jirix *jiri.X, git *gitutil.Git, project project.Project, opts gerrit.CLOpts) (*review, error) {
 	// Sync all CLs in the sequence of dependent CLs ending in the
 	// current branch.
-	if err := syncCL(jirix); err != nil {
+	if err := syncCL(jirix, git); err != nil {
 		return nil, err
 	}
 
@@ -917,8 +917,7 @@ func (review *review) cleanup(stashed bool) error {
 // message for all but that last CL is derived from their
 // <commitMessageFileName>, while the <message> argument is used as
 // the commit message for the last commit.
-func (review *review) createReviewBranch(message string) (e error) {
-	git := gitutil.New(review.jirix.NewSeq())
+func (review *review) createReviewBranch(git *gitutil.Git, message string) (e error) {
 	// Create the review branch.
 	if err := git.FetchRefspec("origin", review.CLOpts.RemoteBranch); err != nil {
 		return err
@@ -972,7 +971,7 @@ func (review *review) createReviewBranch(message string) (e error) {
 		return err
 	}
 	branches = append(branches, review.CLOpts.Branch)
-	if err := review.squashBranches(branches, message); err != nil {
+	if err := review.squashBranches(git, branches, message); err != nil {
 		return err
 	}
 
@@ -986,8 +985,7 @@ func (review *review) createReviewBranch(message string) (e error) {
 //
 // TODO(jsimsa): Consider using "git rebase --onto" to avoid having to
 // deal with merge conflicts.
-func (review *review) squashBranches(branches []string, message string) (e error) {
-	git := gitutil.New(review.jirix.NewSeq())
+func (review *review) squashBranches(git *gitutil.Git, branches []string, message string) (e error) {
 	for i := 1; i < len(branches); i++ {
 		// We want to merge the <branches[i]> branch on top of the review
 		// branch, forcing all conflicts to be reviewed in favor of the
@@ -1017,9 +1015,6 @@ func (review *review) squashBranches(branches []string, message string) (e error
 		if len(output) < 1 || len(output[0]) < 2 {
 			return fmt.Errorf("unexpected output length: %v", output)
 		}
-		authorDate := gitutil.AuthorDateOpt(output[0][0])
-		committer := gitutil.CommitterDateOpt(output[0][1])
-		git = gitutil.New(review.jirix.NewSeq(), authorDate, committer)
 		if i < len(branches)-1 {
 			file, err := getCommitMessageFileName(review.jirix, branches[i])
 			if err != nil {
@@ -1174,8 +1169,7 @@ func (review *review) processLabelsAndCommitFile(message string) string {
 
 // run implements checks that the review passes all local checks
 // and then uploads it to Gerrit.
-func (review *review) run() (e error) {
-	git := gitutil.New(review.jirix.NewSeq())
+func (review *review) run(git *gitutil.Git) (e error) {
 	if uncommittedFlag {
 		changes, err := git.FilesWithUncommittedChanges()
 		if err != nil {
@@ -1235,10 +1229,10 @@ func (review *review) run() (e error) {
 	if message != "" {
 		message = review.processLabelsAndCommitFile(message)
 	}
-	if err := review.createReviewBranch(message); err != nil {
+	if err := review.createReviewBranch(git, message); err != nil {
 		return err
 	}
-	if err := review.updateReviewMessage(file); err != nil {
+	if err := review.updateReviewMessage(git, file); err != nil {
 		return err
 	}
 	if err := review.send(); err != nil {
@@ -1298,8 +1292,7 @@ func (review *review) setTopic() error {
 }
 
 // updateReviewMessage writes the commit message to the given file.
-func (review *review) updateReviewMessage(file string) error {
-	git := gitutil.New(review.jirix.NewSeq())
+func (review *review) updateReviewMessage(git *gitutil.Git, file string) error {
 	if err := git.CheckoutBranch(review.reviewBranch); err != nil {
 		return err
 	}
@@ -1585,11 +1578,11 @@ before the command can be retried.
 }
 
 func runCLSync(jirix *jiri.X, _ []string) error {
-	return syncCL(jirix)
+	git := gitutil.New(jirix.NewSeq())
+	return syncCL(jirix, git)
 }
 
-func syncCL(jirix *jiri.X) (e error) {
-	git := gitutil.New(jirix.NewSeq())
+func syncCL(jirix *jiri.X, git *gitutil.Git) (e error) {
 	stashed, err := git.Stash()
 	if err != nil {
 		return err
