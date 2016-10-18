@@ -372,10 +372,7 @@ type Project struct {
 	// GitHooks is a directory containing git hooks that will be installed for
 	// this project.
 	GitHooks string `xml:"githooks,attr,omitempty"`
-	// RunHook is a script that will run when the project is created, updated,
-	// or moved.  The argument to the script will be "create", "update" or
-	// "move" depending on the type of operation being performed.
-	RunHook string   `xml:"runhook,attr,omitempty"`
+
 	XMLName struct{} `xml:"project"`
 
 	// This is used to store computed key. This is useful when remote and
@@ -433,9 +430,6 @@ func (p *Project) absolutizePaths(basepath string) {
 	if p.GitHooks != "" && !filepath.IsAbs(p.GitHooks) {
 		p.GitHooks = filepath.Join(basepath, p.GitHooks)
 	}
-	if p.RunHook != "" && !filepath.IsAbs(p.RunHook) {
-		p.RunHook = filepath.Join(basepath, p.RunHook)
-	}
 }
 
 // relativizePaths makes all absolute paths relative to basepath.
@@ -453,13 +447,6 @@ func (p *Project) relativizePaths(basepath string) error {
 			return err
 		}
 		p.GitHooks = relGitHooks
-	}
-	if filepath.IsAbs(p.RunHook) {
-		relRunHook, err := filepath.Rel(basepath, p.RunHook)
-		if err != nil {
-			return err
-		}
-		p.RunHook = relRunHook
 	}
 	return nil
 }
@@ -1530,23 +1517,6 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks) error {
 			return fmt.Errorf("error running hook for project %q: %v", hook.ProjectName, err)
 		}
 
-	}
-
-	//TODO(anmittal): remove this ones above change is checked-in
-	// and fnl-hackers know about the change
-	for _, op := range ops {
-		if op.Project().RunHook == "" {
-			continue
-		}
-		// Don't want to run hooks when repo is deleted
-		if op.Kind() == "delete" {
-			continue
-		}
-		s := jirix.NewSeq()
-		s.Verbose(true).Output([]string{fmt.Sprintf("running hook for project %q", op.Project().Name)})
-		if err := s.Dir(op.Project().Path).Capture(os.Stdout, os.Stderr).Last(op.Project().RunHook); err != nil {
-			return fmt.Errorf("error running hook for project %q: %v", op.Project().Name, err)
-		}
 	}
 	return nil
 }

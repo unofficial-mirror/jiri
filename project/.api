@@ -60,7 +60,6 @@ pkg project, type Project struct, Path string
 pkg project, type Project struct, Remote string
 pkg project, type Project struct, RemoteBranch string
 pkg project, type Project struct, Revision string
-pkg project, type Project struct, RunHook string
 pkg project, type Project struct, XMLName struct{}
 pkg project, type ProjectKey string
 pkg project, type ProjectKeys []ProjectKey

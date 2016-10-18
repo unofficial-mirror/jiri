@@ -135,7 +135,6 @@ Manifests have the following XML schema:
              remotebranch="my-branch"
              gerrithost="https://myorg-review.googlesource.com"
              githooks="path/to/githooks-dir"
-             runhook="path/to/runhook-script"
     />
     ...
   </projects>
@@ -198,9 +197,6 @@ specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 * githooks (optional) - The path (relative to [root]) of a directory containing
 git hooks that will be installed in the projects .git/hooks directory during
 each update.
-
-* runhook (optional) - The path (relate to [root]) of a script that will be run
-during each update.
 
 The <hook> tag describes the hooks that must be executed after every 'jiri update'
 They are configured via the following attributes:

@@ -784,7 +784,6 @@ func TestManifestToFromBytes(t *testing.T) {
 						Revision:     "HEAD",
 						GerritHost:   "https://test-review.googlesource.com",
 						GitHooks:     "path/to/githooks",
-						RunHook:      "path/to/hook",
 					},
 					{
 						Name:         "project2",
@@ -809,7 +808,7 @@ func TestManifestToFromBytes(t *testing.T) {
     <localimport file="fileimport"/>
   </imports>
   <projects>
-    <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" runhook="path/to/hook"/>
+    <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks"/>
     <project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
   </projects>
   <hooks>
@@ -862,12 +861,11 @@ func TestProjectToFromFile(t *testing.T) {
 				Name:         "project2",
 				Path:         filepath.Join(jirix.Root, "path2"),
 				GitHooks:     filepath.Join(jirix.Root, "git-hooks"),
-				RunHook:      filepath.Join(jirix.Root, "run-hook"),
 				Remote:       "remote2",
 				RemoteBranch: "branch2",
 				Revision:     "rev2",
 			},
-			`<project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2" githooks="git-hooks" runhook="run-hook"/>
+			`<project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2" githooks="git-hooks"/>
 `,
 		},
 	}
