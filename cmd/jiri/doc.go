@@ -467,31 +467,6 @@ The jiri update flags are:
  -v=false
    Print verbose output.
 
-Jiri which - Show path to the jiri tool
-
-Which behaves similarly to the unix commandline tool.  It is useful in
-determining whether the jiri binary is being run directly, or run via the jiri
-shim script.
-
-If the binary is being run directly, the output looks like this:
-
-  # binary
-  /path/to/binary/jiri
-
-If the script is being run, the output looks like this:
-
-  # script
-  /path/to/script/jiri
-
-Usage:
-   jiri which [flags]
-
-The jiri which flags are:
- -color=true
-   Use color to format output.
- -v=false
-   Print verbose output.
-
 Jiri runp - Run a command in parallel across jiri projects
 
 Run a command in parallel across one or more jiri projects. Commands are run
