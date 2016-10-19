@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/jiritest"
 )
 
 type importTestCase struct {
@@ -21,11 +20,19 @@ type importTestCase struct {
 	Filename       string
 	Exist, Want    string
 	Stdout, Stderr string
+	SetFlags       func()
 }
 
 func TestImport(t *testing.T) {
 	tests := []importTestCase{
 		{
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = false
+				flagImportOut = ""
+			},
 			Stderr: `wrong number of arguments`,
 		},
 		{
@@ -38,7 +45,14 @@ func TestImport(t *testing.T) {
 		},
 		// Remote imports, default append behavior
 		{
-			Args: []string{"-name=name", "-remote-branch=remotebranch", "-root=root", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "name"
+				flagImportRemoteBranch = "remotebranch"
+				flagImportRoot = "root"
+				flagImportOverwrite = false
+				flagImportOut = ""
+			},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="foo" name="name" remote="https://github.com/new.git" remotebranch="remotebranch" root="root"/>
@@ -47,6 +61,13 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = false
+				flagImportOut = ""
+			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
@@ -56,7 +77,14 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args:     []string{"-out=file", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = false
+				flagImportOut = "file"
+			},
+			Args:     []string{"foo", "https://github.com/new.git"},
 			Filename: `file`,
 			Want: `<manifest>
   <imports>
@@ -66,7 +94,14 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"-out=-", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = false
+				flagImportOut = "-"
+			},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Stdout: `<manifest>
   <imports>
     <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
@@ -75,6 +110,13 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = false
+				flagImportOut = ""
+			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
@@ -92,7 +134,14 @@ func TestImport(t *testing.T) {
 		},
 		// Remote imports, explicit overwrite behavior
 		{
-			Args: []string{"-overwrite", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = true
+				flagImportOut = ""
+			},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
@@ -101,7 +150,14 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args:     []string{"-overwrite", "-out=file", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = true
+				flagImportOut = "file"
+			},
+			Args:     []string{"foo", "https://github.com/new.git"},
 			Filename: `file`,
 			Want: `<manifest>
   <imports>
@@ -111,7 +167,14 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"-overwrite", "-out=-", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = true
+				flagImportOut = "-"
+			},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Stdout: `<manifest>
   <imports>
     <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
@@ -120,7 +183,14 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			Args: []string{"-overwrite", "foo", "https://github.com/new.git"},
+			SetFlags: func() {
+				flagImportName = "manifest"
+				flagImportRemoteBranch = "master"
+				flagImportRoot = ""
+				flagImportOverwrite = true
+				flagImportOut = ""
+			},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
     <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
@@ -143,15 +213,16 @@ func TestImport(t *testing.T) {
 	}
 	defer os.RemoveAll(binDir)
 
-	jiriPath := buildGoPkg(t, "fuchsia.googlesource.com/jiri/cmd/jiri", binDir)
 	for _, test := range tests {
-		if err := testImport(t, jiriPath, test); err != nil {
+		if err := testImport(t, test); err != nil {
 			t.Errorf("%v: %v", test.Args, err)
 		}
 	}
 }
 
-func testImport(t *testing.T, jiriTool string, test importTestCase) error {
+func testImport(t *testing.T, test importTestCase) error {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
 	// Temporary directory in which to run `jiri import`.
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -166,14 +237,8 @@ func testImport(t *testing.T, jiriTool string, test importTestCase) error {
 	}
 	defer os.Chdir(cwd)
 
-	// Create and cd into a root directory in which to do the actual import.
-	jiriRoot := filepath.Join(tmpDir, "root")
-	if err := os.Mkdir(jiriRoot, 0755); err != nil {
-		return err
-	}
-	if err := os.Mkdir(filepath.Join(jiriRoot, jiri.RootMetaDir), 0755); err != nil {
-		return err
-	}
+	// cd into a root directory in which to do the actual import.
+	jiriRoot := jirix.Root
 	if err := os.Chdir(jiriRoot); err != nil {
 		return err
 	}
@@ -200,8 +265,20 @@ func testImport(t *testing.T, jiriTool string, test importTestCase) error {
 	}
 
 	// Run import and check the results.
-	importCmd := exec.Command(jiriTool, append([]string{"import"}, test.Args...)...)
-	stdout, stderr := runCmd(t, importCmd, test.Stderr != "")
+	importCmd := func() {
+		if test.SetFlags != nil {
+			test.SetFlags()
+		}
+		err = runImport(jirix, test.Args)
+	}
+	stdout, _, runErr := runfunc(importCmd)
+	if runErr != nil {
+		return err
+	}
+	stderr := ""
+	if err != nil {
+		stderr = err.Error()
+	}
 	if got, want := stdout, test.Stdout; !strings.Contains(got, want) || (got != "" && want == "") {
 		return fmt.Errorf("stdout got %q, want substr %q", got, want)
 	}
