@@ -5,14 +5,10 @@
 package main
 
 import (
-	"flag"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
 
 	"fuchsia.googlesource.com/jiri/gitutil"
@@ -20,21 +16,21 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
-var (
-	buildJiriOnce   sync.Once
-	buildJiriBinDir = ""
-)
-
-func buildJiri(t *testing.T) string {
-	buildJiriOnce.Do(func() {
-		binDir, err := ioutil.TempDir("", "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		buildGoPkg(t, "fuchsia.googlesource.com/jiri/cmd/jiri", binDir)
-		buildJiriBinDir = binDir
-	})
-	return buildJiriBinDir
+func setDefaultRunpFlags() {
+	runpFlags.projectKeys = ""
+	runpFlags.verbose = false
+	runpFlags.interactive = false
+	runpFlags.uncommitted = false
+	runpFlags.untracked = false
+	runpFlags.noUncommitted = false
+	runpFlags.noUntracked = false
+	runpFlags.gerritMessage = false
+	runpFlags.noGerritMessage = false
+	runpFlags.showNamePrefix = false
+	runpFlags.showKeyPrefix = false
+	runpFlags.exitOnError = false
+	runpFlags.collateOutput = true
+	runpFlags.branch = ""
 }
 
 func addProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
@@ -67,26 +63,24 @@ func addProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
 	return projects
 }
 
-func run(t *testing.T, dir, bin string, args ...string) string {
-	cmd := exec.Command(filepath.Join(dir, bin), args...)
-	stdout, stderr := runCmd(t, cmd, false)
-	return strings.TrimSpace(strings.Join([]string{stdout, stderr}, " "))
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	r := m.Run()
-	if buildJiriBinDir != "" {
-		os.RemoveAll(buildJiriBinDir)
+func executeRunp(t *testing.T, fake *jiritest.FakeJiriRoot, args ...string) string {
+	stderr := ""
+	runCmd := func() {
+		if err := runRunp(fake.X, args); err != nil {
+			stderr = err.Error()
+		}
 	}
-	os.Exit(r)
+	stdout, _, err := runfunc(runCmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(strings.Join([]string{stdout, stderr}, " "))
 }
 
 func TestRunP(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	projects := addProjects(t, fake)
-	dir := buildJiri(t)
 
 	if got, want := len(projects), 5; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -111,8 +105,10 @@ func TestRunP(t *testing.T) {
 	}
 
 	chdir(projects[0].Path)
-
-	got := run(t, dir, "jiri", "runp", "--show-name-prefix", "-v", "echo")
+	setDefaultRunpFlags()
+	runpFlags.showNamePrefix = true
+	runpFlags.verbose = true
+	got := executeRunp(t, fake, "echo")
 	hdr := "Project Names: manifest r.a r.b r.c sub/r.t1 sub/sub2/r.t2\n"
 	hdr += "Project Keys: " + strings.Join(keys, " ") + "\n"
 
@@ -120,27 +116,26 @@ func TestRunP(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "-v", "--interactive=false", "basename", "$(", filepath.Join(dir, "jiri"), "project", "info", "-f", "{{.Project.Path}}", ")")
-	if want := hdr + "manifest\nr.a\nr.b\nr.c\nr.t1\nr.t2"; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	got = run(t, dir, "jiri", "runp", "--interactive=false", "git", "rev-parse", "--abbrev-ref", "HEAD")
+	setDefaultRunpFlags()
+	runpFlags.interactive = false
+	got = executeRunp(t, fake, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	if want := "master\nmaster\nmaster\nmaster\nmaster\nmaster"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "-interactive=false", "--show-name-prefix=true", "git", "rev-parse", "--abbrev-ref", "HEAD")
-	if want := "manifest: master\nr.a: master\nr.b: master\nr.c: master\nsub/r.t1: master\nsub/sub2/r.t2: master"; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	got = run(t, dir, "jiri", "runp", "--interactive=false", "--show-key-prefix=true", "git", "rev-parse", "--abbrev-ref", "HEAD")
+	setDefaultRunpFlags()
+	runpFlags.showKeyPrefix = true
+	runpFlags.interactive = false
+	got = executeRunp(t, fake, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	if want := strings.Join(keys, ": master\n") + ": master"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	uncollated := run(t, dir, "jiri", "runp", "--interactive=false", "--collate-stdout=false", "--show-name-prefix=true", "git", "rev-parse", "--abbrev-ref", "HEAD")
+	setDefaultRunpFlags()
+	runpFlags.showNamePrefix = true
+	runpFlags.interactive = false
+	runpFlags.collateOutput = false
+	uncollated := executeRunp(t, fake, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	split := strings.Split(uncollated, "\n")
 	sort.Strings(split)
 	got = strings.TrimSpace(strings.Join(split, "\n"))
@@ -148,7 +143,10 @@ func TestRunP(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--show-name-prefix", "--projects=r.t[12]", "echo")
+	setDefaultRunpFlags()
+	runpFlags.projectKeys = "r.t[12]"
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "sub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -171,13 +169,18 @@ func TestRunP(t *testing.T) {
 	}
 
 	newfile(rb, "untracked.go")
-
-	got = run(t, dir, "jiri", "runp", "--untracked", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.untracked = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "r.b:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--no-untracked", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.noUntracked = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "manifest: \nr.a: \nr.c: \nsub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -188,24 +191,28 @@ func TestRunP(t *testing.T) {
 		t.Error(err)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--uncommitted", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.uncommitted = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "r.c:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--no-uncommitted", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.noUncommitted = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "manifest: \nr.a: \nr.b: \nsub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	// test ordering of has-<x> flags
 	newfile(rc, "untracked.go")
-	got = run(t, dir, "jiri", "runp", "--untracked", "--uncommitted", "--show-name-prefix", "echo")
-	if want := "r.c:"; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	got = run(t, dir, "jiri", "runp", "--uncommitted", "--untracked", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.uncommitted = true
+	runpFlags.untracked = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "r.c:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -218,13 +225,18 @@ func TestRunP(t *testing.T) {
 	chdir(rc)
 
 	// Just the projects with branch b2.
-	got = run(t, dir, "jiri", "runp", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "r.b: \nr.c:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	// All projects since --projects takes precendence over branches.
-	got = run(t, dir, "jiri", "runp", "--projects=.*", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.projectKeys = ".*"
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "manifest: \nr.a: \nr.b: \nr.c: \nsub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -238,12 +250,18 @@ func TestRunP(t *testing.T) {
 	git(t1).CheckoutBranch("a1")
 	chdir(t1)
 
-	got = run(t, dir, "jiri", "runp", "--gerrit-message", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.gerritMessage = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "r.b:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--no-gerrit-message", "--show-name-prefix", "echo")
+	setDefaultRunpFlags()
+	runpFlags.noGerritMessage = true
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
 	if want := "sub/r.t1:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}

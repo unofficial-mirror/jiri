@@ -8,12 +8,10 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
 )
 
@@ -98,23 +96,4 @@ func runfunc(f func()) (string, string, error) {
 	io.Copy(&errbuf, errReader)
 
 	return outbuf.String(), errbuf.String(), nil
-}
-
-// buildGoPkg runs `go build` with the given package, and puts the binary in the given buildDir.
-func buildGoPkg(t *testing.T, pkg string, buildDir string) string {
-	// Sanity checking: let's make sure the given buildDir exists and is a directory.
-	finfo, err := os.Stat(buildDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !finfo.IsDir() {
-		t.Fatal(fmt.Errorf("buildDir (%s) is not a directory\n", buildDir))
-	}
-
-	// In case you're wondering why we don't have to set GOPATH here, it's because it uses
-	// the one from the environment in which we're running the overall `go test` command.
-	buildJiriCmd := exec.Command("go", "build", "-o", filepath.Base(pkg), pkg)
-	buildJiriCmd.Dir = buildDir
-	runCmd(t, buildJiriCmd, false)
-	return filepath.Join(buildDir, filepath.Base(pkg))
 }

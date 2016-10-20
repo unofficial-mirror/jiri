@@ -66,7 +66,6 @@ type runpFlagValues struct {
 	showKeyPrefix   bool
 	exitOnError     bool
 	collateOutput   bool
-	editMessage     bool
 	branch          string
 }
 
@@ -190,8 +189,8 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 	cmd.Stdin = mi.jirix.Stdin()
 	var stdoutCloser, stderrCloser io.Closer
 	if runpFlags.interactive {
-		cmd.Stdout = jirix.Stdout()
-		cmd.Stderr = jirix.Stderr()
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 	} else {
 		var stdout io.Writer
 		stderr := r.serializedWriter(jirix.Stderr())
@@ -213,7 +212,7 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 			// here.
 			defer f.Close()
 		} else {
-			stdout = r.serializedWriter(jirix.Stdout())
+			stdout = r.serializedWriter(os.Stdout)
 			cleanup = func() {}
 		}
 		if !runpFlags.showNamePrefix && !runpFlags.showKeyPrefix {
@@ -278,9 +277,8 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 func (r *runner) Reduce(mr *simplemr.MR, key string, values []interface{}) error {
 	for _, v := range values {
 		mo := v.(*mapOutput)
-		jirix := mo.mi.jirix
 		if mo.err != nil {
-			fmt.Fprintf(jirix.Stdout(), "FAILED: %v: %s %v\n", mo.key, strings.Join(r.args, " "), mo.err)
+			fmt.Fprintf(os.Stdout, "FAILED: %v: %s %v\n", mo.key, strings.Join(r.args, " "), mo.err)
 			return mo.err
 		} else {
 			if runpFlags.collateOutput {
@@ -288,7 +286,7 @@ func (r *runner) Reduce(mr *simplemr.MR, key string, values []interface{}) error
 				defer r.collatedOutputLock.Unlock()
 				defer os.Remove(mo.outputFilename)
 				if fi, err := os.Open(mo.outputFilename); err == nil {
-					io.Copy(jirix.Stdout(), fi)
+					io.Copy(os.Stdout, fi)
 					fi.Close()
 				} else {
 					return err
@@ -405,8 +403,8 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	}
 
 	if runpFlags.verbose {
-		fmt.Fprintf(jirix.Stdout(), "Project Names: %s\n", strings.Join(stateNames(mapInputs), " "))
-		fmt.Fprintf(jirix.Stdout(), "Project Keys: %s\n", strings.Join(stateKeys(mapInputs), " "))
+		fmt.Fprintf(os.Stdout, "Project Names: %s\n", strings.Join(stateNames(mapInputs), " "))
+		fmt.Fprintf(os.Stdout, "Project Keys: %s\n", strings.Join(stateKeys(mapInputs), " "))
 	}
 
 	runner := &runner{
