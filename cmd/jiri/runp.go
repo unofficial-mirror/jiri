@@ -53,32 +53,38 @@ runp by the shell.
 }
 
 type runpFlagValues struct {
-	projectKeys      string
-	verbose          bool
-	interactive      bool
-	hasUncommitted   bool
-	hasUntracked     bool
-	hasGerritMessage bool
-	showNamePrefix   bool
-	showKeyPrefix    bool
-	exitOnError      bool
-	collateOutput    bool
-	editMessage      bool
-	hasBranch        string
+	projectKeys     string
+	verbose         bool
+	interactive     bool
+	uncommitted     bool
+	noUncommitted   bool
+	untracked       bool
+	noUntracked     bool
+	gerritMessage   bool
+	noGerritMessage bool
+	showNamePrefix  bool
+	showKeyPrefix   bool
+	exitOnError     bool
+	collateOutput   bool
+	editMessage     bool
+	branch          string
 }
 
 func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
 	flags.BoolVar(&values.verbose, "v", false, "Print verbose logging information")
 	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project unless it is run from outside of a project in which case it will default to using all projects.")
-	flags.BoolVar(&values.hasUncommitted, "has-uncommitted", false, "If specified, match projects that have, or have no, uncommitted changes")
-	flags.BoolVar(&values.hasUntracked, "has-untracked", false, "If specified, match projects that have, or have no, untracked files")
-	flags.BoolVar(&values.hasGerritMessage, "has-gerrit-message", false, "If specified, match branches that have, or have no, gerrit message")
-	flags.BoolVar(&values.interactive, "interactive", true, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
+	flags.BoolVar(&values.uncommitted, "uncommitted", false, "Match projects that have uncommitted changes")
+	flags.BoolVar(&values.noUncommitted, "no-uncommitted", false, "Match projects that have no uncommitted changes")
+	flags.BoolVar(&values.untracked, "untracked", false, "Match projects that have untracked files")
+	flags.BoolVar(&values.noUntracked, "no-untracked", false, "Match projects that have no untracked files")
+	flags.BoolVar(&values.gerritMessage, "gerrit-message", false, "Match branches that have gerrit message")
+	flags.BoolVar(&values.noGerritMessage, "no-gerrit-message", false, "Match branches that have no gerrit message")
+	flags.BoolVar(&values.interactive, "interactive", false, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
 	flags.BoolVar(&values.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-key-prefix or -collate-stdout.")
 	flags.BoolVar(&values.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix or -collate-stdout")
 	flags.BoolVar(&values.collateOutput, "collate-stdout", true, "Collate all stdout output from each parallel invocation and display it as if had been generated sequentially. This flag cannot be used with -show-name-prefix, -show-key-prefix or -interactive.")
 	flags.BoolVar(&values.exitOnError, "exit-on-error", false, "If set, all commands will killed as soon as one reports an error, otherwise, each will run to completion.")
-	flags.StringVar(&values.hasBranch, "has-branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
+	flags.StringVar(&values.branch, "branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
 }
 
 func init() {
@@ -294,10 +300,6 @@ func (r *runner) Reduce(mr *simplemr.MR, key string, values []interface{}) error
 }
 
 func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
-	hasUntrackedSet := isFlagSet(cmd.ParsedFlags, "has-untracked")
-	hasUncommitedSet := isFlagSet(cmd.ParsedFlags, "has-uncommitted")
-	hasGerritSet := isFlagSet(cmd.ParsedFlags, "has-gerrit-message")
-
 	if runpFlags.interactive {
 		runpFlags.collateOutput = false
 	}
@@ -305,7 +307,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	var keysRE, branchRE *regexp.Regexp
 	var err error
 
-	if isFlagSet(cmd.ParsedFlags, "projects") {
+	if runpFlags.projectKeys != "" {
 		re := ""
 		for _, pre := range strings.Split(runpFlags.projectKeys, ",") {
 			re += pre + "|"
@@ -317,22 +319,17 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		}
 	}
 
-	if isFlagSet(cmd.ParsedFlags, "has-branch") {
-		branchRE, err = regexp.Compile(runpFlags.hasBranch)
+	if runpFlags.branch != "" {
+		branchRE, err = regexp.Compile(runpFlags.branch)
 		if err != nil {
-			return fmt.Errorf("failed to compile has-branch regexp: %q: %v", runpFlags.hasBranch, err)
+			return fmt.Errorf("failed to compile has-branch regexp: %q: %v", runpFlags.branch, err)
 		}
 	}
 
-	for _, f := range []string{"show-key-prefix", "show-name-prefix"} {
-		if isFlagSet(cmd.ParsedFlags, f) {
-			if runpFlags.interactive && isFlagSet(cmd.ParsedFlags, "interactive") {
-				fmt.Fprintf(jirix.Stderr(), "WARNING: interactive mode being disabled because %s was set\n", f)
-			}
-			runpFlags.interactive = false
-			runpFlags.collateOutput = true
-			break
-		}
+	if (runpFlags.showKeyPrefix || runpFlags.showNamePrefix) && runpFlags.interactive {
+		fmt.Fprintf(jirix.Stderr(), "WARNING: interactive mode being disabled because show-key-prefix or show-name-prefix was set\n")
+		runpFlags.interactive = false
+		runpFlags.collateOutput = true
 	}
 
 	git := gitutil.New(jirix.NewSeq())
@@ -345,11 +342,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		}
 	}
 
-	dirty := false
-	if hasUntrackedSet || hasUncommitedSet {
-		dirty = true
-	}
-	states, err := project.GetProjectStates(jirix, dirty)
+	states, err := project.GetProjectStates(jirix, runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted)
 	if err != nil {
 		return err
 	}
@@ -377,13 +370,13 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 				continue
 			}
 		}
-		if hasUntrackedSet && (state.HasUntracked != runpFlags.hasUntracked) {
+		if (runpFlags.untracked && !state.HasUntracked) || (runpFlags.noUntracked && state.HasUntracked) {
 			continue
 		}
-		if hasUncommitedSet && (state.HasUncommitted != runpFlags.hasUncommitted) {
+		if (runpFlags.uncommitted && !state.HasUncommitted) || (runpFlags.noUncommitted && state.HasUncommitted) {
 			continue
 		}
-		if hasGerritSet {
+		if runpFlags.gerritMessage || runpFlags.noGerritMessage {
 			hasMsg := false
 			for _, br := range state.Branches {
 				if (state.CurrentBranch == br.Name) && br.HasGerritMessage {
@@ -391,7 +384,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 					break
 				}
 			}
-			if hasMsg != runpFlags.hasGerritMessage {
+			if (runpFlags.gerritMessage && !hasMsg) || (runpFlags.noGerritMessage && hasMsg) {
 				continue
 			}
 		}
@@ -417,7 +410,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	}
 
 	runner := &runner{
-		args:   args,
+		args: args,
 	}
 	mr := simplemr.MR{}
 	if runpFlags.interactive {

@@ -172,12 +172,12 @@ func TestRunP(t *testing.T) {
 
 	newfile(rb, "untracked.go")
 
-	got = run(t, dir, "jiri", "runp", "--has-untracked", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--untracked", "--show-name-prefix", "echo")
 	if want := "r.b:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--has-untracked=false", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--no-untracked", "--show-name-prefix", "echo")
 	if want := "manifest: \nr.a: \nr.c: \nsub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -188,24 +188,24 @@ func TestRunP(t *testing.T) {
 		t.Error(err)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--has-uncommitted", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--uncommitted", "--show-name-prefix", "echo")
 	if want := "r.c:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--has-uncommitted=false", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--no-uncommitted", "--show-name-prefix", "echo")
 	if want := "manifest: \nr.a: \nr.b: \nsub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	// test ordering of has-<x> flags
 	newfile(rc, "untracked.go")
-	got = run(t, dir, "jiri", "runp", "--has-untracked", "--has-uncommitted", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--untracked", "--uncommitted", "--show-name-prefix", "echo")
 	if want := "r.c:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--has-uncommitted", "--has-untracked", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--uncommitted", "--untracked", "--show-name-prefix", "echo")
 	if want := "r.c:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -238,12 +238,12 @@ func TestRunP(t *testing.T) {
 	git(t1).CheckoutBranch("a1")
 	chdir(t1)
 
-	got = run(t, dir, "jiri", "runp", "--has-gerrit-message", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--gerrit-message", "--show-name-prefix", "echo")
 	if want := "r.b:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	got = run(t, dir, "jiri", "runp", "--has-gerrit-message=false", "--show-name-prefix", "echo")
+	got = run(t, dir, "jiri", "runp", "--no-gerrit-message", "--show-name-prefix", "echo")
 	if want := "sub/r.t1:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
