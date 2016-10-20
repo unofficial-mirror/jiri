@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	JiriRepository = "https://fuchsia.googlesource.com/jiri"
+	JiriRepository    = "https://fuchsia.googlesource.com/jiri"
 	JiriStorageBucket = "https://storage.googleapis.com/fuchsia-build/jiri"
 )
 
@@ -59,6 +59,8 @@ func Update(force bool) error {
 			return err
 		}
 
+		// This will overwrite previous force autoupdate if present
+		os.Args = append(os.Args, "-force-autoupdate=false")
 		// Run the update version.
 		if err := syscall.Exec(path, os.Args, os.Environ()); err != nil {
 			return err
