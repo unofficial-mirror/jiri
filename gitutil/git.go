@@ -152,6 +152,11 @@ func (g *Git) Clone(repo, path string, reference string) error {
 	return g.run("clone", repo, path)
 }
 
+// CloneMirror clones the given repository using mirror flag.
+func (g *Git) CloneMirror(repo, path string) error {
+	return g.run("clone", "--mirror", repo, path)
+}
+
 // CloneRecursive clones the given repository recursively to the given local path.
 func (g *Git) CloneRecursive(repo, path string) error {
 	return g.run("clone", "--recursive", repo, path)

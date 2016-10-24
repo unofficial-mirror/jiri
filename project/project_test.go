@@ -234,6 +234,66 @@ func TestUpdateUniverseSimple(t *testing.T) {
 	}
 }
 
+// TestUpdateUniverseWithCache checks that UpdateUniverse can clone and pull
+// from a cache.
+func TestUpdateUniverseWithCache(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+
+	// Create cache directory
+	cacheDir, err := s.TempDir("", "cache")
+	if err != nil {
+		t.Fatalf("TempDir() failed: %v", err)
+	}
+	if err := fake.X.NewSeq().MkdirAll(cacheDir, os.FileMode(0700)).Done(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := fake.X.NewSeq().RemoveAll(cacheDir).Done(); err != nil {
+			t.Fatalf("RemoveAll(%q) failed: %v", cacheDir, err)
+		}
+	}()
+	fake.X.Cache = cacheDir
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range localProjects {
+		// Check that local clone was referenced from cache
+		if err := s.AssertFileExists(p.Path + "/.git/objects/info/alternates").Done(); err != nil {
+			t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
+		}
+		checkReadme(t, fake.X, p, "initial readme")
+	}
+
+	// Commit to master branch of a project 1.
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	checkReadme(t, fake.X, localProjects[1], "master commit")
+
+	// Check that cache was updated
+	cacheDirPath, err := localProjects[1].CacheDirPath(fake.X)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitCache := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(cacheDirPath))
+	cacheRev, err := gitCache.CurrentRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+	localRev, err := gitLocal.CurrentRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cacheRev != localRev {
+		t.Fatalf("Cache revision(%v) not equal to local revision(%v)", cacheRev, localRev)
+	}
+}
+
 // TestHookLoadSimple tests that manifest is loaded correctly
 // with correct project path in hook
 func TestHookLoadSimple(t *testing.T) {
