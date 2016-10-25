@@ -6,7 +6,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -24,7 +27,9 @@ var (
 	noPristineFlag      bool
 	checkDirtyFlag      bool
 	showNameFlag        bool
-	formatFlag          string
+	jsonOutputFlag      string
+	regexpFlag          bool
+	templateFlag        string
 )
 
 func init() {
@@ -33,7 +38,9 @@ func init() {
 	cmdProjectList.Flags.BoolVar(&noPristineFlag, "nopristine", false, "If true, omit pristine projects, i.e. projects with a clean master branch and no other branches.")
 	cmdProjectShellPrompt.Flags.BoolVar(&checkDirtyFlag, "check-dirty", true, "If false, don't check for uncommitted changes or untracked files. Setting this option to false is dangerous: dirty master branches will not appear in the output.")
 	cmdProjectShellPrompt.Flags.BoolVar(&showNameFlag, "show-name", false, "Show the name of the current repo.")
-	cmdProjectInfo.Flags.StringVar(&formatFlag, "f", "{{.Project.Name}}", "The go template for the fields to display.")
+	cmdProjectInfo.Flags.StringVar(&jsonOutputFlag, "json-output", "", "Path to write operation results to.")
+	cmdProjectInfo.Flags.BoolVar(&regexpFlag, "regexp", false, "Use argument as regular expression.")
+	cmdProjectInfo.Flags.StringVar(&templateFlag, "template", "", "The template for the fields to display.")
 }
 
 // cmdProject represents the "jiri project" command.
@@ -130,27 +137,40 @@ var cmdProjectInfo = &cmdline.Command{
 	Name:   "info",
 	Short:  "Provided structured input for existing jiri projects and branches",
 	Long: `
-Inspect the local filesystem and provide structured info on the existing projects
-and branches. Projects are specified using regular expressions that are matched
-against project keys. If no command line arguments are provided the project
-that the contains the current directory is used, or if run from outside
-of a given project, all projects will be used. The information to be
-displayed is specified using a go template, supplied via the -f flag, that is
-executed against the fuchsia.googlesource.com/jiri/project.ProjectState structure. This structure
-currently has the following fields: ` + fmt.Sprintf("%#v", project.ProjectState{}),
-	ArgsName: "<project-keys>...",
-	ArgsLong: "<project-keys>... a list of project keys, as regexps, to apply the specified format to",
+Inspect the local filesystem and provide structured info on the existing
+projects and branches. Projects are specified using either names or regular
+expressions that are matched against project names. If no command line
+arguments are provided the project that the contains the current directory is
+used, or if run from outside of a given project, all projects will be used. The
+information to be displayed can be specified using a Go template, supplied via
+the -template flag.`,
+	ArgsName: "<project-names>...",
+	ArgsLong: "<project-namess>... a list of project names",
+}
+
+// infoOutput defines JSON format for 'project info' output.
+type infoOutput struct {
+	Name			string `json:"name"`
+	Path			string `json:"path"`
+	Remote			string `json:"remote"`
+	Revision		string `json:"revision"`
+	CurrentBranch   string `json:"current_branch"`
+	Branches		[]string `json:"branches"`
 }
 
 // runProjectInfo provides structured info on local projects.
 func runProjectInfo(jirix *jiri.X, args []string) error {
-	tmpl, err := template.New("info").Parse(formatFlag)
-	if err != nil {
-		return fmt.Errorf("failed to parse template %q: %v", formatFlag, err)
+	var tmpl *template.Template
+	var err error
+	if templateFlag != "" {
+		tmpl, err = template.New("info").Parse(templateFlag)
+		if err != nil {
+			return fmt.Errorf("failed to parse template %q: %v", templateFlag, err)
+		}
 	}
-	regexps := []*regexp.Regexp{}
 
-	if len(args) > 0 {
+	regexps := []*regexp.Regexp{}
+	if len(args) > 0 && regexpFlag {
 		regexps = make([]*regexp.Regexp, len(args), len(args))
 		for i, a := range args {
 			re, err := regexp.Compile(a)
@@ -158,14 +178,6 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 				return fmt.Errorf("failed to compile regexp %v: %v", a, err)
 			}
 			regexps[i] = re
-		}
-	}
-
-	dirty := false
-	for _, slow := range []string{"HasUncommitted", "HasUntracked"} {
-		if strings.Contains(formatFlag, slow) {
-			dirty = true
-			break
 		}
 	}
 
@@ -180,7 +192,7 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		if err != nil {
 			// jiri was run from outside of a project so let's
 			// use all available projects.
-			states, err = project.GetProjectStates(jirix, dirty)
+			states, err = project.GetProjectStates(jirix, false)
 			if err != nil {
 				return err
 			}
@@ -195,29 +207,98 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		}
 	} else {
 		var err error
-		states, err = project.GetProjectStates(jirix, dirty)
+		states, err = project.GetProjectStates(jirix, false)
 		if err != nil {
 			return err
 		}
-		for key := range states {
-			for _, re := range regexps {
-				if re.MatchString(string(key)) {
-					keys = append(keys, key)
-					break
+		for key, state := range states {
+			if regexpFlag {
+				for _, re := range regexps {
+					if re.MatchString(state.Project.Name) {
+						keys = append(keys, key)
+						break
+					}
+				}
+			} else {
+				for _, arg := range args {
+					if arg == state.Project.Name {
+						keys = append(keys, key)
+						break
+					}
 				}
 			}
 		}
 	}
 	sort.Sort(keys)
 
-	for _, key := range keys {
+	info := make([]infoOutput, len(keys))
+	for i, key := range keys {
 		state := states[key]
-		out := &bytes.Buffer{}
-		if err = tmpl.Execute(out, state); err != nil {
-			return jirix.UsageErrorf("invalid format")
+		info[i] = infoOutput{
+			Name: state.Project.Name,
+			Path: state.Project.Path,
+			Remote: state.Project.Remote,
+			Revision: state.Project.Revision,
+			CurrentBranch: state.CurrentBranch,
 		}
-		fmt.Fprintln(jirix.Stdout(), out.String())
+		for _, b := range state.Branches {
+			info[i].Branches = append(info[i].Branches, b.Name)
+		}
 	}
+
+	for _, i := range info {
+		if templateFlag != "" {
+			out := &bytes.Buffer{}
+			if err := tmpl.Execute(out, i); err != nil {
+				return jirix.UsageErrorf("invalid format")
+			}
+			fmt.Fprintln(os.Stdout, out.String())
+		} else {
+			fmt.Printf("* project %s\n", i.Name)
+			fmt.Printf("  Path:     %s\n", i.Path)
+			fmt.Printf("  Remote:   %s\n", i.Remote)
+			fmt.Printf("  Revision: %s\n", i.Revision)
+			if len(i.Branches) != 0 {
+				fmt.Printf("  Branches:\n")
+				width := 0
+				for _, b := range i.Branches {
+					if len(b) > width {
+						width = len(b)
+					}
+				}
+				for _, b := range i.Branches {
+					fmt.Printf("    %-*s", width, b)
+					if i.CurrentBranch == b {
+						fmt.Printf(" current")
+					}
+					fmt.Println()
+				}
+			} else {
+				fmt.Printf("  Branches: none\n")
+			}
+		}
+	}
+
+	if jsonOutputFlag != "" {
+		if err := writeJSONOutput(info); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writeJSONOutput(result interface{}) error {
+	out, err := json.MarshalIndent(&result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize JSON output: %s\n", err)
+	}
+
+	err = ioutil.WriteFile(jsonOutputFlag, out, 0600)
+	if err != nil {
+		return fmt.Errorf("failed write JSON output to %s: %s\n", jsonOutputFlag, err)
+	}
+
 	return nil
 }
 

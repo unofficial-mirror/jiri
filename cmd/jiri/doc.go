@@ -266,27 +266,25 @@ The jiri project clean flags are:
 Jiri project info - Provided structured input for existing jiri projects and branches
 
 Inspect the local filesystem and provide structured info on the existing
-projects and branches. Projects are specified using regular expressions that are
-matched against project keys. If no command line arguments are provided the
-project that the contains the current directory is used, or if run from outside
-of a given project, all projects will be used. The information to be displayed
-is specified using a go template, supplied via the -f flag, that is executed
-against the fuchsia.googlesource.com/jiri/project.ProjectState structure. This structure currently
-has the following fields:
-project.ProjectState{Branches:[]project.BranchState(nil), CurrentBranch:"",
-HasUncommitted:false, HasUntracked:false, Project:project.Project{Name:"",
-Path:"", Remote:"", RemoteBranch:"", Revision:"", GerritHost:"",
-GitHooks:"", XMLName:struct {}{}}}
+projects and branches. Projects are specified using either names or regular
+expressions that are matched against project names. If no command line
+arguments are provided the project that the contains the current directory is
+used, or if run from outside of a given project, all projects will be used. The
+information to be displayed can be specified using a Go template, supplied via
+the -template flag.
 
 Usage:
-   jiri project info [flags] <project-keys>...
+   jiri project info [flags] <project-names>...
 
-<project-keys>... a list of project keys, as regexps, to apply the specified
-format to
+<project-names>... a list of project names
 
 The jiri project info flags are:
- -f={{.Project.Name}}
-   The go template for the fields to display.
+ -json-output=
+   Path to write operation results to.
+ -regexp=false
+   Use argument as regular expression.
+ -template=
+   The template for the fields to display.
 
  -color=true
    Use color to format output.
