@@ -88,3 +88,7 @@ func (SharedOpt) cloneOpt() {}
 type ReferenceOpt string
 
 func (ReferenceOpt) cloneOpt() {}
+
+type NoCheckoutOpt bool
+
+func (NoCheckoutOpt) cloneOpt() {}

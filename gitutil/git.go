@@ -172,6 +172,10 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 			if typedOpt {
 				args = append(args, []string{"--shared", "--local"}...)
 			}
+		case NoCheckoutOpt:
+			if typedOpt {
+				args = append(args, "--no-checkout")
+			}
 		}
 	}
 	args = append(args, repo)
