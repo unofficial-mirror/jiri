@@ -158,12 +158,25 @@ func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 }
 
 // Clone clones the given repository to the given local path.  If reference is
-// not empty it uses the given path as a reference repo.
-func (g *Git) Clone(repo, path string, reference string) error {
-	if reference != "" {
-		return g.run("clone", "--reference", reference, repo, path)
+// not empty it uses the given path as a reference/shared repo.
+func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
+	args := []string{"clone"}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case ReferenceOpt:
+			reference := string(typedOpt)
+			if reference != "" {
+				args = append(args, []string{"--reference", reference}...)
+			}
+		case SharedOpt:
+			if typedOpt {
+				args = append(args, []string{"--shared", "--local"}...)
+			}
+		}
 	}
-	return g.run("clone", repo, path)
+	args = append(args, repo)
+	args = append(args, path)
+	return g.run(args...)
 }
 
 // CloneMirror clones the given repository using mirror flag.

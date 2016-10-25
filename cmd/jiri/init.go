@@ -5,7 +5,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,11 +31,13 @@ does not exists, it will be created.
 }
 
 var (
-	cacheFlag string
+	cacheFlag  string
+	sharedFlag bool
 )
 
 func init() {
-	flag.StringVar(&cacheFlag, "cache", "", "Jiri cache directory")
+	cmdInit.Flags.StringVar(&cacheFlag, "cache", "", "Jiri cache directory")
+	cmdInit.Flags.BoolVar(&sharedFlag, "shared", false, "Use shared cache, which doesn't commit or push")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -90,6 +91,9 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	config := jiri.Config{
 		CachePath: cacheFlag,
+	}
+	if cacheFlag != "" {
+		config.Shared = sharedFlag
 	}
 	configPath := filepath.Join(d, jiri.ConfigFile)
 	if err := config.Write(configPath); err != nil {

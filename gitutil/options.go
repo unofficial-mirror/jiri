@@ -7,6 +7,11 @@ package gitutil
 type CheckoutOpt interface {
 	checkoutOpt()
 }
+
+type CloneOpt interface {
+	cloneOpt()
+}
+
 type CommitOpt interface {
 	commitOpt()
 }
@@ -75,3 +80,11 @@ func (PruneOpt) fetchOpt() {}
 type VerifyOpt bool
 
 func (VerifyOpt) pushOpt() {}
+
+type SharedOpt bool
+
+func (SharedOpt) cloneOpt() {}
+
+type ReferenceOpt string
+
+func (ReferenceOpt) cloneOpt() {}
