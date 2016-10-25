@@ -325,11 +325,6 @@ func parsePresubmitTestType(match string) PresubmitTestType {
 // - https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#list-changes
 // - https://gerrit-review.googlesource.com/Documentation/user-search.html
 func (g *Gerrit) Query(query string) (_ CLList, e error) {
-	cred, err := hostCredentials(g.s, g.host)
-	if err != nil {
-		return nil, err
-	}
-
 	u, err := url.Parse(g.host.String())
 	if err != nil {
 		return nil, err
@@ -350,7 +345,10 @@ func (g *Gerrit) Query(query string) (_ CLList, e error) {
 		return nil, fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
 	}
 	req.Header.Add("Accept", "application/json")
-	req.SetBasicAuth(cred.username, cred.password)
+	// We ignore all errors when obtaining credentials since not every host requires them.
+	if cred, _ := hostCredentials(g.s, g.host); cred != nil {
+		req.SetBasicAuth(cred.username, cred.password)
+	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
