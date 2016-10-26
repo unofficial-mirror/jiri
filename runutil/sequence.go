@@ -138,6 +138,18 @@ func (s Sequence) Capture(stdout, stderr io.Writer) Sequence {
 	return s
 }
 
+// CaptureAll arranges for all the logs/outputs to write to its supplied io.Writers.
+// Specifying nil for a writer will result in using the the corresponding io.Writer
+// supplied to NewSequence. ioutil.Discard should be used to discard output.
+func (s Sequence) CaptureAll(stdout, stderr io.Writer) Sequence {
+	if s.err != nil {
+		return s
+	}
+	s.stdout, s.stderr = stdout, stderr
+	s.r.opts.stdout, s.r.opts.stderr = stdout, stderr
+	return s
+}
+
 // Read arranges for the next call to Run or Last to read from the supplied
 // io.Reader. This will be cleared and not used for any calls to Run or Last
 // beyond the next one. Specifying nil will result in reading from os.DevNull.

@@ -9,6 +9,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -1627,24 +1628,70 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 			return fmt.Errorf("error updating project %q: %v", op.Project().Name, err)
 		}
 	}
-	if err := runHooks(jirix, ops, hooks); err != nil {
+	if err := runHooks(jirix, ops, hooks, showUpdateLogs); err != nil {
 		return err
 	}
 	return applyGitHooks(jirix, ops)
 }
 
 // runHooks runs all hooks for the given operations.
-func runHooks(jirix *jiri.X, ops []operation, hooks Hooks) error {
+func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOuput bool) error {
 	jirix.TimerPush("run hooks")
 	defer jirix.TimerPop()
-
+	type result struct {
+		outReader *os.File
+		errReader *os.File
+		err       error
+	}
+	ch := make(chan result)
 	for _, hook := range hooks {
-		s := jirix.NewSeq()
-		s.Verbose(true).Output([]string{fmt.Sprintf("running hook(%v) for project %q", hook.Name, hook.ProjectName)})
-		if err := s.Dir(hook.ActionPath).Capture(os.Stdout, os.Stderr).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
-			return fmt.Errorf("error running hook for project %q: %v", hook.ProjectName, err)
-		}
+		jirix.NewSeq().Verbose(true).Output([]string{fmt.Sprintf("running hook(%v) for project %q", hook.Name, hook.ProjectName)})
+		go func(hook Hook) {
+			outReader, outWriter, err := os.Pipe()
+			if err != nil {
+				ch <- result{nil, nil, err}
+				return
+			}
+			defer outWriter.Close()
 
+			errReader, errWriter, err := os.Pipe()
+			if err != nil {
+				outWriter.Close()
+				ch <- result{nil, nil, err}
+				return
+			}
+			defer errWriter.Close()
+
+			s := jirix.NewSeq().CaptureAll(outWriter, errWriter).Verbose(true).Output([]string{fmt.Sprintf("output for hook(%v) for project %q", hook.Name, hook.ProjectName)})
+			errWriter.WriteString(fmt.Sprintf("Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName))
+			if err := s.Dir(hook.ActionPath).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
+				ch <- result{outReader, errReader, fmt.Errorf("error running hook for project %q: %v", hook.ProjectName, err)}
+				return
+			}
+			ch <- result{outReader, errReader, nil}
+		}(hook)
+
+	}
+	multiErr := make(MultiError, 0)
+	for range hooks {
+		out := <-ch
+		if showHookOuput && out.outReader != nil {
+			var outbuf bytes.Buffer
+			io.Copy(&outbuf, out.outReader)
+			os.Stdout.WriteString(outbuf.String())
+		}
+		if out.err != nil {
+			if out.errReader != nil {
+				var errbuf bytes.Buffer
+				io.Copy(&errbuf, out.errReader)
+				os.Stderr.WriteString(errbuf.String())
+			}
+			multiErr = append(multiErr, out.err)
+		}
+	}
+
+	if len(multiErr) != 0 {
+		return multiErr
 	}
 	return nil
 }
