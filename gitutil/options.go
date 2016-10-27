@@ -60,6 +60,14 @@ type TagsOpt bool
 
 func (TagsOpt) fetchOpt() {}
 
+type AllOpt bool
+
+func (AllOpt) fetchOpt() {}
+
+type PruneOpt bool
+
+func (PruneOpt) fetchOpt() {}
+
 type VerifyOpt bool
 
 func (VerifyOpt) pushOpt() {}

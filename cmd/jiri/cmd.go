@@ -8,15 +8,38 @@
 package main
 
 import (
+	"fmt"
 	"runtime"
+	"syscall"
 
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/tool"
 )
 
+func changeRlimit(limit uint64) {
+
+}
+
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
+	if runtime.GOOS == "darwin" {
+		var rLimit syscall.Rlimit
+		var limit = 999999
+		err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+		if err != nil {
+			fmt.Println("Unable to obtain rlimit:", err)
+		}
+		if rLimit.Cur < rLimit.Max && limit <= rLimit.Max {
+			rLimit.Max = limit
+			rLimit.Cur = limit
+			err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+			if err != nil {
+				fmt.Println("Unable to increase number of open files limit:", err)
+			}
+		} else {
+			fmt.Printf("Cannot set open files limit to %v, max is %v and current is %v\n", limit, rLimit.Max, rLimit.Cur)
+		}
+	}
 	cmdRoot = newCmdRoot()
 	tool.InitializeRunFlags(&cmdRoot.Flags)
 }

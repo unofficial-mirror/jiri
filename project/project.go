@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
@@ -1185,15 +1186,17 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 	return nil
 }
 
-// fetchProject fetches from the project remote.
-func fetchProject(jirix *jiri.X, project Project) error {
+func fetchAll(jirix *jiri.X, project Project) error {
+	s := jirix.NewSeq()
 	if project.Remote == "" {
 		return fmt.Errorf("project %q does not have a remote", project.Name)
 	}
-	if err := gitutil.New(jirix.NewSeq()).SetRemoteUrl("origin", project.Remote); err != nil {
+	git := gitutil.New(s, gitutil.RootDirOpt(project.Path))
+	if err := git.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	return gitutil.New(jirix.NewSeq()).Fetch("origin")
+	err := git.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true))
+	return err
 }
 
 // resetProjectCurrentBranch resets the current branch to the revision and
@@ -1214,9 +1217,6 @@ func resetProjectCurrentBranch(jirix *jiri.X, project Project) error {
 // branch to the revision and branch specified on the project.
 func syncProjectMaster(jirix *jiri.X, project Project) error {
 	return ApplyToLocalMaster(jirix, Projects{project.Key(): project}, func() error {
-		if err := fetchProject(jirix, project); err != nil {
-			return err
-		}
 		return resetProjectCurrentBranch(jirix, project)
 	})
 }
@@ -1419,7 +1419,7 @@ func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, proje
 	// for the given projects, rather than ApplyToLocalMaster(fetch+reset+load).
 	return ApplyToLocalMaster(jirix, Projects{project.Key(): project}, func() error {
 		if ld.update {
-			if err := fetchProject(jirix, project); err != nil {
+			if err := fetchAll(jirix, project); err != nil {
 				return err
 			}
 		}
@@ -1522,6 +1522,27 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, showUpdateLogs bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
+
+	errs := make(chan error, len(localProjects))
+	var wg sync.WaitGroup
+	for key, project := range localProjects {
+		if _, ok := remoteProjects[key]; ok {
+			wg.Add(1)
+			go func(project Project) {
+				defer wg.Done()
+				err := fetchAll(jirix, project)
+				if err != nil {
+					errs <- fmt.Errorf("fetch failed for %v: %v", project.Name, err)
+				}
+			}(project)
+		}
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		// Return first error
+		return err
+	}
 
 	getRemoteHeadRevisions(jirix, remoteProjects)
 	ops := computeOperations(localProjects, remoteProjects, gc)

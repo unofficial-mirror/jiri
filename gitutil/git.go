@@ -331,19 +331,33 @@ func (g *Git) Fetch(remote string, opts ...FetchOpt) error {
 
 // FetchRefspec fetches refs and tags from the given remote for a particular refspec.
 func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
-	args := []string{"fetch"}
 	tags := false
+	all := false
+	prune := false
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case TagsOpt:
 			tags = bool(typedOpt)
+		case AllOpt:
+			all = bool(typedOpt)
+		case PruneOpt:
+			prune = bool(typedOpt)
 		}
+	}
+	args := []string{}
+	args = append(args, "fetch")
+	if prune {
+		args = append(args, "-p")
 	}
 	if tags {
 		args = append(args, "--tags")
 	}
-
-	args = append(args, remote)
+	if all {
+		args = append(args, "--all")
+	}
+	if remote != "" {
+		args = append(args, remote)
+	}
 	if refspec != "" {
 		args = append(args, refspec)
 	}
