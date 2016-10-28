@@ -18,7 +18,6 @@ fi
 
 # Determine and validate the version of jiri.
 readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
-readonly TARGET="${HOST_OS}-amd64"
 readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/master?format=JSON"
 readonly VERSION=$(curl -sSf "${COMMIT_URL}" | sed -n 's/.*"value": "\([0-9a-f]\{40\}\)"/\1/p')
 if [[ -z ${VERSION} ]]; then
@@ -30,11 +29,12 @@ fi
 readonly TEMP_DIR="$(mktemp -d)"
 trap "rm -rf -- "${TEMP_DIR}"" EXIT
 
-for os in ${TARGETS}; do
+for target in ${TARGETS}; do
+  os=$(echo ${target} | sed 's/darwin/mac/')
   mkdir -p "${TEMP_DIR}/jiri-${os}"
 
   # Download the jiri binary.
-  if ! curl -sf -o "${TEMP_DIR}/jiri-${os}/jiri" "${GS_BUCKET_URL}/${os}-amd64/${VERSION}"; then
+  if ! curl -sf -o "${TEMP_DIR}/jiri-${os}/jiri" "${GS_BUCKET_URL}/${target}-amd64/${VERSION}"; then
     echo "Failed downloading prebuilt jiri binary." 1>&2
     echo "${GS_BUCKET_URL}/${os}/${VERSION}"
     exit 1
