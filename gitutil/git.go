@@ -297,13 +297,51 @@ func (g *Git) GetSymbolicRef() (string, error) {
 	return out[0], nil
 }
 
+// RemoteBranchName returns the name of the tracking branch stripping remote name from it.
+// It will search recursively if current branch tracks a local branch.
+func (g *Git) RemoteBranchName() (string, error) {
+	branch, err := g.CurrentBranchName()
+	if err != nil || branch == "" {
+		return "", err
+	}
+
+	trackingBranch, err := g.TrackingBranchName()
+	if err != nil || trackingBranch == "" {
+		return "", err
+	}
+
+	for {
+		out, err := g.runOutput("config", "branch."+branch+".remote")
+		if err != nil || len(out) == 0 {
+			return "", err
+		}
+		if got, want := len(out), 1; got != want {
+			return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+		}
+		// check if current branch tracks local branch
+		if out[0] != "." {
+			return strings.Replace(trackingBranch, out[0]+"/", "", 1), nil
+		} else {
+			branch = trackingBranch
+			if trackingBranch, err = g.TrackingBranchFromSymbolicRef("refs/heads/" + trackingBranch); err != nil || trackingBranch == "" {
+				return "", err
+			}
+		}
+	}
+}
+
 // TrackingBranchName returns the name of the tracking branch.
 func (g *Git) TrackingBranchName() (string, error) {
 	currentRef, err := g.GetSymbolicRef()
 	if err != nil {
 		return "", err
 	}
-	out, err := g.runOutput("for-each-ref", "--format", "%(upstream:short)", currentRef)
+	return g.TrackingBranchFromSymbolicRef(currentRef)
+}
+
+// TrackingBranchFromSymbolicRef returns the name of the tracking branch for provided ref
+func (g *Git) TrackingBranchFromSymbolicRef(ref string) (string, error) {
+	out, err := g.runOutput("for-each-ref", "--format", "%(upstream:short)", ref)
 	if err != nil || len(out) == 0 {
 		return "", err
 	}

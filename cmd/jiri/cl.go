@@ -704,6 +704,7 @@ func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
 	}
 	gerritRemote := *hostUrl
 	gerritRemote.Path = projectRemoteUrl.Path
+	topic := topicFlag
 
 	// Create and run the review.
 	review, err := newReview(jirix, git, p, gerrit.CLOpts{
@@ -715,6 +716,7 @@ func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
 		Host:         hostUrl,
 		Presubmit:    gerrit.PresubmitTestType(presubmitFlag),
 		RemoteBranch: remoteBranchFlag,
+		Topic:        topic,
 		Reviewers:    parseEmails(reviewersFlag),
 		Verify:       verifyFlag,
 	})
@@ -818,8 +820,10 @@ func newReview(jirix *jiri.X, git *gitutil.Git, project project.Project, opts ge
 		return nil, err
 	}
 	opts.Branch = branch
-	if opts.Topic == "" {
+	if setTopicFlag && opts.Topic == "" {
 		opts.Topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), branch) // use <username>-<branchname> as the default
+	} else if !setTopicFlag {
+		opts.Topic = ""
 	}
 	if opts.Presubmit == gerrit.PresubmitTestType("") {
 		opts.Presubmit = gerrit.PresubmitTestTypeAll // use gerrit.PresubmitTestTypeAll as the default
@@ -1237,11 +1241,6 @@ func (review *review) run(git *gitutil.Git) (e error) {
 	if err := review.send(); err != nil {
 		return err
 	}
-	if setTopicFlag {
-		if err := review.setTopic(); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1271,23 +1270,6 @@ func (review *review) getChangeID() (string, error) {
 		return "", fmt.Errorf("could not find Change-Id in:\n%s", bytes)
 	}
 	return string(changeID[1]), nil
-}
-
-// setTopic sets the topic for the CL corresponding to the branch the
-// review was created for.
-func (review *review) setTopic() error {
-	changeID, err := review.getChangeID()
-	if err != nil {
-		return err
-	}
-	host := review.CLOpts.Host
-	if host.Scheme != "http" && host.Scheme != "https" {
-		return fmt.Errorf("Cannot set topic for gerrit host %q. Please use a host url with 'https' scheme or run with '--set-topic=false'.", host.String())
-	}
-	if err := review.jirix.Gerrit(host).SetTopic(changeID, review.CLOpts); err != nil {
-		return fmt.Errorf("failed to set topic for %v, %#v: %v", changeID, review.CLOpts, err)
-	}
-	return nil
 }
 
 // updateReviewMessage writes the commit message to the given file.

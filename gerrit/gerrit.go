@@ -454,6 +454,9 @@ func Reference(opts CLOpts) string {
 	var params []string
 	params = append(params, formatParams(opts.Reviewers, "r")...)
 	params = append(params, formatParams(opts.Ccs, "cc")...)
+	if opts.Topic != "" {
+		params = append(params, "topic="+opts.Topic)
+	}
 	if len(params) > 0 {
 		ref = ref + "%" + strings.Join(params, ",")
 	}
