@@ -7,8 +7,6 @@
 from recipe_engine.recipe_api import Property
 from recipe_engine import config
 
-import datetime
-
 
 DEPS = [
     'infra/jiri',
@@ -21,41 +19,31 @@ DEPS = [
 ]
 
 PROPERTIES = {
-    'gerrit': Property(kind=str, help='Gerrit host', default=None,
-                       param_name='gerrit_host'),
-    'patch_project': Property(kind=str, help='Gerrit project', default=None,
-                              param_name='gerrit_project'),
-    'event.patchSet.ref': Property(kind=str, help='Gerrit patch ref',
-                                   default=None, param_name='gerrit_patch_ref'),
-    'repository': Property(kind=str, help='Full url to a Git repository',
-                           default=None, param_name='repo_url'),
-    'refspec': Property(kind=str, help='Refspec to checkout', default='master'),
     'category': Property(kind=str, help='Build category', default=None),
+    'patch_gerrit_url': Property(kind=str, help='Gerrit host', default=None),
+    'patch_project': Property(kind=str, help='Gerrit project', default=None),
+    'patch_ref': Property(kind=str, help='Gerrit patch ref', default=None),
+    'patch_storage': Property(kind=str, help='Patch location', default=None),
+    'patch_repository_url': Property(kind=str, help='URL to a Git repository',
+                              default=None),
     'manifest': Property(kind=str, help='Jiri manifest to use'),
     'remote': Property(kind=str, help='Remote manifest repository'),
     'target': Property(kind=str, help='Target to build'),
 }
 
 
-def RunSteps(api, category, repo_url, refspec, gerrit_host, gerrit_project,
-             gerrit_patch_ref, manifest, remote, target):
-    if category == 'cq':
-        assert gerrit_host.startswith('https://')
-        repo_url = '%s/%s' % (gerrit_host.rstrip('/'), gerrit_project)
-        refspec = gerrit_patch_ref
-
-    assert repo_url and refspec, 'repository url and refspec must be given'
-    assert repo_url.startswith('https://')
-
+def RunSteps(api, category, patch_gerrit_url, patch_project, patch_ref,
+             patch_storage, patch_repository_url, manifest, remote, target):
     api.jiri.ensure_jiri()
+
     api.jiri.set_config('jiri')
 
     api.jiri.init()
     api.jiri.clean_project()
     api.jiri.import_manifest(manifest, remote, overwrite=True)
     api.jiri.update(gc=True)
-    if category == 'cq':
-        api.jiri.patch(gerrit_patch_ref, host=gerrit_host, delete=True, force=True)
+    if patch_ref is not None:
+        api.jiri.patch(patch_ref, host=patch_gerrit_url, delete=True, force=True)
 
     api.go.install_go()
 
@@ -81,16 +69,14 @@ def RunSteps(api, category, repo_url, refspec, gerrit_host, gerrit_project,
 
 
 def GenTests(api):
-    yield api.test('scheduler') + api.properties(
-        repository='https://fuchsia.googlesource.com/jiri',
-        refspec='master',
+    yield api.test('ci') + api.properties(
         manifest='jiri',
         remote='https://fuchsia.googlesource.com/manifest',
         target='linux-amd64',
     )
-    yield api.test('cq_try') + api.properties.tryserver_gerrit(
-        'jiri',
-        gerrit_host='https://fuchsia-review.googlesource.com',
+    yield api.test('cq_try') + api.properties.tryserver(
+        gerrit_project='jiri',
+        patch_gerrit_url='fuchsia-review.googlesource.com',
         manifest='jiri',
         remote='https://fuchsia.googlesource.com/manifest',
         target='linux-amd64',
