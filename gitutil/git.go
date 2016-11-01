@@ -488,6 +488,15 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	return branches, current, nil
 }
 
+// Grep searches for matching text and returns a list of lines from
+// `git grep`.
+func (g *Git) Grep(query string) ([]string, error) {
+	// TODO(ianloic): handle patterns that start with "-"
+	// TODO(ianloic): handle different pattern types (-i, -P, -E, etc)
+	// TODO(ianloic): handle different response types (--full-name, -v, --name-only, etc)
+	return g.runOutput("grep", query)
+}
+
 // HasUncommittedChanges checks whether the current branch contains
 // any uncommitted changes.
 func (g *Git) HasUncommittedChanges() (bool, error) {
