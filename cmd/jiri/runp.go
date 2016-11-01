@@ -53,20 +53,18 @@ runp by the shell.
 }
 
 type runpFlagValues struct {
-	projectKeys     string
-	verbose         bool
-	interactive     bool
-	uncommitted     bool
-	noUncommitted   bool
-	untracked       bool
-	noUntracked     bool
-	gerritMessage   bool
-	noGerritMessage bool
-	showNamePrefix  bool
-	showKeyPrefix   bool
-	exitOnError     bool
-	collateOutput   bool
-	branch          string
+	projectKeys    string
+	verbose        bool
+	interactive    bool
+	uncommitted    bool
+	noUncommitted  bool
+	untracked      bool
+	noUntracked    bool
+	showNamePrefix bool
+	showKeyPrefix  bool
+	exitOnError    bool
+	collateOutput  bool
+	branch         string
 }
 
 func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
@@ -76,8 +74,6 @@ func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
 	flags.BoolVar(&values.noUncommitted, "no-uncommitted", false, "Match projects that have no uncommitted changes")
 	flags.BoolVar(&values.untracked, "untracked", false, "Match projects that have untracked files")
 	flags.BoolVar(&values.noUntracked, "no-untracked", false, "Match projects that have no untracked files")
-	flags.BoolVar(&values.gerritMessage, "gerrit-message", false, "Match branches that have gerrit message")
-	flags.BoolVar(&values.noGerritMessage, "no-gerrit-message", false, "Match branches that have no gerrit message")
 	flags.BoolVar(&values.interactive, "interactive", false, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
 	flags.BoolVar(&values.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-key-prefix or -collate-stdout.")
 	flags.BoolVar(&values.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix or -collate-stdout")
@@ -362,7 +358,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 			}
 		} else {
 			// Run on all projects if current project has detached head
-			if git.IsOnBranch() && state.CurrentBranch != homeBranch {
+			if git.IsOnBranch() && state.CurrentBranch.Name != homeBranch {
 				continue
 			}
 		}
@@ -383,18 +379,6 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		}
 		if (runpFlags.uncommitted && !state.HasUncommitted) || (runpFlags.noUncommitted && state.HasUncommitted) {
 			continue
-		}
-		if runpFlags.gerritMessage || runpFlags.noGerritMessage {
-			hasMsg := false
-			for _, br := range state.Branches {
-				if (state.CurrentBranch == br.Name) && br.HasGerritMessage {
-					hasMsg = true
-					break
-				}
-			}
-			if (runpFlags.gerritMessage && !hasMsg) || (runpFlags.noGerritMessage && hasMsg) {
-				continue
-			}
 		}
 		mapInputs[key] = &mapInput{
 			ProjectState: state,

@@ -112,7 +112,7 @@ func runProjectList(jirix *jiri.X, _ []string) error {
 	for _, key := range keys {
 		state := states[key]
 		if noPristineFlag {
-			pristine := len(state.Branches) == 1 && state.CurrentBranch == "master" && !state.HasUncommitted && !state.HasUntracked
+			pristine := len(state.Branches) == 1 && state.CurrentBranch.Name == "master" && !state.HasUncommitted && !state.HasUntracked
 			if pristine {
 				continue
 			}
@@ -121,13 +121,10 @@ func runProjectList(jirix *jiri.X, _ []string) error {
 		if branchesFlag {
 			for _, branch := range state.Branches {
 				s := "  "
-				if branch.Name == state.CurrentBranch {
+				if branch.Name == state.CurrentBranch.Name {
 					s += "* "
 				}
 				s += branch.Name
-				if branch.HasGerritMessage {
-					s += " (exported to gerrit)"
-				}
 				fmt.Fprintf(jirix.Stdout(), "%v\n", s)
 			}
 		}
@@ -247,7 +244,7 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 			Path:          state.Project.Path,
 			Remote:        state.Project.Remote,
 			Revision:      state.Project.Revision,
-			CurrentBranch: state.CurrentBranch,
+			CurrentBranch: state.CurrentBranch.Name,
 		}
 		for _, b := range state.Branches {
 			info[i].Branches = append(info[i].Branches, b.Name)
@@ -355,7 +352,7 @@ func runProjectShellPrompt(jirix *jiri.X, args []string) error {
 				status += "%"
 			}
 		}
-		short := state.CurrentBranch + status
+		short := state.CurrentBranch.Name + status
 		long := filepath.Base(states[key].Project.Name) + ":" + short
 		if key == currentProjectKey {
 			if showNameFlag {
@@ -364,7 +361,7 @@ func runProjectShellPrompt(jirix *jiri.X, args []string) error {
 				statuses = append([]string{short}, statuses...)
 			}
 		} else {
-			pristine := state.CurrentBranch == "master"
+			pristine := state.CurrentBranch.Name == "master"
 			if checkDirtyFlag {
 				pristine = pristine && !state.HasUncommitted && !state.HasUntracked
 			}

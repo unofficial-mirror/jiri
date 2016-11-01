@@ -61,6 +61,15 @@ func (RootDirOpt) gitOpt()       {}
 func (UserNameOpt) gitOpt()      {}
 func (UserEmailOpt) gitOpt()     {}
 
+type TrackingBranch string
+type Revision string
+type BranchName string
+
+const (
+	RemoteType = "remote"
+	LocalType  = "local"
+)
+
 // New is the Git factory.
 func New(s runutil.Sequence, opts ...gitOpt) *Git {
 	rootDir := ""
@@ -118,6 +127,40 @@ func (g *Git) BranchesDiffer(branch1, branch2 string) (bool, error) {
 	}
 	// Otherwise there is a difference.
 	return true, nil
+}
+
+func (g *Git) GetAllBranchesInfo() (map[string]struct {
+	TrackingBranch
+	Revision
+}, error) {
+	branchesInfo, err := g.runOutput("for-each-ref", "--format", "%(refname:short):%(upstream:short):%(objectname)", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]struct {
+		TrackingBranch
+		Revision
+	})
+	for _, branchInfo := range branchesInfo {
+		s := strings.SplitN(branchInfo, ":", 3)
+		m[LocalType+"/"+s[0]] = struct {
+			TrackingBranch
+			Revision
+		}{TrackingBranch(s[1]), Revision(s[2])}
+
+	}
+	branchesInfo, err = g.runOutput("for-each-ref", "--format", "%(refname:short):%(objectname)", "refs/remotes")
+	if err != nil {
+		return nil, err
+	}
+	for _, branchInfo := range branchesInfo {
+		s := strings.SplitN(branchInfo, ":", 2)
+		m[RemoteType+"/"+s[0]] = struct {
+			TrackingBranch
+			Revision
+		}{"", Revision(s[1])}
+	}
+	return m, nil
 }
 
 // CheckoutBranch checks out the given branch.
@@ -481,6 +524,9 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 			branch = strings.TrimSpace(strings.TrimPrefix(branch, "*"))
 			if g.IsOnBranch() {
 				current = branch
+			} else {
+				// Do not append detached head
+				continue
 			}
 		}
 		branches = append(branches, strings.TrimSpace(branch))

@@ -426,7 +426,7 @@ func initForMultiPart(jirix *jiri.X) (*multiPart, error) {
 		return nil, err
 	}
 	mp.currentKey = current.Key()
-	mp.currentBranch = states[mp.currentKey].CurrentBranch
+	mp.currentBranch = states[mp.currentKey].CurrentBranch.Name
 	if len(keys) == 1 {
 		filename := filepath.Join(states[keys[0]].Project.Path, jiri.ProjectMetaDir, mp.currentBranch, multiPartMetaDataFileName)
 		os.Remove(filename)
@@ -463,7 +463,7 @@ func projectStates(jirix *jiri.X, allowdirty bool) (map[project.ProjectKey]*proj
 	uncommitted := []string{}
 	var keys project.ProjectKeys
 	for _, s := range states {
-		if s.CurrentBranch == branch {
+		if s.CurrentBranch.Name == branch {
 			key := s.Project.Key()
 			fullState, err := project.GetProjectState(jirix, key, true)
 			if err != nil {

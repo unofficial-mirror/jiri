@@ -24,8 +24,6 @@ func setDefaultRunpFlags() {
 	runpFlags.untracked = false
 	runpFlags.noUncommitted = false
 	runpFlags.noUntracked = false
-	runpFlags.gerritMessage = false
-	runpFlags.noGerritMessage = false
 	runpFlags.showNamePrefix = false
 	runpFlags.showKeyPrefix = false
 	runpFlags.exitOnError = false
@@ -249,21 +247,4 @@ func TestRunP(t *testing.T) {
 	git(rb).CheckoutBranch("a1")
 	git(t1).CheckoutBranch("a1")
 	chdir(t1)
-
-	setDefaultRunpFlags()
-	runpFlags.gerritMessage = true
-	runpFlags.showNamePrefix = true
-	got = executeRunp(t, fake, "echo")
-	if want := "r.b:"; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	setDefaultRunpFlags()
-	runpFlags.noGerritMessage = true
-	runpFlags.showNamePrefix = true
-	got = executeRunp(t, fake, "echo")
-	if want := "sub/r.t1:"; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
 }
