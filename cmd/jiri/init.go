@@ -5,15 +5,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
-)
-
-var (
 )
 
 var cmdInit = &cmdline.Command{
@@ -31,6 +29,14 @@ Running "init" in existing jiri [root] is safe.
 If you provide a directory, the command is run inside it. If this directory
 does not exists, it will be created.
 `,
+}
+
+var (
+	cacheFlag string
+)
+
+func init() {
+	flag.StringVar(&cacheFlag, "cache", "", "Jiri cache directory")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -68,6 +74,14 @@ func runInit(env *cmdline.Env, args []string) error {
 		if err := os.Mkdir(d, 0755); err != nil {
 			return err
 		}
+	}
+
+	config := jiri.Config{
+		CachePath: cacheFlag,
+	}
+	configPath := filepath.Join(d, jiri.ConfigFile)
+	if err := config.Write(configPath); err != nil {
+		return err
 	}
 
 	// TODO(phosek): also create an empty manifest

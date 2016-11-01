@@ -1553,6 +1553,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 
 // updateCache creates the cache or updates it if already present.
 func updateCache(jirix *jiri.X, remoteProjects Projects) error {
+	// TODO(anmittal): Also update cache if any project was cloned using it
 	if jirix.Cache == "" {
 		return nil
 	}
