@@ -1186,7 +1186,7 @@ func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
 
 // syncProjectMaster checks out latest detached head if project is on one
 // else it rebases current branch onto its tracking branch
-func syncProjectMaster(jirix *jiri.X, project Project) error {
+func syncProjectMaster(jirix *jiri.X, project Project, showUpdateLogs bool) error {
 	s := jirix.NewSeq()
 	git := gitutil.New(s, gitutil.RootDirOpt(project.Path))
 	if !git.IsOnBranch() {
@@ -1222,13 +1222,14 @@ func syncProjectMaster(jirix *jiri.X, project Project) error {
 			if err != nil {
 				return err
 			}
-			var line string
 			if rebaseSuccess {
-				line = fmt.Sprintf("NOTE: For project (%v), rebased your local branch %v on %v", project.Name, branch, trackingBranch)
+				s.Verbose(showUpdateLogs).Output([]string{fmt.Sprintf("NOTE: For project (%v), rebased your local branch %v on %v", project.Name, branch, trackingBranch)})
 			} else {
-				line = fmt.Sprintf("NOTE: For project (%v), not able to rebase your local branch onto %v. Please do it manually", project.Name, trackingBranch)
+				s.Verbose(true).Output([]string{
+					fmt.Sprintf("NOTE: For project (%v), not able to rebase your local branch onto %v.", project.Name, trackingBranch),
+					"Please do it manually.",
+				})
 			}
-			s.Verbose(true).Output([]string{line})
 			return nil
 		} else {
 			revision, err2 := getHeadRevision(jirix, project)
@@ -1672,7 +1673,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	}
 	s := jirix.NewSeq()
 	for _, op := range ops {
-		updateFn := func() error { return op.Run(jirix) }
+		updateFn := func() error { return op.Run(jirix, showUpdateLogs) }
 		if err := s.Verbose(showUpdateLogs).Call(updateFn, "%v", op).Done(); err != nil {
 			return fmt.Errorf("error updating project %q: %v", op.Project().Name, err)
 		}
@@ -1860,7 +1861,7 @@ type operation interface {
 	// Kind returns the kind of operation.
 	Kind() string
 	// Run executes the operation.
-	Run(jirix *jiri.X) error
+	Run(jirix *jiri.X, showUpdateLogs bool) error
 	// String returns a string representation of the operation.
 	String() string
 	// Test checks whether the operation would fail.
@@ -1892,7 +1893,7 @@ func (op createOperation) Kind() string {
 	return "create"
 }
 
-func (op createOperation) Run(jirix *jiri.X) (e error) {
+func (op createOperation) Run(jirix *jiri.X, showUpdateLogs bool) (e error) {
 	s := jirix.NewSeq()
 
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
@@ -1963,7 +1964,7 @@ type deleteOperation struct {
 func (op deleteOperation) Kind() string {
 	return "delete"
 }
-func (op deleteOperation) Run(jirix *jiri.X) error {
+func (op deleteOperation) Run(jirix *jiri.X, showUpdateLogs bool) error {
 	s := jirix.NewSeq()
 	if op.gc {
 		// Never delete projects with non-master branches, uncommitted
@@ -2032,13 +2033,13 @@ type moveOperation struct {
 func (op moveOperation) Kind() string {
 	return "move"
 }
-func (op moveOperation) Run(jirix *jiri.X) error {
+func (op moveOperation) Run(jirix *jiri.X, showUpdateLogs bool) error {
 	s := jirix.NewSeq()
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	if err := s.MkdirAll(path, perm).Rename(op.source, op.destination).Done(); err != nil {
 		return err
 	}
-	if err := syncProjectMaster(jirix, op.project); err != nil {
+	if err := syncProjectMaster(jirix, op.project, showUpdateLogs); err != nil {
 		return err
 	}
 	return writeMetadata(jirix, op.project, op.project.Path)
@@ -2075,8 +2076,8 @@ type updateOperation struct {
 func (op updateOperation) Kind() string {
 	return "update"
 }
-func (op updateOperation) Run(jirix *jiri.X) error {
-	if err := syncProjectMaster(jirix, op.project); err != nil {
+func (op updateOperation) Run(jirix *jiri.X, showUpdateLogs bool) error {
+	if err := syncProjectMaster(jirix, op.project, showUpdateLogs); err != nil {
 		return err
 	}
 	return writeMetadata(jirix, op.project, op.project.Path)
@@ -2100,7 +2101,7 @@ func (op nullOperation) Kind() string {
 	return "null"
 }
 
-func (op nullOperation) Run(jirix *jiri.X) error {
+func (op nullOperation) Run(jirix *jiri.X, showUpdateLogs bool) error {
 	return writeMetadata(jirix, op.project, op.project.Path)
 }
 
