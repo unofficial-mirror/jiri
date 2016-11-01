@@ -1190,8 +1190,15 @@ func syncProjectMaster(jirix *jiri.X, project Project) error {
 	s := jirix.NewSeq()
 	git := gitutil.New(s, gitutil.RootDirOpt(project.Path))
 	if !git.IsOnBranch() {
-		err := checkoutHeadRevision(jirix, project, false)
-		if err != nil {
+		if changes, err := git.HasUncommittedChanges(); err != nil {
+			return err
+		} else if changes {
+			line1 := fmt.Sprintf("Note: %q contains uncommited changes.", project.Name)
+			line2 := fmt.Sprintf("Commit or discard the changes and try again.")
+			s.Verbose(true).Output([]string{line1, line2})
+			return nil
+		}
+		if err := checkoutHeadRevision(jirix, project, false); err != nil {
 			revision, err2 := getHeadRevision(jirix, project)
 			if err2 != nil {
 				return err2
