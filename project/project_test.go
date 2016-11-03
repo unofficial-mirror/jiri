@@ -1169,6 +1169,116 @@ func testCheckoutSnapshot(t *testing.T, testURL bool) {
 	}
 }
 
+func testLocalBranchesAreUpdated(t *testing.T, shouldLocalBeOnABranch, rebaseAll bool) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitRemote := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// This will fetch non-master to local
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "non-master commit")
+
+	if err := gitRemote.CheckoutBranch("master"); err != nil {
+		t.Fatal(err)
+	}
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
+
+	gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+
+	// This will create a local branch non-master
+	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Go back to detached HEAD
+	if !shouldLocalBeOnABranch {
+		if err := gitLocal.CheckoutBranch("HEAD", gitutil.DetachOpt(true)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := project.UpdateUniverse(fake.X, false, false, false, rebaseAll, project.DefaultHookTimeout); err != nil {
+		t.Fatal(err)
+	}
+
+	if shouldLocalBeOnABranch && gitLocal.IsOnBranch() == false {
+		t.Fatalf("local repo should be on the branch after update")
+	} else if !shouldLocalBeOnABranch && gitLocal.IsOnBranch() == true {
+		t.Fatalf("local repo should be on detached head after update")
+	}
+
+	projects, err := project.LocalProjects(fake.X, project.FastScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	states, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := states[localProjects[1].Key()]
+	if shouldLocalBeOnABranch && state.CurrentBranch.Name != "non-master" {
+		t.Fatalf("local repo should be on branch(non-master) it is on %q", state.CurrentBranch.Name)
+	}
+
+	if rebaseAll {
+		for _, branch := range state.Branches {
+			if branch.Tracking != nil {
+				if branch.Revision != branch.Tracking.Revision {
+					t.Fatalf("branch %q has different revision then remote branch %q", branch.Name, branch.Tracking.Name)
+				}
+			}
+		}
+	} else {
+		for _, branch := range state.Branches {
+			if branch.Tracking != nil {
+				if branch.Name == state.CurrentBranch.Name {
+					if branch.Revision != branch.Tracking.Revision {
+						t.Fatalf("branch %q has different revision then remote branch %q", branch.Name, branch.Tracking.Name)
+					}
+				} else if branch.Revision == branch.Tracking.Revision {
+					t.Fatalf("branch %q should have different revision then remote branch %q", branch.Name, branch.Tracking.Name)
+				}
+			}
+		}
+	}
+}
+
+// TestLocalBranchesAreUpdatedWhenOnHead test that all the local branches are
+// updated on jiri update when local repo is on detached head
+func TestLocalBranchesAreUpdatedWhenOnHead(t *testing.T) {
+	testLocalBranchesAreUpdated(t, false, true)
+}
+
+// TestLocalBranchesAreUpdatedWhenOnBranch test that all the local branches are
+// updated on jiri update when local repo is on a branch
+func TestLocalBranchesAreUpdatedWhenOnBranch(t *testing.T) {
+	testLocalBranchesAreUpdated(t, true, true)
+}
+
+// TestLocalBranchesNotUpdatedWhenOnHead test that all the local branches are not
+// updated on jiri update when local repo is on detached head and rebaseAll is false
+func TestLocalBranchesNotUpdatedWhenOnHead(t *testing.T) {
+	testLocalBranchesAreUpdated(t, false, false)
+}
+
+// TestLocalBranchesAreUpdatedWhenOnBranch test that all the local branches are not
+// updated on jiri update when local repo is on a branch and rebaseAll is false
+func TestLocalBranchesNotUpdatedWhenOnBranch(t *testing.T) {
+	testLocalBranchesAreUpdated(t, true, false)
+}
+
 // TestUpdateWhenRemoteChangesMerged checks that UpdateUniverse can pull from a
 // non-master remote branch if the local changes were merged somehwere else(gerrit)
 // before being pushed to remote
@@ -1267,7 +1377,7 @@ func TestFileImportCycle(t *testing.T) {
 	}
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(jirix, false, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in local manifest files"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1318,7 +1428,7 @@ func TestRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote2, fileB, "commit B")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1388,7 +1498,7 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote1, fileD, "commit D")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
