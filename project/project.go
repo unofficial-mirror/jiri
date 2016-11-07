@@ -1706,7 +1706,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 }
 
 // runHooks runs all hooks for the given operations.
-func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOuput bool) error {
+func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOutput bool) error {
 	jirix.TimerPush("run hooks")
 	defer jirix.TimerPop()
 	type result struct {
@@ -1727,7 +1727,6 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOuput bool) e
 
 			errReader, errWriter, err := os.Pipe()
 			if err != nil {
-				outWriter.Close()
 				ch <- result{nil, nil, err}
 				return
 			}
@@ -1735,8 +1734,8 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOuput bool) e
 
 			s := jirix.NewSeq().CaptureAll(outWriter, errWriter).Verbose(true).Output([]string{fmt.Sprintf("output for hook(%v) for project %q", hook.Name, hook.ProjectName)})
 			errWriter.WriteString(fmt.Sprintf("Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName))
-			if err := s.Dir(hook.ActionPath).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
-				ch <- result{outReader, errReader, fmt.Errorf("error running hook for project %q: %v", hook.ProjectName, err)}
+			if err := s.Dir(hook.ActionPath).Timeout(5 * time.Minute).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
+				ch <- result{outReader, errReader, err}
 				return
 			}
 			ch <- result{outReader, errReader, nil}
@@ -1746,16 +1745,20 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOuput bool) e
 	multiErr := make(MultiError, 0)
 	for range hooks {
 		out := <-ch
-		if showHookOuput && out.outReader != nil {
-			var outbuf bytes.Buffer
-			io.Copy(&outbuf, out.outReader)
-			os.Stdout.WriteString(outbuf.String())
+		if out.err != nil && runutil.IsTimeout(out.err) {
+			jirix.NewSeq().Verbose(true).Output([]string{"Timeout while executing hook"})
+			if out.outReader != nil {
+				io.Copy(os.Stdout, out.outReader)
+			}
+			multiErr = append(multiErr, out.err)
+			continue
+		}
+		if out.outReader != nil && showHookOutput {
+			io.Copy(os.Stdout, out.outReader)
 		}
 		if out.err != nil {
 			if out.errReader != nil {
-				var errbuf bytes.Buffer
-				io.Copy(&errbuf, out.errReader)
-				os.Stderr.WriteString(errbuf.String())
+				io.Copy(os.Stderr, out.errReader)
 			}
 			multiErr = append(multiErr, out.err)
 		}
