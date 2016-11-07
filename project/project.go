@@ -1198,6 +1198,14 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, showU
 			}
 		}()
 	}
+	headRevision, err := getHeadRevision(jirix, project)
+	if err != nil {
+		return err
+	}
+	branchesContainingHead, err := git.GetBranchesContaining(headRevision)
+	if err != nil {
+		return err
+	}
 	for _, branch := range state.Branches {
 		if branch.Tracking != nil { // tracked branch
 			if branch.Revision == branch.Tracking.Revision {
@@ -1226,9 +1234,8 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, showU
 				})
 			}
 		} else {
-			revision, err2 := getHeadRevision(jirix, project)
-			if err2 != nil {
-				return err2
+			if branchesContainingHead[branch.Name] {
+				continue
 			}
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -1242,28 +1249,28 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, showU
 			if rebaseUntracked {
 				if err := git.CheckoutBranch(branch.Name); err != nil {
 					s.Verbose(true).Output([]string{
-						fmt.Sprintf("NOTE: For project (%v), not able to rebase your local branch %q onto %q.", project.Name, branch.Name, revision),
+						fmt.Sprintf("NOTE: For project (%v), not able to rebase your local branch %q onto %q.", project.Name, branch.Name, headRevision),
 						"Please do it manually.",
 					})
 					continue
 				}
-				rebaseSuccess, err := tryRebase(jirix, project, revision)
+				rebaseSuccess, err := tryRebase(jirix, project, headRevision)
 				if err != nil {
 					return err
 				}
 				if rebaseSuccess {
-					s.Verbose(showUpdateLogs).Output([]string{fmt.Sprintf("NOTE: For project (%v), rebased your untracked branch %q on %q", project.Name, branch.Name, revision)})
+					s.Verbose(showUpdateLogs).Output([]string{fmt.Sprintf("NOTE: For project (%v), rebased your untracked branch %q on %q", project.Name, branch.Name, headRevision)})
 				} else {
 					s.Verbose(true).Output([]string{
 						fmt.Sprintf("NOTE: For project (%v), not able to rebase your untracked branch %q.", project.Name, branch.Name),
-						fmt.Sprintf("To rebase it manually run 'git -C %s checkout %v; git -C %s rebase %v'", relativePath, branch.Name, relativePath, revision),
+						fmt.Sprintf("To rebase it manually run 'git -C %s checkout %v; git -C %s rebase %v'", relativePath, branch.Name, relativePath, headRevision),
 					})
 				}
 			} else if state.CurrentBranch.Name == branch.Name || showUpdateLogs { // untracked branch, and only provide message for current branch if -verbose not passed
 				s.Verbose(true).Output([]string{
 					fmt.Sprintf("NOTE: For Project (%v), branch %q does not track any remote branch.", project.Name, branch.Name),
 					"To rebase it, update with -rebase-untracked flag, or to rebase it manually run",
-					fmt.Sprintf("'git -C %s checkout %v; git -C %s rebase %v'", relativePath, branch.Name, relativePath, revision),
+					fmt.Sprintf("'git -C %s checkout %v; git -C %s rebase %v'", relativePath, branch.Name, relativePath, headRevision),
 				})
 			}
 		}
@@ -2321,14 +2328,8 @@ func computeOp(local, remote *Project, state *ProjectState, gc bool) operation {
 				source:      local.Path,
 				state:       *state,
 			}}
-		case localBranchesNeedUpdating || (state.CurrentBranch.Name == "" && local.Revision != remote.Revision):
-			return updateOperation{commonOperation{
-				destination: remote.Path,
-				project:     *remote,
-				source:      local.Path,
-				state:       *state,
-			}}
-		case state.CurrentBranch.Tracking == nil && local.Revision != remote.Revision:
+		// We put checks for untracked-branch updation in syncProjectMaster funtion
+		case state.CurrentBranch.Tracking == nil || localBranchesNeedUpdating || (state.CurrentBranch.Name == "" && local.Revision != remote.Revision):
 			return updateOperation{commonOperation{
 				destination: remote.Path,
 				project:     *remote,
