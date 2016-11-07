@@ -1347,6 +1347,14 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 		branches = []BranchState{state.CurrentBranch}
 	}
 	rebaseUntrackedMessage := false
+	headRevision, err := GetHeadRevision(jirix, project)
+	if err != nil {
+		return err
+	}
+	branchesContainingHead, err := scm.ListBranchesContainingRef(headRevision)
+	if err != nil {
+		return err
+	}
 	for _, branch := range branches {
 		if branch.Tracking != nil { // tracked branch
 			if branch.Revision == branch.Tracking.Revision {
@@ -1378,9 +1386,8 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 				continue
 			}
 		} else {
-			revision, err2 := GetHeadRevision(jirix, project)
-			if err2 != nil {
-				return err2
+			if branchesContainingHead[branch.Name] {
+				continue
 			}
 			if rebaseUntracked {
 				if project.LocalConfig.NoRebase {
@@ -1395,12 +1402,12 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 					jirix.IncrementFailures()
 					continue
 				}
-				rebaseSuccess, err := tryRebase(jirix, project, revision)
+				rebaseSuccess, err := tryRebase(jirix, project, headRevision)
 				if err != nil {
 					return err
 				}
 				if rebaseSuccess {
-					jirix.Logger.Debugf("For project %q, rebased your untracked branch %q on %q", project.Name, branch.Name, revision)
+					jirix.Logger.Debugf("For project %q, rebased your untracked branch %q on %q", project.Name, branch.Name, headRevision)
 				} else {
 					msg := fmt.Sprintf("For project %s(%s), not able to rebase your untracked branch %q onto JIRI_HEAD.", project.Name, relativePath, branch.Name)
 					msg += "\nPlease do it manually\n\n"
@@ -1413,7 +1420,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 				rebaseUntrackedMessage = true
 				msg := fmt.Sprintf("For Project %q, branch %q does not track any remote branch.", project.Name, branch.Name)
 				msg += fmt.Sprintf("\nTo rebase it update with -rebase-untracked flag, or to rebase it manually run")
-				msg += fmt.Sprintf("\n'git -C %q checkout %s && git -C %q rebase %s'\n\n", relativePath, branch.Name, relativePath, revision)
+				msg += fmt.Sprintf("\n'git -C %q checkout %s && git -C %q rebase %s'\n\n", relativePath, branch.Name, relativePath, headRevision)
 				jirix.Logger.Warningf(msg)
 				continue
 			}
@@ -2650,6 +2657,10 @@ func computeOp(local, remote *Project, state *ProjectState, gc, rebaseUntracked,
 						localBranchesNeedUpdating = true
 						break
 					}
+				} else if rebaseUntracked && rebaseAll {
+					// We put checks for untracked-branch updation in syncProjectMaster funtion
+					localBranchesNeedUpdating = true
+					break
 				}
 			}
 		}

@@ -525,6 +525,20 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	return branches, current, nil
 }
 
+// ListBranchesContainingRef returns a slice of the local branches
+// which contains the given commit
+func (g *Git) ListBranchesContainingRef(commit string) (map[string]bool, error) {
+	branches, _, err := g.GetBranches("--contains", commit)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]bool)
+	for _, branch := range branches {
+		m[branch] = true
+	}
+	return m, nil
+}
+
 // Grep searches for matching text and returns a list of lines from
 // `git grep`.
 func (g *Git) Grep(query string) ([]string, error) {
