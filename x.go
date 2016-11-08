@@ -105,7 +105,6 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
-	fmt.Printf("%v\n", x.config)
 	x.Cache, err = findCache(root, x.config)
 	if err != nil {
 		return nil, err
