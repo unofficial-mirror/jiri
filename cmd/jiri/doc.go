@@ -379,46 +379,20 @@ The jiri snapshot checkout flags are:
 
 Jiri snapshot create - Create a new project snapshot
 
-The "jiri snapshot create <label>" command captures the current project state in
-a manifest.  If the -push-remote flag is provided, the snapshot is committed and
-pushed upstream.
-
-Internally, snapshots are organized as follows:
-
- <snapshot-dir>/
-   labels/
-     <label1>/
-       <label1-snapshot1>
-       <label1-snapshot2>
-       ...
-     <label2>/
-       <label2-snapshot1>
-       <label2-snapshot2>
-       ...
-     <label3>/
-     ...
-   <label1> # a symlink to the latest <label1-snapshot*>
-   <label2> # a symlink to the latest <label2-snapshot*>
-   ...
-
-NOTE: Unlike the jiri tool commands, the above internal organization is not an
-API. It is an implementation and can change without notice.
+The "jiri snapshot create <snapshot>" command captures the current project state
+in a manifest.
 
 Usage:
-   jiri snapshot create [flags] <label>
+   jiri snapshot create [flags] <snapshot>
 
-<label> is the snapshot label.
+<snapshot> is the snapshot manifest file.
 
 The jiri snapshot create flags are:
- -push-remote=false
-   Commit and push snapshot upstream.
  -time-format=2006-01-02T15:04:05Z07:00
    Time format for snapshot file name.
 
  -color=true
    Use color to format output.
- -dir=
-   Directory where snapshot are stored.  Defaults to [root]/.snapshot.
  -v=false
    Print verbose output.
 

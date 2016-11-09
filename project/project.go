@@ -46,9 +46,6 @@ type Manifest struct {
 	LocalImports []LocalImport `xml:"imports>localimport"`
 	Projects     []Project     `xml:"projects>project"`
 	Hooks        []Hook        `xml:"hooks>hook"`
-	// SnapshotPath is the relative path to the snapshot file from root.
-	// It is only set when creating a snapshot.
-	SnapshotPath string   `xml:"snapshotpath,attr,omitempty"`
 	XMLName      struct{} `xml:"manifest"`
 }
 
@@ -105,7 +102,6 @@ var (
 // deepCopy returns a deep copy of Manifest.
 func (m *Manifest) deepCopy() *Manifest {
 	x := new(Manifest)
-	x.SnapshotPath = m.SnapshotPath
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.LocalImports = append([]LocalImport(nil), m.LocalImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
@@ -601,27 +597,11 @@ type Update map[string][]CL
 
 // CreateSnapshot creates a manifest that encodes the current state of
 // HEAD of all projects and writes this snapshot out to the given file.
-func CreateSnapshot(jirix *jiri.X, file, snapshotPath string) error {
+func CreateSnapshot(jirix *jiri.X, file string) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
-	// If snapshotPath is empty, use the file as the path.
-	if snapshotPath == "" {
-		snapshotPath = file
-	}
-
-	// Get a clean, symlink-free, relative path to the snapshot.
-	snapshotPath = filepath.Clean(snapshotPath)
-	if evaledSnapshotPath, err := filepath.EvalSymlinks(snapshotPath); err == nil {
-		snapshotPath = evaledSnapshotPath
-	}
-	if relSnapshotPath, err := filepath.Rel(jirix.Root, snapshotPath); err == nil {
-		snapshotPath = relSnapshotPath
-	}
-
-	manifest := Manifest{
-		SnapshotPath: snapshotPath,
-	}
+	manifest := Manifest{}
 
 	// Add all local projects to manifest.
 	localProjects, err := LocalProjects(jirix, FullScan)
@@ -989,7 +969,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, showUpdateLogs bool) (e error) {
 func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string) error {
 	seq := jirix.NewSeq()
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile, snapshotPath); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile); err != nil {
 		return err
 	}
 

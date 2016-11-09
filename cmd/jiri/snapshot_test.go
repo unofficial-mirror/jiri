@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,123 +18,6 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/tool"
 )
-
-func createLabelDir(t *testing.T, jirix *jiri.X, snapshotDir, name string, snapshots []string) {
-	if snapshotDir == "" {
-		snapshotDir = filepath.Join(jirix.Root, defaultSnapshotDir)
-	}
-	s := jirix.NewSeq()
-	labelDir, perm := filepath.Join(snapshotDir, "labels", name), os.FileMode(0700)
-	if err := s.MkdirAll(labelDir, perm).Done(); err != nil {
-		t.Fatalf("MkdirAll(%v, %v) failed: %v", labelDir, perm, err)
-	}
-	for i, snapshot := range snapshots {
-		path := filepath.Join(labelDir, snapshot)
-		_, err := os.Create(path)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		if i == 0 {
-			symlinkPath := filepath.Join(snapshotDir, name)
-			if err := s.Symlink(path, symlinkPath).Done(); err != nil {
-				t.Fatalf("Symlink(%v, %v) failed: %v", path, symlinkPath, err)
-			}
-		}
-	}
-}
-
-func generateOutput(labels []label) string {
-	output := ""
-	for _, label := range labels {
-		output += fmt.Sprintf("snapshots of label %q:\n", label.name)
-		for _, snapshot := range label.snapshots {
-			output += fmt.Sprintf("  %v\n", snapshot)
-		}
-	}
-	return output
-}
-
-type config struct {
-	remote bool
-	dir    string
-}
-
-type label struct {
-	name      string
-	snapshots []string
-}
-
-func TestList(t *testing.T) {
-	resetFlags()
-	fake, cleanup := jiritest.NewFakeJiriRoot(t)
-	defer cleanup()
-
-	snapshotDir1 := "" // Should use default dir.
-	snapshotDir2 := filepath.Join(fake.X.Root, "some/other/dir")
-
-	// Create a test suite.
-	tests := []config{
-		config{
-			dir: snapshotDir1,
-		},
-		config{
-			dir: snapshotDir2,
-		},
-	}
-	labels := []label{
-		label{
-			name:      "beta",
-			snapshots: []string{"beta-1", "beta-2", "beta-3"},
-		},
-		label{
-			name:      "stable",
-			snapshots: []string{"stable-1", "stable-2", "stable-3"},
-		},
-	}
-
-	for _, test := range tests {
-		snapshotDirFlag = test.dir
-		// Create the snapshots directory and populate it with the
-		// data specified by the test suite.
-		for _, label := range labels {
-			createLabelDir(t, fake.X, test.dir, label.name, label.snapshots)
-		}
-
-		// Check that running "jiri snapshot list" with no arguments
-		// returns the expected output.
-		var stdout bytes.Buffer
-		fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
-		if err := runSnapshotList(fake.X, nil); err != nil {
-			t.Fatalf("%v", err)
-		}
-		got, want := stdout.String(), generateOutput(labels)
-		if got != want {
-			t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v\n", got, want)
-		}
-
-		// Check that running "jiri snapshot list" with one argument
-		// returns the expected output.
-		stdout.Reset()
-		if err := runSnapshotList(fake.X, []string{"stable"}); err != nil {
-			t.Fatalf("%v", err)
-		}
-		got, want = stdout.String(), generateOutput(labels[1:])
-		if got != want {
-			t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v\n", got, want)
-		}
-
-		// Check that running "jiri snapshot list" with
-		// multiple arguments returns the expected output.
-		stdout.Reset()
-		if err := runSnapshotList(fake.X, []string{"beta", "stable"}); err != nil {
-			t.Fatalf("%v", err)
-		}
-		got, want = stdout.String(), generateOutput(labels)
-		if got != want {
-			t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v\n", got, want)
-		}
-	}
-}
 
 func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
 	s := jirix.NewSeq()
@@ -177,66 +61,8 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	}
 }
 
-func resetFlags() {
-	snapshotDirFlag = ""
-	pushRemoteFlag = false
-}
-
-func TestGetSnapshotDir(t *testing.T) {
-	resetFlags()
-	defer resetFlags()
-	fake, cleanup := jiritest.NewFakeJiriRoot(t)
-	defer cleanup()
-
-	// With all flags at default values, snapshot dir should be default.
-	resetFlags()
-	got, err := getSnapshotDir(fake.X)
-	if err != nil {
-		t.Fatalf("getSnapshotDir() failed: %v\n", err)
-	}
-	if want := filepath.Join(fake.X.Root, defaultSnapshotDir); got != want {
-		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
-	}
-
-	// With dir flag set to absolute path, snapshot dir should be value of dir
-	// flag.
-	resetFlags()
-	tempDir, err := fake.X.NewSeq().TempDir("", "")
-	if err != nil {
-		t.Fatalf("TempDir() failed: %v", err)
-	}
-	defer fake.X.NewSeq().RemoveAll(tempDir).Done()
-	snapshotDirFlag = tempDir
-	got, err = getSnapshotDir(fake.X)
-	if err != nil {
-		t.Fatalf("getSnapshotDir() failed: %v\n", err)
-	}
-	if want := snapshotDirFlag; got != want {
-		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
-	}
-
-	// With dir flag set to relative path, snapshot dir should absolute path
-	// rooted at current working dir.
-	resetFlags()
-	snapshotDirFlag = "some/relative/path"
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("os.Getwd() failed: %v", err)
-	}
-	defer fake.X.NewSeq().RemoveAll(filepath.Join(cwd, "some"))
-	got, err = getSnapshotDir(fake.X)
-	if err != nil {
-		t.Fatalf("getSnapshotDir() failed: %v\n", err)
-	}
-	if want := filepath.Join(cwd, snapshotDirFlag); got != want {
-		t.Errorf("unexpected snapshot dir: got %v want %v", got, want)
-	}
-}
-
 // TestCreate tests creating and checking out a snapshot.
 func TestCreate(t *testing.T) {
-	resetFlags()
-	defer resetFlags()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	s := fake.X.NewSeq()
@@ -268,7 +94,14 @@ func TestCreate(t *testing.T) {
 	// Create a snapshot.
 	var stdout bytes.Buffer
 	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
-	if err := runSnapshotCreate(fake.X, []string{"test-local"}); err != nil {
+
+	tmpfile, err := ioutil.TempFile("", "jiri-snapshot-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	if err := runSnapshotCreate(fake.X, []string{tmpfile.Name()}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -282,8 +115,7 @@ func TestCreate(t *testing.T) {
 
 	// Check that invoking the UpdateUniverse() with the snapshot restores the
 	// local repositories.
-	snapshotDir := filepath.Join(fake.X.Root, defaultSnapshotDir)
-	snapshotFile := filepath.Join(snapshotDir, "test-local")
+	snapshotFile := tmpfile.Name()
 	localX := fake.X.Clone(tool.ContextOpts{
 		Manifest: &snapshotFile,
 	})
