@@ -1553,7 +1553,6 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) {
 
 // updateCache creates the cache or updates it if already present.
 func updateCache(jirix *jiri.X, remoteProjects Projects) error {
-	// TODO(anmittal): Also update cache if any project was cloned using it
 	if jirix.Cache == "" {
 		return nil
 	}
@@ -1571,15 +1570,17 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			wg.Add(1)
 			go func(dir, remote string) {
 				defer wg.Done()
-				s := jirix.NewSeq() // This should be crated inside loop, as when we set git directory,
+				// This should be crated inside loop, as when we set git directory,
 				// It changes the dir of previous git in the loop
-				if isPathDir(dir) { // Cache already present, update it
-					git := gitutil.New(s, gitutil.RootDirOpt(dir))
-					if err := git.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+				s := jirix.NewSeq()
+				if isPathDir(dir) {
+					// Cache already present, update it
+					if err := gitutil.New(s, gitutil.RootDirOpt(dir)).Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
 						errs <- err
 						return
 					}
-				} else { // Create cache
+				} else {
+					// Create cache
 					if err := gitutil.New(s).CloneMirror(remote, dir); err != nil {
 						errs <- err
 						return
