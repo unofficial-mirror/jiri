@@ -333,57 +333,13 @@ The jiri project shell-prompt flags are:
  -v=false
    Print verbose output.
 
-Jiri snapshot - Manage project snapshots
+Jiri snapshot - Create a new project snapshot
 
-The "jiri snapshot" command can be used to manage project snapshots. In
-particular, it can be used to create new snapshots and to list existing
-snapshots.
-
-Usage:
-   jiri snapshot [flags] <command>
-
-The jiri snapshot commands are:
-   checkout    Checkout a project snapshot
-   create      Create a new project snapshot
-   list        List existing project snapshots
-
-The jiri snapshot flags are:
- -dir=
-   Directory where snapshot are stored.  Defaults to [root]/.snapshot.
-
- -color=true
-   Use color to format output.
- -v=false
-   Print verbose output.
-
-Jiri snapshot checkout - Checkout a project snapshot
-
-The "jiri snapshot checkout <snapshot>" command restores local project state to
-the state in the given snapshot manifest.
-
-Usage:
-   jiri snapshot checkout [flags] <snapshot>
-
-<snapshot> is the snapshot manifest file.
-
-The jiri snapshot checkout flags are:
- -gc=false
-   Garbage collect obsolete repositories.
-
- -color=true
-   Use color to format output.
- -dir=
-   Directory where snapshot are stored.  Defaults to [root]/.snapshot.
- -v=false
-   Print verbose output.
-
-Jiri snapshot create - Create a new project snapshot
-
-The "jiri snapshot create <snapshot>" command captures the current project state
+The "jiri snapshot <snapshot>" command captures the current project state
 in a manifest.
 
 Usage:
-   jiri snapshot create [flags] <snapshot>
+   jiri snapshot [flags] <snapshot>
 
 <snapshot> is the snapshot manifest file.
 
@@ -396,25 +352,6 @@ The jiri snapshot create flags are:
  -v=false
    Print verbose output.
 
-Jiri snapshot list - List existing project snapshots
-
-The "snapshot list" command lists existing snapshots of the labels specified as
-command-line arguments. If no arguments are provided, the command lists
-snapshots for all known labels.
-
-Usage:
-   jiri snapshot list [flags] <label ...>
-
-<label ...> is a list of snapshot labels.
-
-The jiri snapshot list flags are:
- -color=true
-   Use color to format output.
- -dir=
-   Directory where snapshot are stored.  Defaults to [root]/.snapshot.
- -v=false
-   Print verbose output.
-
 Jiri update - Update all jiri projects
 
 Updates all projects. The sequence in which the individual updates happen
@@ -424,7 +361,9 @@ to update is described in the manifest.
 Run "jiri help manifest" for details on manifests.
 
 Usage:
-   jiri update [flags]
+   jiri update [flags] <snapshot>
+
+<snapshot> is the snapshot manifest file.
 
 The jiri update flags are:
  -attempts=1

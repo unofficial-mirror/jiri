@@ -44,9 +44,15 @@ to update is described in the manifest.
 
 Run "jiri help manifest" for details on manifests.
 `,
+	ArgsName: "<snapshot>",
+	ArgsLong: "<snapshot> is the snapshot manifest file.",
 }
 
-func runUpdate(jirix *jiri.X, _ []string) error {
+func runUpdate(jirix *jiri.X, args []string) error {
+	if len(args) > 1 {
+		return jirix.UsageErrorf("unexpected number of arguments")
+	}
+
 	if autoupdateFlag {
 		// Try to update Jiri itself.
 		err := jiri.Update(forceAutoupdateFlag)
@@ -57,8 +63,13 @@ func runUpdate(jirix *jiri.X, _ []string) error {
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
-	updateFn := func() error { return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag) }
-	if err := retry.Function(jirix.Context, updateFn, retry.AttemptsOpt(attemptsFlag)); err != nil {
+	if err := retry.Function(jirix.Context, func() error {
+		if len(args) > 0 {
+			return project.CheckoutSnapshot(jirix, args[0], gcFlag)
+		} else {
+			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag)
+		}
+	}, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
 	return project.WriteUpdateHistorySnapshot(jirix, "")

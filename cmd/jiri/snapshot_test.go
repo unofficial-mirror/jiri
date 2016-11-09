@@ -61,8 +61,8 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	}
 }
 
-// TestCreate tests creating and checking out a snapshot.
-func TestCreate(t *testing.T) {
+// TestSnapshot tests creating and checking out a snapshot.
+func TestSnapshot(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 	s := fake.X.NewSeq()
@@ -101,7 +101,7 @@ func TestCreate(t *testing.T) {
 	}
 	defer os.Remove(tmpfile.Name())
 
-	if err := runSnapshotCreate(fake.X, []string{tmpfile.Name()}); err != nil {
+	if err := runSnapshot(fake.X, []string{tmpfile.Name()}); err != nil {
 		t.Fatalf("%v", err)
 	}
 
