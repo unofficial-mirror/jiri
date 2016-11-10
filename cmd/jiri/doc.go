@@ -224,6 +224,38 @@ The jiri import flags are:
  -v=false
    Print verbose output.
 
+Jiri patch - Patch in the existing change
+
+Command "patch" applies the existing changelist to the current project. The
+change can be identified either using change ID, in which case the latest
+patchset will be used, or the the full reference.
+
+A new branch will be created to apply the patch to. The default name of this
+branch is "change/<changeset>/<patchset>", but this can be overriden using the
+-branch flag. The command will fail if the branch already exists. The -delete
+flag will delete the branch if already exists. Use the -force flag to force
+deleting the branch even if it contains unmerged changes).
+
+Usage:
+   jiri patch <change>
+
+<change> is a change ID or a full reference.
+
+The jiri project info flags are:
+ -branch=
+   Name of the branch the patch will be applied to
+ -delete=false
+   Delete the existing branch if already exists
+ -force=false
+   Use force when deleting the existing branch
+ -host=
+   Gerrit host to use.  Defaults to gerrit host specified in manifest.
+
+ -color=true
+   Use color to format output.
+ -v=false
+   Print verbose output.
+
 Jiri project - Manage the jiri projects
 
 Manage the jiri projects.
