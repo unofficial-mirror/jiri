@@ -76,6 +76,18 @@ func runInit(env *cmdline.Env, args []string) error {
 		}
 	}
 
+	if cacheFlag != "" {
+		cache, err := filepath.Abs(cacheFlag)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stat(cache); os.IsNotExist(err) {
+			if err := os.MkdirAll(cache, 0755); err != nil {
+				return err
+			}
+		}
+	}
+
 	config := jiri.Config{
 		CachePath: cacheFlag,
 	}
