@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"fuchsia.googlesource.com/jiri"
@@ -15,6 +16,7 @@ import (
 	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/project"
 )
 
 var (
@@ -26,6 +28,7 @@ var (
 	uploadVerifyFlag    bool
 	uploadRebaseFlag    bool
 	uploadSetTopicFlag  bool
+	uploadMultipartFlag bool
 )
 
 var cmdUpload = &cmdline.Command{
@@ -45,6 +48,7 @@ func init() {
 	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", true, `Set topic.`)
 	cmdUpload.Flags.BoolVar(&uploadVerifyFlag, "verify", true, `Run pre-push git hooks.`)
 	cmdUpload.Flags.BoolVar(&uploadRebaseFlag, "rebase", false, `Run rebase before pushing.`)
+	cmdUpload.Flags.BoolVar(&uploadMultipartFlag, "multipart", false, `Send multipart CL.`)
 }
 
 // runUpload is a wrapper that pushes the changes to gerrit for review.
@@ -57,83 +61,145 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	if !scm.IsOnBranch() {
 		return fmt.Errorf("The project is not on any branch.")
 	}
-	remoteBranch, err := scm.RemoteBranchName()
-	if err != nil {
-		return err
-	}
-	if remoteBranch == "" {
-		return fmt.Errorf("Current branch is un-tracked or tracks a local un-tracked branch.")
-	}
-	g := git.NewGit(p.Path)
-	if uploadRebaseFlag {
-		if changes, err := g.HasUncommittedChanges(); err != nil {
-			return fmt.Errorf("Cannot get uncommited changes for project %q", p.Name, err)
-		} else if changes {
-			return fmt.Errorf("Project has uncommited changes, please commit them or stash them. Cannot rebase before pushing.")
-		}
-	}
 
-	host := uploadHostFlag
-	if host == "" {
-		if p.GerritHost == "" {
-			return fmt.Errorf("No gerrit host found.  Please use the '--host' flag, or add a 'gerrithost' attribute for project %q.", p.Name)
-		}
-		host = p.GerritHost
-	}
-	hostUrl, err := url.Parse(host)
-	if err != nil {
-		return fmt.Errorf("invalid Gerrit host %q: %v", host, err)
-	}
-	projectRemoteUrl, err := url.Parse(p.Remote)
-	if err != nil {
-		return fmt.Errorf("invalid project remote: %v", p.Remote, err)
-	}
-	gerritRemote := *hostUrl
-	gerritRemote.Path = projectRemoteUrl.Path
-	branch, err := gitutil.New(jirix).CurrentBranchName()
+	currentBranch, err := scm.CurrentBranchName()
 	if err != nil {
 		return err
 	}
+	var projectsToProcess []project.Project
 	topic := ""
 	if uploadSetTopicFlag {
 		if topic = uploadTopicFlag; topic == "" {
-			topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), branch) // use <username>-<branchname> as the default
+			topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), currentBranch) // use <username>-<branchname> as the default
 		}
 	}
-	opts := gerrit.CLOpts{
-		Ccs:          parseEmails(uploadCcsFlag),
-		Host:         hostUrl,
-		Presubmit:    gerrit.PresubmitTestType(uploadPresubmitFlag),
-		RemoteBranch: remoteBranch,
-		Remote:       gerritRemote.String(),
-		Reviewers:    parseEmails(uploadReviewersFlag),
-		Verify:       uploadVerifyFlag,
-		Topic:        topic,
-		Branch:       branch,
-	}
-
-	if opts.Presubmit == gerrit.PresubmitTestType("") {
-		opts.Presubmit = gerrit.PresubmitTestTypeAll
-	}
-
-	if uploadRebaseFlag {
-		if err := g.Fetch("origin", git.PruneOpt(true)); err != nil {
-			return err
-		}
-		trackingBranch, err := scm.TrackingBranchName()
+	if uploadMultipartFlag {
+		projects, err := project.LocalProjects(jirix, project.FastScan)
 		if err != nil {
 			return err
 		}
-		if err = scm.Rebase(trackingBranch); err != nil {
-			if err2 := scm.RebaseAbort(); err2 != nil {
-				return err2
+		for _, project := range projects {
+			scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
+			if scm.IsOnBranch() {
+				branch, err := scm.CurrentBranchName()
+				if err != nil {
+					return err
+				}
+				if currentBranch == branch {
+					projectsToProcess = append(projectsToProcess, project)
+				}
 			}
-			return fmt.Errorf("Not able to rebase the branch to %v, please rebase manually: %v", trackingBranch, err)
+		}
+
+	} else {
+		if project, err := currentProject(jirix); err != nil {
+			return err
+		} else {
+			projectsToProcess = append(projectsToProcess, project)
+		}
+	}
+	type GerritPushOption struct {
+		Project      project.Project
+		CLOpts       gerrit.CLOpts
+		relativePath string
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	var gerritPushOptions []GerritPushOption
+	for _, project := range projectsToProcess {
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
+		relativePath, err := filepath.Rel(cwd, project.Path)
+		if err != nil {
+			// Just use the full path if an error occurred.
+			relativePath = project.Path
+		}
+		if uploadRebaseFlag {
+			if changes, err := git.NewGit(project.Path).HasUncommittedChanges(); err != nil {
+				return err
+			} else if changes {
+				return fmt.Errorf("Project %s(%s) has uncommited changes, please commit them or stash them. Cannot rebase before pushing.", project.Name, relativePath)
+			}
+		}
+		remoteBranch, err := scm.RemoteBranchName()
+		if err != nil {
+			return err
+		}
+		if remoteBranch == "" {
+			return fmt.Errorf("For project %s(%s), current branch is un-tracked or tracks a local un-tracked branch.", project.Name, relativePath)
+		}
+
+		host := uploadHostFlag
+		if host == "" {
+			if project.GerritHost == "" {
+				return fmt.Errorf("No gerrit host found.  Please use the '--host' flag, or add a 'gerrithost' attribute for project %s(%s).", project.Name, relativePath)
+			}
+			host = project.GerritHost
+		}
+		hostUrl, err := url.Parse(host)
+		if err != nil {
+			return fmt.Errorf("invalid Gerrit host for project %s(%s) %q: %s", project.Name, relativePath, host, err)
+		}
+		projectRemoteUrl, err := url.Parse(project.Remote)
+		if err != nil {
+			return fmt.Errorf("invalid project remote for project %s(%s): %s", project.Name, relativePath, project.Remote, err)
+		}
+		gerritRemote := *hostUrl
+		gerritRemote.Path = projectRemoteUrl.Path
+		opts := gerrit.CLOpts{
+			Ccs:          parseEmails(uploadCcsFlag),
+			Host:         hostUrl,
+			Presubmit:    gerrit.PresubmitTestType(uploadPresubmitFlag),
+			RemoteBranch: remoteBranch,
+			Remote:       gerritRemote.String(),
+			Reviewers:    parseEmails(uploadReviewersFlag),
+			Verify:       uploadVerifyFlag,
+			Topic:        topic,
+			Branch:       currentBranch,
+		}
+
+		if opts.Presubmit == gerrit.PresubmitTestType("") {
+			opts.Presubmit = gerrit.PresubmitTestTypeAll
+		}
+		gerritPushOptions = append(gerritPushOptions, GerritPushOption{project, opts, relativePath})
+	}
+
+	// Rebase all projects before pushing
+	if uploadRebaseFlag {
+		for _, gerritPushOption := range gerritPushOptions {
+			scm := gitutil.New(jirix, gitutil.RootDirOpt(gerritPushOption.Project.Path))
+			if err := scm.Fetch("origin"); err != nil {
+				return err
+			}
+			trackingBranch, err := scm.TrackingBranchName()
+			if err != nil {
+				return err
+			}
+			if err = scm.Rebase(trackingBranch); err != nil {
+				if err2 := scm.RebaseAbort(); err2 != nil {
+					return err2
+				}
+				return fmt.Errorf("For project %s(%s), not able to rebase the branch to %s, please rebase manually: %s", gerritPushOption.Project.Name, gerritPushOption.relativePath, trackingBranch, err)
+			}
 		}
 	}
 
-	if err := gerrit.Push(jirix.NewSeq(), opts); err != nil {
-		return gerritError(err.Error())
+	for _, gerritPushOption := range gerritPushOptions {
+		fmt.Printf("Pushing project %s(%s)\n", gerritPushOption.Project.Name, gerritPushOption.relativePath)
+		if err := gerrit.Push(jirix.NewSeq().Dir(gerritPushOption.Project.Path), gerritPushOption.CLOpts); err != nil {
+			if strings.Contains(err.Error(), "(no new changes)") {
+				if gitErr, ok := err.(gitutil.GitError); ok {
+					fmt.Printf("%s", gitErr.Output)
+					fmt.Printf("%s", gitErr.ErrorOutput)
+				} else {
+					return gerritError(err.Error())
+				}
+			} else {
+				return gerritError(err.Error())
+			}
+		}
+		fmt.Println()
 	}
 	return nil
 }
