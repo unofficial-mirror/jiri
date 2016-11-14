@@ -793,7 +793,7 @@ func TestCheckoutSnapshot(t *testing.T) {
 	manifest.Projects[2].Revision = latestCommitRevs[2]
 	snapshotFile := filepath.Join(dir, "snapshot")
 	manifest.ToFile(fake.X, snapshotFile)
-	project.CheckoutSnapshot(fake.X, snapshotFile, false, project.DefaultHookTimeout, false)
+	project.CheckoutSnapshot(fake.X, snapshotFile, false, project.DefaultHookTimeout)
 	for i, localProject := range localProjects {
 		gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
 		rev, _ := gitLocal.CurrentRevision()
@@ -901,7 +901,7 @@ func TestFileImportCycle(t *testing.T) {
 	}
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(jirix, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in local manifest files"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -952,7 +952,7 @@ func TestRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote2, fileB, "commit B")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1022,7 +1022,7 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote1, fileD, "commit D")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}

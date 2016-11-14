@@ -15,16 +15,9 @@ var Version string = "manual-build"
 var Name string = ""
 
 var (
-	VerboseFlag bool
-
 	// Flags for working with projects.
 	ManifestFlag string
 )
-
-// InitializeRunFlags initializes flags for running commands.
-func InitializeRunFlags(flags *flag.FlagSet) {
-	flags.BoolVar(&VerboseFlag, "v", false, "Print verbose output.")
-}
 
 // InitializeRunFlags initializes flags for working with projects.
 func InitializeProjectFlags(flags *flag.FlagSet) {

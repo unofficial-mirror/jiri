@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/tool"
 )
 
 func init() {
@@ -34,7 +33,6 @@ func init() {
 		}
 	}
 	cmdRoot = newCmdRoot()
-	tool.InitializeRunFlags(&cmdRoot.Flags)
 }
 
 func main() {

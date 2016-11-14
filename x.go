@@ -19,6 +19,7 @@ import (
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/color"
 	"fuchsia.googlesource.com/jiri/envvar"
+	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/timing"
 	"fuchsia.googlesource.com/jiri/tool"
 )
@@ -83,25 +84,47 @@ type X struct {
 	Cache  string
 	Jobs   uint
 	Color  color.Color
+	Logger *log.Logger
 }
 
 var (
-	rootFlag  string
-	jobsFlag  uint
-	colorFlag bool
+	rootFlag         string
+	jobsFlag         uint
+	colorFlag        bool
+	quietVerboseFlag bool
+	debugVerboseFlag bool
+	traceVerboseFlag bool
+	allVerboseFlag   bool
 )
 
 func init() {
 	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
 	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
 	flag.BoolVar(&colorFlag, "color", true, "Use color to format output.")
+	flag.BoolVar(&quietVerboseFlag, "quiet", false, "Only print user actionable messages.")
+	flag.BoolVar(&debugVerboseFlag, "v", false, "Print debug level output.")
+	flag.BoolVar(&traceVerboseFlag, "vv", false, "Print trace level output.")
+	flag.BoolVar(&allVerboseFlag, "vvv", false, "Print all output.")
 }
 
 // NewX returns a new execution environment, given a cmdline env.
 // It also prepends .jiri_root/bin to the PATH.
 func NewX(env *cmdline.Env) (*X, error) {
 	color := color.NewColor(colorFlag)
-	ctx := tool.NewContextFromEnv(env)
+
+	loggerLevel := log.InfoLevel
+	if quietVerboseFlag {
+		loggerLevel = log.ErrorLevel
+	} else if allVerboseFlag {
+		loggerLevel = log.AllLevel
+	} else if traceVerboseFlag {
+		loggerLevel = log.TraceLevel
+	} else if debugVerboseFlag {
+		loggerLevel = log.DebugLevel
+	}
+	logger := log.NewLogger(loggerLevel)
+
+	ctx := tool.NewContextFromEnv(env, loggerLevel >= log.TraceLevel)
 	root, err := findJiriRoot(ctx.Timer())
 	if err != nil {
 		return nil, err
@@ -117,6 +140,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 		Usage:   env.UsageErrorf,
 		Jobs:    jobsFlag,
 		Color:   color,
+		Logger:  logger,
 	}
 	configPath := filepath.Join(x.RootMetaDir(), ConfigFile)
 	if _, err := os.Stat(configPath); err == nil {
@@ -255,6 +279,7 @@ func (x *X) Clone(opts tool.ContextOpts) *X {
 		Jobs:    x.Jobs,
 		Cache:   x.Cache,
 		Color:   x.Color,
+		Logger:  x.Logger,
 	}
 }
 
