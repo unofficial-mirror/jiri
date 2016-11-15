@@ -46,7 +46,7 @@ type Manifest struct {
 	LocalImports []LocalImport `xml:"imports>localimport"`
 	Projects     []Project     `xml:"projects>project"`
 	Hooks        []Hook        `xml:"hooks>hook"`
-	XMLName      struct{} `xml:"manifest"`
+	XMLName      struct{}      `xml:"manifest"`
 }
 
 // ManifestFromBytes returns a manifest parsed from data, with defaults filled
@@ -1173,7 +1173,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, showUpdateLogs bool) erro
 		if changes, err := git.HasUncommittedChanges(); err != nil {
 			return err
 		} else if changes {
-			line1 := fmt.Sprintf("Note: %q contains uncommited changes.", project.Name)
+			line1 := fmt.Sprintf("Note: %q(%v) contains uncommited changes.", project.Name, project.Path)
 			line2 := fmt.Sprintf("Commit or discard the changes and try again.")
 			s.Verbose(true).Output([]string{line1, line2})
 			return nil
