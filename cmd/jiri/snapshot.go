@@ -12,7 +12,7 @@ import (
 
 var cmdSnapshot = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runSnapshot),
-	Name:  "snapshot",
+	Name:   "snapshot",
 	Short:  "Create a new project snapshot",
 	Long: `
 The "jiri snapshot <snapshot>" command captures the current project state
@@ -26,5 +26,5 @@ func runSnapshot(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
-	return project.CreateSnapshot(jirix, args[0])
+	return project.CreateSnapshot(jirix, args[0], false)
 }

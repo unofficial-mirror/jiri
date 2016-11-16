@@ -16,6 +16,7 @@ import (
 
 var (
 	gcFlag              bool
+	localManifestFlag   bool
 	attemptsFlag        int
 	autoupdateFlag      bool
 	forceAutoupdateFlag bool
@@ -26,6 +27,7 @@ func init() {
 	tool.InitializeProjectFlags(&cmdUpdate.Flags)
 
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
+	cmdUpdate.Flags.BoolVar(&localManifestFlag, "local-manifest", false, "Use local manifest")
 	cmdUpdate.Flags.BoolVar(&verboseUpdateFlag, "verbose", false, "Show all update logs.")
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
@@ -67,10 +69,10 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		if len(args) > 0 {
 			return project.CheckoutSnapshot(jirix, args[0], gcFlag)
 		} else {
-			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag)
+			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag, localManifestFlag)
 		}
 	}, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
-	return project.WriteUpdateHistorySnapshot(jirix, "")
+	return project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag)
 }
