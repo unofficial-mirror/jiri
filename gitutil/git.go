@@ -119,6 +119,13 @@ func (g *Git) AddRemote(name, path string) error {
 	return g.run("remote", "add", name, path)
 }
 
+// GetRemoteBranchesContaining returns a slice of the remote branches
+// which contains the given commit
+func (g *Git) GetRemoteBranchesContaining(commit string) ([]string, error) {
+	branches, _, err := g.GetBranches("-r", "--contains", commit)
+	return branches, err
+}
+
 // BranchesDiffer tests whether two branches have any changes between them.
 func (g *Git) BranchesDiffer(branch1, branch2 string) (bool, error) {
 	out, err := g.runOutput("--no-pager", "diff", "--name-only", branch1+".."+branch2)
@@ -881,6 +888,11 @@ func (g *Git) Reset(target string, opts ...ResetOpt) error {
 // SetRemoteUrl sets the url of the remote with given name to the given url.
 func (g *Git) SetRemoteUrl(name, url string) error {
 	return g.run("remote", "set-url", name, url)
+}
+
+// DeleteRemote deletes the named remote
+func (g *Git) DeleteRemote(name string) error {
+	return g.run("remote", "rm", name)
 }
 
 // Stash attempts to stash any unsaved changes. It returns true if

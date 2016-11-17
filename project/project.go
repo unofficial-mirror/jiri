@@ -1061,8 +1061,7 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 		if _, ok := localProjects[remoteKey]; !ok {
 			for localKey, _ := range localKeysNotInRemote {
 				localProject := localProjects[localKey]
-				// Also do matching for name when we support remote rename
-				if localProject.Remote == remoteProject.Remote && localProject.Path == remoteProject.Path {
+				if localProject.Path == remoteProject.Path && (localProject.Name == remoteProject.Name || localProject.Remote == remoteProject.Remote) {
 					delete(localProjects, localKey)
 					delete(localKeysNotInRemote, localKey)
 					// Change local project key
@@ -2018,9 +2017,10 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 		}()
 	}
 
-	for key, _ := range localProjects {
+	for key, local := range localProjects {
 		remote, ok := remoteProjects[key]
-		if !ok || remote.Revision != "HEAD" {
+		// Don't update when project has pinned revision or it's remote has changed
+		if !ok || remote.Revision != "HEAD" || local.Remote != remote.Remote {
 			continue
 		}
 		keys <- key
@@ -2142,6 +2142,10 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 		if r, ok := remoteProjects[key]; ok {
 			if project.LocalConfig.Ignore || project.LocalConfig.NoUpdate {
 				jirix.Logger.Warningf("Not updating remotes for project %s(%s) due to its local-config\n\n", project.Name, project.Path)
+				continue
+			}
+			// Don't fetch when remote url has changed as that may cause fetch to fail
+			if r.Remote != project.Remote {
 				continue
 			}
 			wg.Add(1)
@@ -2393,6 +2397,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 
 	ops := computeOperations(localProjects, remoteProjects, states, gc, rebaseTracked, rebaseUntracked, rebaseAll, snapshot)
 	moveOperations := []moveOperation{}
+	changeRemoteOperations := operations{}
 	deleteOperations := []deleteOperation{}
 	updateOperations := operations{}
 	createOperations := []createOperation{}
@@ -2405,6 +2410,8 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		switch o := op.(type) {
 		case deleteOperation:
 			deleteOperations = append(deleteOperations, o)
+		case changeRemoteOperation:
+			changeRemoteOperations = append(changeRemoteOperations, o)
 		case moveOperation:
 			moveOperations = append(moveOperations, o)
 		case updateOperation:
@@ -2416,6 +2423,9 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		}
 	}
 	if err := runDeleteOperations(jirix, deleteOperations); err != nil {
+		return err
+	}
+	if err := runCommonOperations(jirix, changeRemoteOperations); err != nil {
 		return err
 	}
 	if err := runMoveOperations(jirix, moveOperations); err != nil {
@@ -3044,6 +3054,81 @@ func (op moveOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
 	return nil
 }
 
+// changeRemoteOperation represents the chnage of remote URL
+type changeRemoteOperation struct {
+	commonOperation
+	rebaseTracked   bool
+	rebaseUntracked bool
+	rebaseAll       bool
+	snapshot        bool
+}
+
+func (op changeRemoteOperation) Kind() string {
+	return "change-remote"
+}
+
+func (op changeRemoteOperation) Run(jirix *jiri.X) error {
+	if op.project.LocalConfig.Ignore || op.project.LocalConfig.NoUpdate {
+		jirix.Logger.Warningf("Project %s(%s) won't be updated due to it's local-config. It has a changed remote\n\n", op.project.Name, op.project.Path)
+		return nil
+	}
+	git := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
+	tempRemote := "new-remote-origin"
+	if err := git.AddRemote(tempRemote, op.project.Remote); err != nil {
+		return err
+	}
+	defer git.DeleteRemote(tempRemote)
+
+	if err := fetch(jirix, op.project.Path, tempRemote); err != nil {
+		return err
+	}
+
+	// Check for all leaf commits in new remote
+	for _, branch := range op.state.Branches {
+		if containingBranches, err := git.GetRemoteBranchesContaining(branch.Revision); err != nil {
+			return err
+		} else {
+			foundBranch := false
+			for _, remoteBranchName := range containingBranches {
+				if strings.HasPrefix(remoteBranchName, tempRemote) {
+					foundBranch = true
+					break
+				}
+			}
+			if !foundBranch {
+				jirix.Logger.Errorf("Note: For project %q(%v), remote url has changed. Its branch %q is on a commit", op.project.Name, op.project.Path, branch.Name)
+				jirix.Logger.Errorf("which is not in new remote(%v). Please manually reset your branches or move", op.project.Remote)
+				jirix.Logger.Errorf("your project folder out of the root and try again")
+				return nil
+			}
+
+		}
+	}
+
+	// Everything ok, change the remote url
+	if err := git.SetRemoteUrl("origin", op.project.Remote); err != nil {
+		return err
+	}
+
+	if err := fetch(jirix, op.project.Path, "", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+		return err
+	}
+
+	if err := syncProjectMaster(jirix, op.project, op.state, op.rebaseTracked, op.rebaseUntracked, op.rebaseAll, op.snapshot); err != nil {
+		return err
+	}
+
+	return writeMetadata(jirix, op.project, op.project.Path)
+}
+
+func (op changeRemoteOperation) String() string {
+	return fmt.Sprintf("Change remote of project %q to %q and update it to %q", op.project.Name, op.project.Remote, fmtRevision(op.project.Revision))
+}
+
+func (op changeRemoteOperation) Test(jirix *jiri.X, _ *fsUpdates) error {
+	return nil
+}
+
 // updateOperation represents the update of a project.
 type updateOperation struct {
 	commonOperation
@@ -3108,7 +3193,7 @@ func (ops operations) Len() int {
 // The order in which operation types are defined determines the order
 // in which operations are performed. For correctness and also to
 // minimize the chance of a conflict, the delete operations should
-// happen before move operations, which should happen before create
+// happen before change-remote operations, which should happen before move
 // operations. If two create operations make nested directories, the
 // outermost should be created first.
 func (ops operations) Less(i, j int) bool {
@@ -3117,14 +3202,16 @@ func (ops operations) Less(i, j int) bool {
 		switch op.Kind() {
 		case "delete":
 			vals[idx] = 0
-		case "move":
+		case "change-remote":
 			vals[idx] = 1
-		case "update":
+		case "move":
 			vals[idx] = 2
 		case "create":
 			vals[idx] = 3
-		case "null":
+		case "update":
 			vals[idx] = 4
+		case "null":
+			vals[idx] = 5
 		}
 	}
 	if vals[0] != vals[1] {
@@ -3217,6 +3304,13 @@ func computeOp(local, remote *Project, state *ProjectState, gc, rebaseTracked, r
 			}
 		}
 		switch {
+		case local.Remote != remote.Remote:
+			return changeRemoteOperation{commonOperation{
+				destination: remote.Path,
+				project:     *remote,
+				source:      local.Path,
+				state:       *state,
+			}, rebaseTracked, rebaseUntracked, rebaseAll, snapshot}
 		case local.Path != remote.Path:
 			// moveOperation also does an update, so we don't need to check the
 			// revision here.

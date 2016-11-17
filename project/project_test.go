@@ -1213,6 +1213,45 @@ func TestUpdateUniverseMovedProject(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "initial readme")
 }
 
+// TestUpdateUniverseChangeRemote checks that UpdateUniverse can change remote
+// of a project.
+func TestUpdateUniverseChangeRemote(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	changedRemoteDir := fake.Projects[localProjects[1].Name] + "-remote-changed"
+	if err := os.Rename(fake.Projects[localProjects[1].Name], changedRemoteDir); err != nil {
+		t.Fatal(err)
+	}
+
+	writeReadme(t, fake.X, changedRemoteDir, "new commit")
+
+	// Update the local path at which project 1 is located.
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == localProjects[1].Name {
+			p.Remote = changedRemoteDir
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+	// Check that UpdateUniverse() moves the local copy of the project 1.
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	checkReadme(t, fake.X, localProjects[1], "new commit")
+}
+
 func TestIgnoredProjectsNotMoved(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
