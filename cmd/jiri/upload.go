@@ -16,14 +16,12 @@ import (
 )
 
 var (
-	uploadCcsFlag          string
-	uploadEditFlag         bool
-	uploadHostFlag         string
-	uploadPresubmitFlag    string
-	uploadRemoteBranchFlag string
-	uploadReviewersFlag    string
-	uploadTopicFlag        string
-	uploadVerifyFlag       bool
+	uploadCcsFlag       string
+	uploadHostFlag      string
+	uploadPresubmitFlag string
+	uploadReviewersFlag string
+	uploadTopicFlag     string
+	uploadVerifyFlag    bool
 )
 
 var cmdUpload = &cmdline.Command{
@@ -80,7 +78,6 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	gerritRemote.Path = projectRemoteUrl.Path
 	opts := gerrit.CLOpts{
 		Ccs:          parseEmails(uploadCcsFlag),
-		Edit:         uploadEditFlag,
 		Host:         hostUrl,
 		Presubmit:    gerrit.PresubmitTestType(uploadPresubmitFlag),
 		RemoteBranch: remoteBranch,
