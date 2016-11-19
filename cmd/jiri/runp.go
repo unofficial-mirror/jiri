@@ -330,14 +330,19 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		runpFlags.collateOutput = true
 	}
 
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("os.Getwd() failed: %v", err)
+	}
 	git := gitutil.New(jirix.NewSeq())
 	homeBranch, err := git.CurrentBranchName()
-	if err != nil {
+	if dir == jirix.Root || err != nil {
 		// jiri was run from outside of a project. Let's assume we'll
 		// use all projects if none have been specified via the projects flag.
 		if keysRE == nil {
 			keysRE = regexp.MustCompile(".*")
 		}
+		homeBranch = ""
 	}
 	projects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
