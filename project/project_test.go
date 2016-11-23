@@ -802,7 +802,7 @@ func TestFileImportCycle(t *testing.T) {
 	}
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false, false, false)
+	err := project.UpdateUniverse(jirix, false, false, false, false)
 	if got, want := fmt.Sprint(err), "import cycle detected in local manifest files"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -853,7 +853,7 @@ func TestRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote2, fileB, "commit B")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false)
+	err := project.UpdateUniverse(fake.X, false, false, false, false)
 	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -923,7 +923,7 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote1, fileD, "commit D")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false)
+	err := project.UpdateUniverse(fake.X, false, false, false, false)
 	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}

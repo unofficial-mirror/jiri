@@ -21,6 +21,7 @@ var (
 	autoupdateFlag      bool
 	forceAutoupdateFlag bool
 	verboseUpdateFlag   bool
+	rebaseUntrackedFlag bool
 )
 
 func init() {
@@ -32,6 +33,7 @@ func init() {
 	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
 	cmdUpdate.Flags.BoolVar(&forceAutoupdateFlag, "force-autoupdate", false, "Always update to the current version.")
+	cmdUpdate.Flags.BoolVar(&rebaseUntrackedFlag, "rebase-untracked", false, "Rebase untracked branches onto HEAD.")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -69,7 +71,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		if len(args) > 0 {
 			return project.CheckoutSnapshot(jirix, args[0], gcFlag)
 		} else {
-			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag, localManifestFlag)
+			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag, localManifestFlag, rebaseUntrackedFlag)
 		}
 	}, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
