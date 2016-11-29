@@ -29,6 +29,7 @@ var (
 	uploadRebaseFlag    bool
 	uploadSetTopicFlag  bool
 	uploadMultipartFlag bool
+	uploadBranchFlag    string
 )
 
 var cmdUpload = &cmdline.Command{
@@ -49,22 +50,45 @@ func init() {
 	cmdUpload.Flags.BoolVar(&uploadVerifyFlag, "verify", true, `Run pre-push git hooks.`)
 	cmdUpload.Flags.BoolVar(&uploadRebaseFlag, "rebase", false, `Run rebase before pushing.`)
 	cmdUpload.Flags.BoolVar(&uploadMultipartFlag, "multipart", false, `Send multipart CL.`)
+	cmdUpload.Flags.StringVar(&uploadBranchFlag, "branch", "", `Used when multipart flag is true and this command is executed from root folder`)
 }
 
 // runUpload is a wrapper that pushes the changes to gerrit for review.
 func runUpload(jirix *jiri.X, _ []string) error {
-	p, err := currentProject(jirix)
+	dir, err := os.Getwd()
 	if err != nil {
-		return err
+		return fmt.Errorf("os.Getwd() failed: %s", err)
 	}
-	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
-	if !scm.IsOnBranch() {
-		return fmt.Errorf("The project is not on any branch.")
+	var p *project.Project
+	// Walk up the path until we find a project at that path, or hit the jirix.Root.
+	// Note that we can't just compare path prefixes because of soft links.
+	for dir != jirix.Root && dir != string(filepath.Separator) {
+		project, err := project.ProjectAtPath(jirix, dir)
+		if err != nil {
+			dir = filepath.Dir(dir)
+			continue
+		}
+		p = &project
+		break
 	}
-
-	currentBranch, err := scm.CurrentBranchName()
-	if err != nil {
-		return err
+	currentBranch := ""
+	if p == nil {
+		if !uploadMultipartFlag {
+			return fmt.Errorf("directory %q is not contained in a project", dir)
+		} else if uploadBranchFlag == "" {
+			return fmt.Errorf("Please run with -branch flag")
+		} else {
+			currentBranch = uploadBranchFlag
+		}
+	} else {
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
+		if !scm.IsOnBranch() {
+			return fmt.Errorf("Current project is not on any branch.")
+		}
+		currentBranch, err = scm.CurrentBranchName()
+		if err != nil {
+			return err
+		}
 	}
 	var projectsToProcess []project.Project
 	topic := ""
@@ -98,6 +122,9 @@ func runUpload(jirix *jiri.X, _ []string) error {
 			projectsToProcess = append(projectsToProcess, project)
 		}
 	}
+	if len(projectsToProcess) == 0 {
+		return fmt.Errorf("Did not find any project to push for branch %q", currentBranch)
+	}
 	type GerritPushOption struct {
 		Project      project.Project
 		CLOpts       gerrit.CLOpts
@@ -127,7 +154,7 @@ func runUpload(jirix *jiri.X, _ []string) error {
 			return err
 		}
 		if remoteBranch == "" {
-			return fmt.Errorf("For project %s(%s), current branch is un-tracked or tracks a local un-tracked branch.", project.Name, relativePath)
+			return fmt.Errorf("For project %s(%s), branch %q is un-tracked or tracks a local un-tracked branch.", project.Name, relativePath, currentBranch)
 		}
 
 		host := uploadHostFlag

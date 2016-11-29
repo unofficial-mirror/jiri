@@ -100,6 +100,7 @@ func resetFlags() {
 	uploadVerifyFlag = true
 	uploadRebaseFlag = false
 	uploadMultipartFlag = false
+	uploadBranchFlag = ""
 }
 
 func TestUploadSimple(t *testing.T) {
@@ -174,6 +175,54 @@ func TestUploadMultipartSimple(t *testing.T) {
 	gerritPath := fake.Projects[localProjects[0].Name]
 	uploadHostFlag = gerritPath
 	uploadMultipartFlag = true
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Fatal(err)
+	}
+
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
+	expectedRef := "refs/for/master%topic=" + topic
+
+	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, []string{"file-10", "file-20"})
+}
+
+func TestUploadMultipartWithBranchFlagSimple(t *testing.T) {
+	defer resetFlags()
+	fake, localProjects, cleanup := setupUploadTest(t)
+	defer cleanup()
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	branch := "my-branch"
+	for i := 0; i < 2; i++ {
+		if err := os.Chdir(localProjects[i].Path); err != nil {
+			t.Fatal(err)
+		}
+		git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+		if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := git.CheckoutBranch(branch); err != nil {
+			t.Fatalf("%v", err)
+		}
+		files := []string{"file-1" + strconv.Itoa(i)}
+		commitFiles(t, fake.X, files)
+		files = []string{"file-2" + strconv.Itoa(i)}
+		commitFiles(t, fake.X, files)
+	}
+	if err := os.Chdir(fake.X.Root); err != nil {
+		t.Fatal(err)
+	}
+
+	gerritPath := fake.Projects[localProjects[0].Name]
+	uploadHostFlag = gerritPath
+	uploadMultipartFlag = true
+	uploadBranchFlag = branch
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +422,7 @@ func TestUploadFailsForUntrackedBranch(t *testing.T) {
 	uploadHostFlag = gerritPath
 	if err := runUpload(fake.X, []string{}); err == nil {
 		t.Fatalf("Should have got a error here.")
-	} else if !strings.Contains(err.Error(), "branch is un-tracked or tracks a local un-tracked branch") {
+	} else if !strings.Contains(err.Error(), fmt.Sprintf("branch %q is un-tracked or tracks a local un-tracked branch", branch)) {
 		t.Fatalf("Wrong error: %s", err)
 	}
 }
