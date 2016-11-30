@@ -133,7 +133,8 @@ func TestUploadSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedRef := "refs/for/master"
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
+	expectedRef := "refs/for/master%topic=" + topic
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
 }
 
@@ -187,7 +188,8 @@ func TestUploadRebase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedRef := "refs/for/master"
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
+	expectedRef := "refs/for/master%topic=" + topic
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, localFiles)
 	assertUploadPushedFilesToRef(t, fake.X, localProjects[1].Path, branch, remoteFiles)
 }
@@ -228,7 +230,8 @@ func TestUploadMultipleCommits(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedRef := "refs/for/master"
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
+	expectedRef := "refs/for/master%topic=" + topic
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, append(files1, files2...))
 }
 

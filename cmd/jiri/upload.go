@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"fuchsia.googlesource.com/jiri"
@@ -24,6 +25,7 @@ var (
 	uploadTopicFlag     string
 	uploadVerifyFlag    bool
 	uploadRebaseFlag    bool
+	uploadSetTopicFlag  bool
 )
 
 var cmdUpload = &cmdline.Command{
@@ -39,7 +41,8 @@ func init() {
 	cmdUpload.Flags.StringVar(&uploadPresubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdUpload.Flags.StringVar(&uploadReviewersFlag, "r", "", `Comma-separated list of emails or LDAPs to request review.`)
-	cmdUpload.Flags.StringVar(&uploadTopicFlag, "topic", "", `CL topic.`)
+	cmdUpload.Flags.StringVar(&uploadTopicFlag, "topic", "", `CL topic. Default is <username>-<branchname>.`)
+	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", true, `Set topic.`)
 	cmdUpload.Flags.BoolVar(&uploadVerifyFlag, "verify", true, `Run pre-push git hooks.`)
 	cmdUpload.Flags.BoolVar(&uploadRebaseFlag, "rebase", false, `Run rebase before pushing.`)
 }
@@ -87,6 +90,16 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	}
 	gerritRemote := *hostUrl
 	gerritRemote.Path = projectRemoteUrl.Path
+	branch, err := gitutil.New(jirix).CurrentBranchName()
+	if err != nil {
+		return err
+	}
+	topic := ""
+	if uploadSetTopicFlag {
+		if topic = uploadTopicFlag; topic == "" {
+			topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), branch) // use <username>-<branchname> as the default
+		}
+	}
 	opts := gerrit.CLOpts{
 		Ccs:          parseEmails(uploadCcsFlag),
 		Host:         hostUrl,
@@ -95,13 +108,9 @@ func runUpload(jirix *jiri.X, _ []string) error {
 		Remote:       gerritRemote.String(),
 		Reviewers:    parseEmails(uploadReviewersFlag),
 		Verify:       uploadVerifyFlag,
-		Topic:        uploadTopicFlag,
+		Topic:        topic,
+		Branch:       branch,
 	}
-	branch, err := gitutil.New(jirix).CurrentBranchName()
-	if err != nil {
-		return err
-	}
-	opts.Branch = branch
 
 	if opts.Presubmit == gerrit.PresubmitTestType("") {
 		opts.Presubmit = gerrit.PresubmitTestTypeAll
