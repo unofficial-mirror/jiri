@@ -80,6 +80,7 @@ type X struct {
 	Usage  func(format string, args ...interface{}) error
 	config *Config
 	Cache  string
+	Jobs   uint
 }
 
 // NewX returns a new execution environment, given a cmdline env.
@@ -91,10 +92,15 @@ func NewX(env *cmdline.Env) (*X, error) {
 		return nil, err
 	}
 
+	if jobsFlag == 0 {
+		return nil, fmt.Errorf("No of concurrent jobs should be more than zero")
+	}
+
 	x := &X{
 		Context: ctx,
 		Root:    root,
 		Usage:   env.UsageErrorf,
+		Jobs:    jobsFlag,
 	}
 	configPath := filepath.Join(x.RootMetaDir(), ConfigFile)
 	if _, err := os.Stat(configPath); err == nil {
@@ -127,12 +133,16 @@ func NewX(env *cmdline.Env) (*X, error) {
 	return x, nil
 }
 
+const DefaultJobs = 25
+
 var (
 	rootFlag string
+	jobsFlag uint
 )
 
 func init() {
 	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
+	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
 }
 
 func cleanPath(path string) (string, error) {
@@ -236,6 +246,8 @@ func (x *X) Clone(opts tool.ContextOpts) *X {
 		Context: x.Context.Clone(opts),
 		Root:    x.Root,
 		Usage:   x.Usage,
+		Jobs:    x.Jobs,
+		Cache:   x.Cache,
 	}
 }
 

@@ -1570,7 +1570,7 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 	errs := make(chan error, len(remoteProjects))
 	var wg sync.WaitGroup
 	processingPath := make(map[string]bool)
-
+	fetchLimit := make(chan struct{}, jirix.Jobs)
 	for _, project := range remoteProjects {
 		if cacheDirPath, err := project.CacheDirPath(jirix); err == nil {
 			if processingPath[cacheDirPath] {
@@ -1578,7 +1578,9 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			}
 			processingPath[cacheDirPath] = true
 			wg.Add(1)
+			fetchLimit <- struct{}{}
 			go func(dir, remote string) {
+				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				// This should be crated inside loop, as when we set git directory,
 				// It changes the dir of previous git in the loop
@@ -1617,12 +1619,15 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 }
 
 func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) error {
+	fetchLimit := make(chan struct{}, jirix.Jobs)
 	errs := make(chan error, len(localProjects))
 	var wg sync.WaitGroup
 	for key, project := range localProjects {
 		if _, ok := remoteProjects[key]; ok {
 			wg.Add(1)
+			fetchLimit <- struct{}{}
 			go func(project Project) {
+				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				if err := fetchAll(jirix, project); err != nil {
 					errs <- fmt.Errorf("fetch failed for %v: %v", project.Name, err)
@@ -1641,7 +1646,6 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 	if len(multiErr) != 0 {
 		return multiErr
 	}
-
 	return nil
 }
 
