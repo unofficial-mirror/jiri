@@ -1123,7 +1123,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if err := git.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	err := git.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true))
+	err := git.Fetch("origin", gitutil.PruneOpt(true))
 	return err
 }
 
