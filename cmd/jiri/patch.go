@@ -82,10 +82,13 @@ func patchProject(jirix *jiri.X, project project.Project, ref string) error {
 			return fmt.Errorf("branch %v already exists in project %q", branch, project.Name)
 		}
 	}
-	if err := git.CreateAndCheckoutBranch(branch); err != nil {
+	if err := git.FetchRefspec("origin", ref); err != nil {
 		return err
 	}
-	if err := git.Pull(project.Remote, ref); err != nil {
+	if err := git.CreateBranchWithUpstream(branch, "FETCH_HEAD"); err != nil {
+		return err
+	}
+	if err := git.CheckoutBranch(branch); err != nil {
 		return err
 	}
 
