@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"fuchsia.googlesource.com/jiri/gitutil"
@@ -51,6 +52,8 @@ func expectGrep(t *testing.T, fake *jiritest.FakeJiriRoot, args []string, expect
 	if err != nil {
 		t.Fatal(err)
 	}
+	sort.Strings(results)
+	sort.Strings(expected)
 	if len(results) != len(expected) {
 		t.Fatalf("grep %v, expected %d matches, got %d matches", args, len(expected), len(results))
 	}
