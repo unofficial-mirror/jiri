@@ -1715,55 +1715,71 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, showHookOutput bool) 
 	jirix.TimerPush("run hooks")
 	defer jirix.TimerPop()
 	type result struct {
-		outReader *os.File
-		errReader *os.File
-		err       error
+		outFile *os.File
+		errFile *os.File
+		err     error
 	}
 	ch := make(chan result)
+	tmpDir, err := ioutil.TempDir("", "run-hooks")
+	if err != nil {
+		return fmt.Errorf("not able to create tmp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
 	for _, hook := range hooks {
 		jirix.NewSeq().Verbose(true).Output([]string{fmt.Sprintf("running hook(%v) for project %q", hook.Name, hook.ProjectName)})
 		go func(hook Hook) {
-			outReader, outWriter, err := os.Pipe()
+			outFile, err := ioutil.TempFile(tmpDir, hook.Name+"-out")
 			if err != nil {
 				ch <- result{nil, nil, err}
 				return
 			}
-			defer outWriter.Close()
-
-			errReader, errWriter, err := os.Pipe()
+			errFile, err := ioutil.TempFile(tmpDir, hook.Name+"-err")
 			if err != nil {
 				ch <- result{nil, nil, err}
 				return
 			}
-			defer errWriter.Close()
 
-			s := jirix.NewSeq().CaptureAll(outWriter, errWriter).Verbose(true).Output([]string{fmt.Sprintf("output for hook(%v) for project %q", hook.Name, hook.ProjectName)})
-			errWriter.WriteString(fmt.Sprintf("Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName))
+			s := jirix.NewSeq().CaptureAll(outFile, errFile).Verbose(true).Output([]string{fmt.Sprintf("output for hook(%v) for project %q", hook.Name, hook.ProjectName)})
+			errFile.WriteString(fmt.Sprintf("Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName))
 			if err := s.Dir(hook.ActionPath).Timeout(5 * time.Minute).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
-				ch <- result{outReader, errReader, err}
+				ch <- result{outFile, errFile, err}
 				return
 			}
-			ch <- result{outReader, errReader, nil}
+			ch <- result{outFile, errFile, nil}
 		}(hook)
 
 	}
 	multiErr := make(MultiError, 0)
 	for range hooks {
 		out := <-ch
+		defer func() {
+			if out.outFile != nil {
+				out.outFile.Close()
+			}
+			if out.errFile != nil {
+				out.errFile.Close()
+			}
+		}()
 		if out.err != nil && runutil.IsTimeout(out.err) {
 			jirix.NewSeq().Verbose(true).Output([]string{"Timeout while executing hook"})
-			if out.outReader != nil {
-				io.Copy(os.Stdout, out.outReader)
+			if out.outFile != nil {
+				out.outFile.Sync()
+				out.outFile.Seek(0, 0)
+				io.Copy(os.Stdout, out.outFile)
 			}
 			multiErr = append(multiErr, out.err)
 			continue
 		}
-		if out.outReader != nil && showHookOutput {
-			io.Copy(os.Stdout, out.outReader)
+		if out.outFile != nil && showHookOutput {
+			out.outFile.Sync()
+			out.outFile.Seek(0, 0)
+			io.Copy(os.Stdout, out.outFile)
 		}
 		if out.err != nil {
-			if out.errReader != nil {
-				io.Copy(os.Stderr, out.errReader)
+			if out.errFile != nil {
+				out.errFile.Sync()
+				out.errFile.Seek(0, 0)
+				io.Copy(os.Stderr, out.errFile)
 			}
 			multiErr = append(multiErr, out.err)
 		}
