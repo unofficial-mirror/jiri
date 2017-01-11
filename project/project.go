@@ -11,6 +11,7 @@ import (
 	"hash/fnv"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -1778,8 +1779,39 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 	jirix.TimerPush("apply githooks")
 	defer jirix.TimerPop()
 	s := jirix.NewSeq()
+	commitHookMap := make(map[string][]byte)
 	for _, op := range ops {
 		if op.Kind() != "delete" {
+			if op.Project().GerritHost != "" {
+				hookPath := filepath.Join(op.Project().Path, ".git", "hooks", "commit-msg")
+				commitHook, err := os.Create(hookPath)
+				if err != nil {
+					return err
+				}
+				bytes, ok := commitHookMap[op.Project().GerritHost]
+				if !ok {
+					downloadPath := op.Project().GerritHost + "/tools/hooks/commit-msg"
+					response, err := http.Get(downloadPath)
+					if err != nil {
+						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
+					}
+					defer response.Body.Close()
+					if b, err := ioutil.ReadAll(response.Body); err != nil {
+						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
+					} else {
+						bytes = b
+						commitHookMap[op.Project().GerritHost] = b
+					}
+				}
+				if _, err := commitHook.Write(bytes); err != nil {
+					return err
+				}
+				commitHook.Close()
+				if err := os.Chmod(hookPath, 0750); err != nil {
+					return err
+				}
+			}
+
 			// Apply exclusion for /.jiri/. Ideally we'd only write this file on
 			// create, but the remote manifest import is move from the temp directory
 			// into the final spot, so we need this to apply to both.
