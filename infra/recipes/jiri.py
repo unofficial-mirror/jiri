@@ -36,18 +36,16 @@ def RunSteps(api, category, patch_gerrit_url, patch_project, patch_ref,
              patch_storage, patch_repository_url, manifest, remote, target):
     api.jiri.ensure_jiri()
 
-    api.jiri.set_config('jiri')
-
     api.jiri.init()
     api.jiri.clean_project()
-    api.jiri.import_manifest(manifest, remote, overwrite=True)
+    api.jiri.import_manifest(manifest, remote)
     api.jiri.update(gc=True)
     if patch_ref is not None:
-        api.jiri.patch(patch_ref, host=patch_gerrit_url, delete=True, force=True)
+        api.jiri.patch(patch_ref, host=patch_gerrit_url)
 
-    api.go.install_go()
+    api.go.ensure_go()
 
-    gitdir = api.path['slave_build'].join(
+    gitdir = api.path['start_dir'].join(
         'go', 'src', 'fuchsia.googlesource.com', 'jiri')
     git_commit = api.git.get_hash(cwd=gitdir)
     result = api.step('date', ['date', '--rfc-3339=seconds'],
@@ -57,7 +55,7 @@ def RunSteps(api, category, patch_gerrit_url, patch_project, patch_ref,
     build_time = result.stdout.strip()
 
     ldflags = "-X \"fuchsia.googlesource.com/jiri/version.GitCommit=%s\" -X \"fuchsia.googlesource.com/jiri/version.BuildTime=%s\"" % (git_commit, build_time)
-    gopath = api.path['slave_build'].join('go')
+    gopath = api.path['start_dir'].join('go')
     goos, goarch = target.split("-", 2)
 
     with api.step.context({'env': {'GOPATH': gopath, 'GOOS': goos, 'GOARCH': goarch}}):

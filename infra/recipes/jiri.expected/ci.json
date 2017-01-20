@@ -1,5 +1,9 @@
 [
   {
+    "cmd": [],
+    "name": "ensure_jiri"
+  },
+  {
     "cmd": [
       "python",
       "-u",
@@ -7,33 +11,35 @@
       "--platform",
       "linux-amd64",
       "--dest-directory",
-      "[SLAVE_BUILD]/cipd",
+      "[START_DIR]/cipd",
       "--json-output",
       "/path/to/tmp/json"
     ],
-    "name": "install cipd",
+    "name": "ensure_jiri.install cipd",
     "~followup_annotations": [
-      "@@@STEP_TEXT@cipd instance_id: 40-chars-fake-of-the-package-instance_id@@@",
+      "@@@STEP_NEST_LEVEL@1@@@",
+      "@@@STEP_TEXT@cipd version: git_revision:05844bd9d1200cba8449b936b76e25eb90eabe25@@@",
       "@@@STEP_LOG_LINE@json.output@{@@@",
-      "@@@STEP_LOG_LINE@json.output@  \"executable\": \"[SLAVE_BUILD]/cipd/cipd\", @@@",
-      "@@@STEP_LOG_LINE@json.output@  \"instance_id\": \"40-chars-fake-of-the-package-instance_id\"@@@",
+      "@@@STEP_LOG_LINE@json.output@  \"executable\": \"[START_DIR]/cipd/cipd\", @@@",
+      "@@@STEP_LOG_LINE@json.output@  \"version\": \"git_revision:05844bd9d1200cba8449b936b76e25eb90eabe25\"@@@",
       "@@@STEP_LOG_LINE@json.output@}@@@",
       "@@@STEP_LOG_END@json.output@@@"
     ]
   },
   {
     "cmd": [
-      "[SLAVE_BUILD]/cipd/cipd",
+      "[START_DIR]/cipd/cipd",
       "ensure",
       "--root",
-      "[CACHE]/cipd",
+      "[START_DIR]/cipd/jiri",
       "--list",
       "fuchsia/tools/jiri/linux-amd64 latest",
       "--json-output",
       "/path/to/tmp/json"
     ],
-    "name": "ensure_installed",
+    "name": "ensure_jiri.ensure_installed",
     "~followup_annotations": [
+      "@@@STEP_NEST_LEVEL@1@@@",
       "@@@STEP_LOG_LINE@json.output@{@@@",
       "@@@STEP_LOG_LINE@json.output@  \"result\": [@@@",
       "@@@STEP_LOG_LINE@json.output@    {@@@",
@@ -47,56 +53,87 @@
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
-      "init"
+      "[START_DIR]/cipd/jiri/jiri",
+      "init",
+      "-cache",
+      "[CACHE]/git"
     ],
-    "name": "init"
+    "name": "jiri init"
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "project",
       "clean"
     ],
-    "name": "project clean"
+    "name": "jiri project clean"
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "import",
-      "-overwrite=true",
       "jiri",
       "https://fuchsia.googlesource.com/manifest"
     ],
-    "name": "import"
+    "name": "jiri import"
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "update",
       "-autoupdate=false",
       "-gc=true"
     ],
-    "name": "update"
+    "name": "jiri update"
+  },
+  {
+    "cmd": [],
+    "name": "ensure_go"
   },
   {
     "cmd": [
       "python",
       "-u",
-      "RECIPE_MODULE[infra::go]/resources/bootstrap.py",
+      "RECIPE_MODULE[infra::cipd]/resources/bootstrap.py",
       "--platform",
       "linux-amd64",
       "--dest-directory",
-      "[SLAVE_BUILD]/go",
+      "[START_DIR]/cipd",
       "--json-output",
       "/path/to/tmp/json"
     ],
-    "name": "install go",
+    "name": "ensure_go.install cipd",
     "~followup_annotations": [
-      "@@@STEP_TEXT@Go version: go1.7@@@",
+      "@@@STEP_NEST_LEVEL@1@@@",
+      "@@@STEP_TEXT@cipd version: git_revision:05844bd9d1200cba8449b936b76e25eb90eabe25@@@",
       "@@@STEP_LOG_LINE@json.output@{@@@",
-      "@@@STEP_LOG_LINE@json.output@  \"path\": \"[SLAVE_BUILD]/go/go\", @@@",
-      "@@@STEP_LOG_LINE@json.output@  \"version\": \"go1.7\"@@@",
+      "@@@STEP_LOG_LINE@json.output@  \"executable\": \"[START_DIR]/cipd/cipd\", @@@",
+      "@@@STEP_LOG_LINE@json.output@  \"version\": \"git_revision:05844bd9d1200cba8449b936b76e25eb90eabe25\"@@@",
+      "@@@STEP_LOG_LINE@json.output@}@@@",
+      "@@@STEP_LOG_END@json.output@@@"
+    ]
+  },
+  {
+    "cmd": [
+      "[START_DIR]/cipd/cipd",
+      "ensure",
+      "--root",
+      "[START_DIR]/cipd/go",
+      "--list",
+      "fuchsia/go/go/linux-amd64 release",
+      "--json-output",
+      "/path/to/tmp/json"
+    ],
+    "name": "ensure_go.ensure_installed",
+    "~followup_annotations": [
+      "@@@STEP_NEST_LEVEL@1@@@",
+      "@@@STEP_LOG_LINE@json.output@{@@@",
+      "@@@STEP_LOG_LINE@json.output@  \"result\": [@@@",
+      "@@@STEP_LOG_LINE@json.output@    {@@@",
+      "@@@STEP_LOG_LINE@json.output@      \"instance_id\": \"resolved-instance_id-of-release---------\", @@@",
+      "@@@STEP_LOG_LINE@json.output@      \"package\": \"fuchsia/go/go/linux-amd64\"@@@",
+      "@@@STEP_LOG_LINE@json.output@    }@@@",
+      "@@@STEP_LOG_LINE@json.output@  ]@@@",
       "@@@STEP_LOG_LINE@json.output@}@@@",
       "@@@STEP_LOG_END@json.output@@@"
     ]
@@ -109,7 +146,7 @@
       "--format=%H",
       "-s"
     ],
-    "cwd": "[SLAVE_BUILD]/go/src/fuchsia.googlesource.com/jiri",
+    "cwd": "[START_DIR]/go/src/fuchsia.googlesource.com/jiri",
     "name": "git show",
     "stdout": "/path/to/tmp/"
   },
@@ -123,7 +160,7 @@
   },
   {
     "cmd": [
-      "[SLAVE_BUILD]/go/go/bin/go",
+      "[START_DIR]/cipd/go/bin/go",
       "build",
       "-ldflags",
       "-X \"fuchsia.googlesource.com/jiri/version.GitCommit=deadbeef\" -X \"fuchsia.googlesource.com/jiri/version.BuildTime=2016-10-11 14:40:25-07:00\"",
@@ -133,20 +170,20 @@
     "env": {
       "GOARCH": "amd64",
       "GOOS": "linux",
-      "GOPATH": "[SLAVE_BUILD]/go",
-      "GOROOT": "[SLAVE_BUILD]/go/go"
+      "GOPATH": "[START_DIR]/go",
+      "GOROOT": "[START_DIR]/cipd/go"
     },
     "name": "go build"
   },
   {
     "cmd": [
-      "[SLAVE_BUILD]/go/go/bin/go",
+      "[START_DIR]/cipd/go/bin/go",
       "test",
       "fuchsia.googlesource.com/jiri/cmd/jiri"
     ],
     "env": {
-      "GOPATH": "[SLAVE_BUILD]/go",
-      "GOROOT": "[SLAVE_BUILD]/go/go"
+      "GOPATH": "[START_DIR]/go",
+      "GOROOT": "[START_DIR]/cipd/go"
     },
     "name": "go test"
   },
