@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -702,6 +703,69 @@ func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 	localRev, _ := gitLocal.CurrentRevision()
 	if file2CommitRev != localRev {
 		t.Fatalf("Current commit is %v, it should be %v\n", localRev, file2CommitRev)
+	}
+}
+
+// TestCheckoutSnapshot tests checking out snapshot functionality
+func TestCheckoutSnapshot(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+	var oldCommitRevs []string
+	var latestCommitRevs []string
+
+	for i, localProject := range localProjects {
+		gitRemote := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProject.Name]))
+		writeFile(t, fake.X, fake.Projects[localProject.Name], "file1"+strconv.Itoa(i), "file1"+strconv.Itoa(i))
+		file1CommitRev, _ := gitRemote.CurrentRevision()
+		oldCommitRevs = append(oldCommitRevs, file1CommitRev)
+		writeFile(t, fake.X, fake.Projects[localProject.Name], "file2"+strconv.Itoa(i), "file2"+strconv.Itoa(i))
+		file2CommitRev, _ := gitRemote.CurrentRevision()
+		latestCommitRevs = append(latestCommitRevs, file2CommitRev)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, localProject := range localProjects {
+		gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		rev, _ := gitLocal.CurrentRevision()
+		if rev != latestCommitRevs[i] {
+			t.Fatalf("Current commit for project %q is %v, it should be %v\n", localProject.Name, rev, latestCommitRevs[i])
+		}
+
+		// Test case when local repo in on a branch
+		if i == 1 {
+			if err := gitLocal.CheckoutBranch("master"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	dir, err := ioutil.TempDir("", "snap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	manifest := &project.Manifest{}
+	for _, localProject := range localProjects {
+		manifest.Projects = append(manifest.Projects, localProject)
+	}
+	manifest.Projects[0].Revision = oldCommitRevs[0]
+	manifest.Projects[1].Revision = oldCommitRevs[1]
+
+	// Test case when snapshot specifies latest revision
+	manifest.Projects[2].Revision = latestCommitRevs[2]
+	snapshotFile := filepath.Join(dir, "snapshot")
+	manifest.ToFile(fake.X, snapshotFile)
+	project.CheckoutSnapshot(fake.X, snapshotFile, false, false)
+	for i, localProject := range localProjects {
+		gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		rev, _ := gitLocal.CurrentRevision()
+		expectedRev := manifest.Projects[i].Revision
+		if rev != expectedRev {
+			t.Fatalf("Current commit for project %q is %v, it should be %v\n", localProject.Name, rev, expectedRev)
+		}
 	}
 }
 

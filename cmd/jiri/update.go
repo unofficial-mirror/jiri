@@ -69,7 +69,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 	// Attempt <attemptsFlag> times before failing.
 	if err := retry.Function(jirix.Context, func() error {
 		if len(args) > 0 {
-			return project.CheckoutSnapshot(jirix, args[0], gcFlag)
+			return project.CheckoutSnapshot(jirix, args[0], gcFlag, verboseUpdateFlag)
 		} else {
 			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag, localManifestFlag, rebaseUntrackedFlag)
 		}
