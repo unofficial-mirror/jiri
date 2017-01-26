@@ -1,4 +1,4 @@
-// Copyright 2015 The Vanadium Authors. All rights reserved.
+	// Copyright 2015 The Vanadium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -225,8 +225,17 @@ func TestRunP(t *testing.T) {
 	// Just the projects with branch b2.
 	setDefaultRunpFlags()
 	runpFlags.showNamePrefix = true
+	runpFlags.branch = "b2"
 	got = executeRunp(t, fake, "echo")
 	if want := "r.b: \nr.c:"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// Show all prjects even though current project is on b2
+	setDefaultRunpFlags()
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
+	if want := "manifest: \nr.a: \nr.b: \nr.c: \nsub/r.t1: \nsub/sub2/r.t2:"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
@@ -242,9 +251,4 @@ func TestRunP(t *testing.T) {
 	if err := s.MkdirAll(filepath.Join(rb, ".jiri", "a1"), os.FileMode(0755)).Done(); err != nil {
 		t.Fatal(err)
 	}
-	newfile(rb, filepath.Join(".jiri", "a1", ".gerrit_commit_message"))
-
-	git(rb).CheckoutBranch("a1")
-	git(t1).CheckoutBranch("a1")
-	chdir(t1)
 }

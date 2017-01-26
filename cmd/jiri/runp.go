@@ -21,7 +21,6 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/envvar"
-	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/simplemr"
 	"fuchsia.googlesource.com/jiri/tool"
@@ -91,35 +90,35 @@ func init() {
 }
 
 type mapInput struct {
-	*project.ProjectState
+	project.Project
 	key          project.ProjectKey
 	jirix        *jiri.X
 	index, total int
 	result       error
 }
 
-func newmapInput(jirix *jiri.X, state *project.ProjectState, key project.ProjectKey, index, total int) *mapInput {
+func newmapInput(jirix *jiri.X, project project.Project, key project.ProjectKey, index, total int) *mapInput {
 	return &mapInput{
-		ProjectState: state,
-		key:          key,
-		jirix:        jirix.Clone(tool.ContextOpts{}),
-		index:        index,
-		total:        total,
+		Project: project,
+		key:     key,
+		jirix:   jirix.Clone(tool.ContextOpts{}),
+		index:   index,
+		total:   total,
 	}
 }
 
-func stateNames(states map[project.ProjectKey]*mapInput) []string {
+func projectNames(mapInputs map[project.ProjectKey]*mapInput) []string {
 	n := []string{}
-	for _, state := range states {
-		n = append(n, state.Project.Name)
+	for _, mi := range mapInputs {
+		n = append(n, mi.Project.Name)
 	}
 	sort.Strings(n)
 	return n
 }
 
-func stateKeys(states map[project.ProjectKey]*mapInput) []string {
+func projectKeys(mapInputs map[project.ProjectKey]*mapInput) []string {
 	n := []string{}
-	for key := range states {
+	for key := range mapInputs {
 		n = append(n, string(key))
 	}
 	sort.Strings(n)
@@ -181,7 +180,7 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 	var wg sync.WaitGroup
 	cmd := exec.Command(path, "-c", strings.Join(r.args, " "))
 	cmd.Env = envvar.MapToSlice(jirix.Env())
-	cmd.Dir = mi.ProjectState.Project.Path
+	cmd.Dir = mi.Project.Path
 	cmd.Stdin = mi.jirix.Stdin()
 	var stdoutCloser, stderrCloser io.Closer
 	if runpFlags.interactive {
@@ -237,7 +236,7 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 			stderrCloser = stderrWriter
 			prefix := key
 			if runpFlags.showNamePrefix {
-				prefix = mi.ProjectState.Project.Name
+				prefix = mi.Project.Name
 			}
 			wg.Add(2)
 			go func() { copyWithPrefix(prefix, stdout, stdoutReader); wg.Done() }()
@@ -330,38 +329,39 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("os.Getwd() failed: %v", err)
 	}
-	git := gitutil.New(jirix.NewSeq())
-	homeBranch, err := git.CurrentBranchName()
 	if dir == jirix.Root || err != nil {
 		// jiri was run from outside of a project. Let's assume we'll
 		// use all projects if none have been specified via the projects flag.
 		if keysRE == nil {
 			keysRE = regexp.MustCompile(".*")
 		}
-		homeBranch = ""
 	}
 	projects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return err
 	}
 
-	states, err := project.GetProjectStates(jirix, projects, runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted)
-	if err != nil {
-		return err
+	projectStateRequired := branchRE != nil || runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted
+	var states map[project.ProjectKey]*project.ProjectState
+	if projectStateRequired {
+		jirix.TimerPush("project states")
+		var err error
+		states, err = project.GetProjectStates(jirix, projects, runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted)
+		jirix.TimerPop()
+		if err != nil {
+			return err
+		}
 	}
 	mapInputs := map[project.ProjectKey]*mapInput{}
 	var keys project.ProjectKeys
-	for key, state := range states {
+	for _, localProject := range projects {
+		key := localProject.Key()
 		if keysRE != nil {
 			if !keysRE.MatchString(string(key)) {
 				continue
 			}
-		} else {
-			// Run on all projects if current project has detached head
-			if git.IsOnBranch() && state.CurrentBranch.Name != homeBranch {
-				continue
-			}
 		}
+		state := states[key]
 		if branchRE != nil {
 			found := false
 			for _, br := range state.Branches {
@@ -381,9 +381,9 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 			continue
 		}
 		mapInputs[key] = &mapInput{
-			ProjectState: state,
-			jirix:        jirix,
-			key:          key,
+			Project: localProject,
+			jirix:   jirix,
+			key:     key,
 		}
 		keys = append(keys, key)
 	}
@@ -397,8 +397,8 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	}
 
 	if runpFlags.verbose {
-		fmt.Fprintf(os.Stdout, "Project Names: %s\n", strings.Join(stateNames(mapInputs), " "))
-		fmt.Fprintf(os.Stdout, "Project Keys: %s\n", strings.Join(stateKeys(mapInputs), " "))
+		fmt.Fprintf(os.Stdout, "Project Names: %s\n", strings.Join(projectNames(mapInputs), " "))
+		fmt.Fprintf(os.Stdout, "Project Keys: %s\n", strings.Join(projectKeys(mapInputs), " "))
 	}
 
 	runner := &runner{
@@ -409,10 +409,13 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 		// Run one mapper at a time.
 		mr.NumMappers = 1
 		sort.Sort(keys)
+	} else {
+		mr.NumMappers = int(jirix.Jobs)
 	}
 	in, out := make(chan *simplemr.Record, len(mapInputs)), make(chan *simplemr.Record, len(mapInputs))
 	sigch := make(chan os.Signal)
 	signal.Notify(sigch, os.Interrupt)
+	jirix.TimerPush("Map and Reduce")
 	go func() { <-sigch; mr.Cancel() }()
 	go mr.Run(in, out, runner, runner)
 	for _, key := range keys {
@@ -420,6 +423,7 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	}
 	close(in)
 	<-out
+	jirix.TimerPop()
 	return mr.Error()
 }
 
