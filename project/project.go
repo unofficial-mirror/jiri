@@ -869,7 +869,7 @@ func loadManifestFile(jirix *jiri.X, file string, localProjects Projects, localM
 	return ld.Projects, ld.Hooks, nil
 }
 
-func loadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, string, error) {
+func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, string, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
 	ld := newManifestLoader(localProjects, true)
@@ -932,7 +932,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, showUpdateLogs bool, localManifest b
 		}
 
 		// Determine the set of remote projects and match them up with the locals.
-		remoteProjects, hooks, tmpLoadDir, err := loadUpdatedManifest(jirix, localProjects, localManifest)
+		remoteProjects, hooks, tmpLoadDir, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
 		matchLocalWithRemote(localProjects, remoteProjects)
 
 		// Make sure we clean up the tmp dir used to load remote manifest projects.
@@ -1127,7 +1127,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	return err
 }
 
-func getHeadRevision(jirix *jiri.X, project Project) (string, error) {
+func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
 	if err := project.fillDefaults(); err != nil {
 		return "", err
 	}
@@ -1139,7 +1139,7 @@ func getHeadRevision(jirix *jiri.X, project Project) (string, error) {
 }
 
 func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) error {
-	revision, err := getHeadRevision(jirix, project)
+	revision, err := GetHeadRevision(jirix, project)
 	if err != nil {
 		return err
 	}
@@ -1180,7 +1180,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, showUpdateLogs bool, reba
 			return nil
 		}
 		if err := checkoutHeadRevision(jirix, project, false); err != nil {
-			revision, err2 := getHeadRevision(jirix, project)
+			revision, err2 := GetHeadRevision(jirix, project)
 			if err2 != nil {
 				return err2
 			}
@@ -1215,7 +1215,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, showUpdateLogs bool, reba
 			}
 			return nil
 		} else {
-			revision, err2 := getHeadRevision(jirix, project)
+			revision, err2 := GetHeadRevision(jirix, project)
 			if err2 != nil {
 				return err2
 			}
