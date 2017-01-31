@@ -114,10 +114,10 @@ func runUpload(jirix *jiri.X, _ []string) error {
 			return err
 		}
 		if err = git.Rebase(trackingBranch); err != nil {
-			if err := git.RebaseAbort(); err != nil {
-				return err
+			if err2 := git.RebaseAbort(); err2 != nil {
+				return err2
 			}
-			return fmt.Errorf("Not able to rebase the branch to %v, please rebase manually", trackingBranch)
+			return fmt.Errorf("Not able to rebase the branch to %v, please rebase manually: %v", trackingBranch, err)
 		}
 	}
 
