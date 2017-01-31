@@ -155,6 +155,12 @@ func TestUploadRebase(t *testing.T) {
 	}
 	branch := "my-branch"
 	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := git.Config("user.name", "John Doe"); err != nil {
+		t.Fatalf("%v", err)
+	}
 	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
 		t.Fatalf("%v", err)
 	}

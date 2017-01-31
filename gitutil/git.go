@@ -749,6 +749,12 @@ func (g *Git) Remove(fileNames ...string) error {
 	return g.run(args...)
 }
 
+func (g *Git) Config(configArgs ...string) error {
+	args := []string{"config"}
+	args = append(args, configArgs...)
+	return g.run(args...)
+}
+
 // RemoteUrl gets the url of the remote with the given name.
 func (g *Git) RemoteUrl(name string) (string, error) {
 	configKey := fmt.Sprintf("remote.%s.url", name)
