@@ -406,7 +406,8 @@ func (g *Git) CurrentRevision() (string, error) {
 
 // CurrentRevisionOfBranch returns the current revision of the given branch.
 func (g *Git) CurrentRevisionOfBranch(branch string) (string, error) {
-	out, err := g.runOutput("rev-parse", branch)
+	// Using rev-list instead of rev-parse as latter doesn't work well with tag
+	out, err := g.runOutput("rev-list", "-n", "1", branch)
 	if err != nil {
 		return "", err
 	}
@@ -577,6 +578,14 @@ func (g *Git) IsFileCommitted(file string) bool {
 	}
 	// Check if file is unknown to git.
 	return g.run("ls-files", file, "--error-unmatch") == nil
+}
+
+func (g *Git) ShortStatus() (string, error) {
+	out, err := g.runOutput("status", "-s")
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(out, "\n"), nil
 }
 
 // LatestCommitMessage returns the latest commit message on the
