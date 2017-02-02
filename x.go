@@ -123,7 +123,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if debugVerboseFlag {
 		loggerLevel = log.DebugLevel
 	}
-	logger := log.NewLogger(loggerLevel)
+	logger := log.NewLogger(loggerLevel, color)
 
 	ctx := tool.NewContextFromEnv(env, loggerLevel >= log.TraceLevel)
 	root, err := findJiriRoot(ctx.Timer())

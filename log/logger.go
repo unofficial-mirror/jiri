@@ -9,6 +9,8 @@ import (
 	glog "log"
 	"os"
 	"sync"
+
+	"fuchsia.googlesource.com/jiri/color"
 )
 
 // Logger provides for convenient logging in jiri. It supports logger
@@ -28,6 +30,7 @@ type Logger struct {
 	LoggerLevel   LogLevel
 	goLogger      *glog.Logger
 	goErrorLogger *glog.Logger
+	color         color.Color
 }
 
 type LogLevel int
@@ -40,12 +43,13 @@ const (
 	AllLevel
 )
 
-func NewLogger(loggerLevel LogLevel) *Logger {
+func NewLogger(loggerLevel LogLevel, color color.Color) *Logger {
 	return &Logger{
 		LoggerLevel:   loggerLevel,
 		lock:          &sync.Mutex{},
 		goLogger:      glog.New(os.Stdout, "", glog.Lmicroseconds),
 		goErrorLogger: glog.New(os.Stderr, "", glog.Lmicroseconds),
+		color:         color,
 	}
 }
 
@@ -63,33 +67,33 @@ func (l Logger) Capture(stdout, stderr io.Writer) Logger {
 	return l
 }
 
-func (l Logger) log(format string, a ...interface{}) {
+func (l Logger) log(colorfn color.Colorfn, format string, a ...interface{}) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	l.goLogger.Printf(format, a...)
+	l.goLogger.Printf(colorfn(format, a...))
 }
 
 func (l Logger) Infof(format string, a ...interface{}) {
 	if l.LoggerLevel >= InfoLevel {
-		l.log(format, a...)
+		l.log(l.color.DefaultColor, format, a...)
 	}
 }
 
 func (l Logger) Debugf(format string, a ...interface{}) {
 	if l.LoggerLevel >= DebugLevel {
-		l.log(format, a...)
+		l.log(l.color.Yellow, format, a...)
 	}
 }
 
 func (l Logger) Tracef(format string, a ...interface{}) {
 	if l.LoggerLevel >= TraceLevel {
-		l.log(format, a...)
+		l.log(l.color.Blue, format, a...)
 	}
 }
 
 func (l Logger) Logf(format string, a ...interface{}) {
 	if l.LoggerLevel >= AllLevel {
-		l.log(format, a...)
+		l.log(l.color.DefaultColor, format, a...)
 	}
 }
 
@@ -97,6 +101,6 @@ func (l Logger) Errorf(format string, a ...interface{}) {
 	if l.LoggerLevel >= ErrorLevel {
 		l.lock.Lock()
 		defer l.lock.Unlock()
-		l.goErrorLogger.Printf(format, a...)
+		l.goErrorLogger.Printf(l.color.Red(format, a...))
 	}
 }
