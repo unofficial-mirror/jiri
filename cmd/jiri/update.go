@@ -22,6 +22,7 @@ var (
 	forceAutoupdateFlag bool
 	verboseUpdateFlag   bool
 	rebaseUntrackedFlag bool
+	hookTimeoutFlag     uint
 )
 
 func init() {
@@ -34,6 +35,7 @@ func init() {
 	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
 	cmdUpdate.Flags.BoolVar(&forceAutoupdateFlag, "force-autoupdate", false, "Always update to the current version.")
 	cmdUpdate.Flags.BoolVar(&rebaseUntrackedFlag, "rebase-untracked", false, "Rebase untracked branches onto HEAD.")
+	cmdUpdate.Flags.UintVar(&hookTimeoutFlag, "hook-timeout", project.DefaultHookTimeout, "Timeout in minutes for running the hooks operation.")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -69,9 +71,9 @@ func runUpdate(jirix *jiri.X, args []string) error {
 	// Attempt <attemptsFlag> times before failing.
 	if err := retry.Function(jirix.Context, func() error {
 		if len(args) > 0 {
-			return project.CheckoutSnapshot(jirix, args[0], gcFlag, verboseUpdateFlag)
+			return project.CheckoutSnapshot(jirix, args[0], gcFlag, hookTimeoutFlag, verboseUpdateFlag)
 		} else {
-			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag, localManifestFlag, rebaseUntrackedFlag)
+			return project.UpdateUniverse(jirix, gcFlag, verboseUpdateFlag, localManifestFlag, rebaseUntrackedFlag, hookTimeoutFlag)
 		}
 	}, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
