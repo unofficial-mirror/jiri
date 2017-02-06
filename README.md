@@ -228,9 +228,10 @@ To find documentation about a specific topic or subcommand, run `jiri help
 
 ### Main commands are:
 ```
+   branch      Show or delete branches
    cl          Manage changelists for multiple projects
    grep        Search across projects
-   import      Adds imports to .jiri\_manifest file
+   import      Adds imports to .jiri_manifest file
    init        Create a new jiri root
    patch       Patch in the existing change
    project     Manage the jiri projects
