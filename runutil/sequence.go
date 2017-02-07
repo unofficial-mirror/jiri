@@ -104,13 +104,13 @@ type sequence struct {
 // environment, stdin, stderr, stdout and other supported options.
 // If the environment parameter is nil or empty then the current value of
 // os.Environ() will be used instead.
-func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, verbose bool) Sequence {
+func NewSequence(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, verbose bool) Sequence {
 	if len(env) == 0 {
 		env = envvar.SliceToMap(os.Environ())
 	}
 	s := Sequence{
 		&sequence{
-			r:            newExecutor(env, stdin, stdout, stderr, color, verbose),
+			r:            newExecutor(env, stdin, stdout, stderr, verbose),
 			defaultStdin: stdin,
 		},
 	}

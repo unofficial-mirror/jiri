@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 
 	"fuchsia.googlesource.com/jiri/cmdline"
+	"fuchsia.googlesource.com/jiri/color"
 	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/timing"
 	"fuchsia.googlesource.com/jiri/tool"
@@ -81,11 +82,25 @@ type X struct {
 	config *Config
 	Cache  string
 	Jobs   uint
+	Color  color.Color
+}
+
+var (
+	rootFlag  string
+	jobsFlag  uint
+	colorFlag bool
+)
+
+func init() {
+	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
+	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
+	flag.BoolVar(&colorFlag, "color", true, "Use color to format output.")
 }
 
 // NewX returns a new execution environment, given a cmdline env.
 // It also prepends .jiri_root/bin to the PATH.
 func NewX(env *cmdline.Env) (*X, error) {
+	color := color.NewColor(colorFlag)
 	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())
 	if err != nil {
@@ -101,6 +116,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 		Root:    root,
 		Usage:   env.UsageErrorf,
 		Jobs:    jobsFlag,
+		Color:   color,
 	}
 	configPath := filepath.Join(x.RootMetaDir(), ConfigFile)
 	if _, err := os.Stat(configPath); err == nil {
@@ -134,16 +150,6 @@ func NewX(env *cmdline.Env) (*X, error) {
 }
 
 const DefaultJobs = 25
-
-var (
-	rootFlag string
-	jobsFlag uint
-)
-
-func init() {
-	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
-	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
-}
 
 func cleanPath(path string) (string, error) {
 	result, err := filepath.EvalSymlinks(path)
@@ -248,6 +254,7 @@ func (x *X) Clone(opts tool.ContextOpts) *X {
 		Usage:   x.Usage,
 		Jobs:    x.Jobs,
 		Cache:   x.Cache,
+		Color:   x.Color,
 	}
 }
 

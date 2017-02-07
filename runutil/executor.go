@@ -25,7 +25,6 @@ const (
 )
 
 type opts struct {
-	color   bool
 	dir     string
 	env     map[string]string
 	stdin   io.Reader
@@ -39,18 +38,10 @@ type executor struct {
 	opts   opts
 }
 
-func newExecutor(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, color, verbose bool) *executor {
-	if color {
-		term := os.Getenv("TERM")
-		switch term {
-		case "dumb", "":
-			color = false
-		}
-	}
+func newExecutor(env map[string]string, stdin io.Reader, stdout, stderr io.Writer, verbose bool) *executor {
 	return &executor{
 		indent: 0,
 		opts: opts{
-			color:   color,
 			env:     env,
 			stdin:   stdin,
 			stdout:  stdout,

@@ -57,7 +57,7 @@ func removeTimestampsAndPath(t *testing.T, buffer *bytes.Buffer, bin string) str
 
 func TestCommandOK(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	if err := s.Last("go", "run", "./testdata/ok_hello.go"); err != nil {
 		t.Fatalf(`Command("go run ./testdata/ok_hello.go") failed: %v`, err)
 	}
@@ -75,7 +75,7 @@ func TestCommandOK(t *testing.T) {
 
 func TestCommandFail(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	if err := s.Last("go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`Command("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
@@ -97,7 +97,7 @@ func TestCommandFail(t *testing.T) {
 
 func TestCommandWithOptsOK(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, true)
 	if err := s.Capture(&cmdOut, nil).Verbose(false).Last("go", "run", "./testdata/ok_hello.go"); err != nil {
 		t.Fatalf(`CommandWithOpts("go run ./testdata/ok_hello.go") failed: %v`, err)
 	}
@@ -111,7 +111,7 @@ func TestCommandWithOptsOK(t *testing.T) {
 
 func TestCommandWithOptsFail(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, true)
 	if err := s.Capture(&cmdOut, nil).Verbose(false).Last("go", "run", "./testdata/fail_hello.go"); err == nil {
 		t.Fatalf(`CommandWithOpts("go run ./testdata/fail_hello.go") did not fail when it should`)
 	}
@@ -125,7 +125,7 @@ func TestCommandWithOptsFail(t *testing.T) {
 
 func TestTimedCommandOK(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	bin, err := buildTestProgram("fast_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -143,7 +143,7 @@ func TestTimedCommandOK(t *testing.T) {
 
 func TestTimedCommandFail(t *testing.T) {
 	var out, stderr bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, &stderr, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, &stderr, true)
 	bin, err := buildTestProgram("slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -169,7 +169,7 @@ hello
 
 func TestTimedCommandWithOptsOK(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, true)
 	bin, err := buildTestProgram("fast_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -191,7 +191,7 @@ func TestTimedCommandWithOptsOK(t *testing.T) {
 
 func TestTimedCommandWithOptsFail(t *testing.T) {
 	var cmdOut, runOut bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &runOut, ioutil.Discard, true)
 	bin, err := buildTestProgram("slow_hello")
 	if bin != "" {
 		defer os.RemoveAll(filepath.Dir(bin))
@@ -214,7 +214,7 @@ func TestTimedCommandWithOptsFail(t *testing.T) {
 
 func TestFunctionOK(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/ok_hello.go")
 		cmd.Stdout = &out
@@ -230,7 +230,7 @@ func TestFunctionOK(t *testing.T) {
 
 func TestFunctionFail(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/fail_hello.go")
 		cmd.Stdout = &out
@@ -251,7 +251,7 @@ func TestFunctionFail(t *testing.T) {
 
 func TestFunctionWithOptsOK(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, false)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false)
 
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/ok_hello.go")
@@ -271,7 +271,7 @@ func TestFunctionWithOptsOK(t *testing.T) {
 
 func TestFunctionWithOptsFail(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, false)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false)
 	fn := func() error {
 		cmd := exec.Command("go", "run", "./testdata/fail_hello.go")
 		cmd.Stdout = &out
@@ -290,7 +290,7 @@ func TestFunctionWithOptsFail(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	s.Output([]string{"hello", "world"})
 	if got, want := removeTimestamps(t, &out), ">> hello\n>> world\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
@@ -299,7 +299,7 @@ func TestOutput(t *testing.T) {
 
 func TestOutputWithOpts(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, false)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false)
 	s.Verbose(true).Output([]string{"hello", "world"})
 	if got, want := removeTimestamps(t, &out), ">> hello\n>> world\n"; got != want {
 		t.Fatalf("unexpected output:\ngot\n%v\nwant\n%v", got, want)
@@ -308,7 +308,7 @@ func TestOutputWithOpts(t *testing.T) {
 
 func TestNested(t *testing.T) {
 	var out bytes.Buffer
-	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, &out, ioutil.Discard, true)
 	fn := func() error {
 		s.Output([]string{"hello", "world"})
 		return nil
@@ -326,7 +326,7 @@ func buildTestProgram(fileName string) (string, error) {
 	}
 	bin := filepath.Join(tmpDir, fileName)
 	buildArgs := []string{"build", "-o", bin, fmt.Sprintf("./testdata/%s.go", fileName)}
-	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, false, true)
+	s := runutil.NewSequence(nil, os.Stdin, os.Stdout, os.Stderr, true)
 	if err := s.Last("go", buildArgs...); err != nil {
 		return "", err
 	}

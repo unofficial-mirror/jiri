@@ -26,7 +26,6 @@ type Context struct {
 
 // ContextOpts records the context options.
 type ContextOpts struct {
-	Color    *bool
 	Manifest *string
 	Env      map[string]string
 	Stdin    io.Reader
@@ -39,7 +38,6 @@ type ContextOpts struct {
 // newContextOpts is the ContextOpts factory.
 func newContextOpts() *ContextOpts {
 	return &ContextOpts{
-		Color:    &ColorFlag,
 		Env:      map[string]string{},
 		Manifest: &ManifestFlag,
 		Stdin:    os.Stdin,
@@ -52,9 +50,6 @@ func newContextOpts() *ContextOpts {
 
 // initOpts initializes all unset options to the given defaults.
 func initOpts(defaultOpts, opts *ContextOpts) {
-	if opts.Color == nil {
-		opts.Color = defaultOpts.Color
-	}
 	if opts.Env == nil {
 		opts.Env = defaultOpts.Env
 	}
@@ -109,11 +104,6 @@ func (ctx Context) Clone(opts ContextOpts) *Context {
 	return NewContext(opts)
 }
 
-// Color returns the color setting of the context.
-func (ctx Context) Color() bool {
-	return *ctx.opts.Color
-}
-
 // Env returns the environment of the context.
 func (ctx Context) Env() map[string]string {
 	return ctx.opts.Env
@@ -138,7 +128,7 @@ func (ctx Context) Manifest() string {
 // NewSeq returns a new instance of Sequence initialized using the options
 // stored in the context.
 func (ctx Context) NewSeq() runutil.Sequence {
-	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Color, *ctx.opts.Verbose)
+	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, *ctx.opts.Verbose)
 }
 
 // Stdin returns the standard input of the context.
