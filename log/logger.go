@@ -36,7 +36,8 @@ type Logger struct {
 type LogLevel int
 
 const (
-	ErrorLevel LogLevel = iota
+	ErrorLevel   LogLevel = iota
+	WarningLevel
 	InfoLevel
 	DebugLevel
 	TraceLevel
@@ -81,7 +82,7 @@ func (l Logger) Infof(format string, a ...interface{}) {
 
 func (l Logger) Debugf(format string, a ...interface{}) {
 	if l.LoggerLevel >= DebugLevel {
-		l.log(l.color.Yellow, format, a...)
+		l.log(l.color.Cyan, format, a...)
 	}
 }
 
@@ -94,6 +95,12 @@ func (l Logger) Tracef(format string, a ...interface{}) {
 func (l Logger) Logf(format string, a ...interface{}) {
 	if l.LoggerLevel >= AllLevel {
 		l.log(l.color.DefaultColor, format, a...)
+	}
+}
+
+func (l Logger) Warningf(format string, a ...interface{}) {
+	if l.LoggerLevel >= WarningLevel {
+		l.log(l.color.Yellow, format, a...)
 	}
 }
 
