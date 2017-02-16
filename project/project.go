@@ -520,6 +520,22 @@ func (p *Project) CacheDirPath(jirix *jiri.X) (string, error) {
 	return "", nil
 }
 
+func (p *Project) writeJiriHeadFile(jirix *jiri.X) error {
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
+	fn := filepath.Join(p.Path, ".git", "JIRI_HEAD")
+	head := "ref: refs/remotes/origin/master"
+	var err error
+	if p.Revision != "" {
+		head, err = git.CurrentRevisionOfBranch(p.Revision)
+		if err != nil {
+			return err
+		}
+	} else if p.RemoteBranch != "" {
+		head = "ref: refs/remotes/origin/" + p.RemoteBranch
+	}
+	return safeWriteFile(jirix, fn, []byte(head))
+}
+
 func isPathDir(dir string) bool {
 	if dir != "" {
 		if fi, err := os.Stat(dir); err == nil {
@@ -1705,6 +1721,9 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		if err := s.Verbose(showUpdateLogs).Call(updateFn, "%v", op).Done(); err != nil {
 			return fmt.Errorf("error updating project %q: %v", op.Project().Name, err)
 		}
+	}
+	for _, project := range remoteProjects {
+		project.writeJiriHeadFile(jirix)
 	}
 	if err := runHooks(jirix, ops, hooks, showUpdateLogs); err != nil {
 		return err

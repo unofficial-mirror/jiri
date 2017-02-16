@@ -36,6 +36,38 @@ func checkReadme(t *testing.T, jirix *jiri.X, p project.Project, message string)
 	}
 }
 
+func checkJiriHead(t *testing.T, jirix *jiri.X, p project.Project) {
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
+
+	headFile := filepath.Join(p.Path, ".git", "JIRI_HEAD")
+	data, err := ioutil.ReadFile(headFile)
+	if err != nil {
+		t.Fatalf("ReadFile(%v) failed: %v", headFile, err)
+	}
+	headFileContents := string(data)
+	headFileCommit, err := git.CurrentRevisionOfBranch(headFileContents)
+	if err != nil {
+		t.Fatalf("git.CurrentRevisionOfBranch failed: %v", err)
+	}
+
+	projectRevision := p.Revision
+	if projectRevision == "" {
+		if p.RemoteBranch == "" {
+			projectRevision = "origin/master"
+		} else {
+			projectRevision = "origin/" + p.RemoteBranch
+		}
+	}
+	revisionCommit, err := git.CurrentRevisionOfBranch(projectRevision)
+	if err != nil {
+		t.Fatalf("git.CurrentRevisionOfBranch failed: %v", err)
+	}
+
+	if revisionCommit != headFileCommit {
+		t.Fatalf("JIRI_HEAD contains %v (%s) expected %v (%s)", headFileContents, headFileCommit, projectRevision, revisionCommit)
+	}
+}
+
 // Checks that /.jiri/ is ignored in a local project checkout
 func checkMetadataIsIgnored(t *testing.T, jirix *jiri.X, p project.Project) {
 	if _, err := jirix.NewSeq().Stat(p.Path); err != nil {
@@ -232,6 +264,7 @@ func TestUpdateUniverseSimple(t *testing.T) {
 		}
 		checkReadme(t, fake.X, p, "initial readme")
 		checkMetadataIsIgnored(t, fake.X, p)
+		checkJiriHead(t, fake.X, p)
 	}
 }
 
@@ -266,6 +299,7 @@ func TestUpdateUniverseWithCache(t *testing.T) {
 			t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
 		}
 		checkReadme(t, fake.X, p, "initial readme")
+		checkJiriHead(t, fake.X, p)
 	}
 
 	// Commit to master branch of a project 1.
@@ -274,6 +308,7 @@ func TestUpdateUniverseWithCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkReadme(t, fake.X, localProjects[1], "master commit")
+	checkJiriHead(t, fake.X, localProjects[1])
 
 	// Check that cache was updated
 	cacheDirPath, err := localProjects[1].CacheDirPath(fake.X)
