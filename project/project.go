@@ -178,6 +178,20 @@ func (h *Hook) validate() error {
 	return nil
 }
 
+// ProjectsByPath implements the Sort interface. It sorts Projects by
+// the Path field.
+type ProjectsByPath []Project
+
+func (projects ProjectsByPath) Len() int {
+	return len(projects)
+}
+func (projects ProjectsByPath) Swap(i, j int) {
+	projects[i], projects[j] = projects[j], projects[i]
+}
+func (projects ProjectsByPath) Less(i, j int) bool {
+	return projects[i].Path < projects[j].Path
+}
+
 // ToFile writes the manifest m to a file with the given filename, with
 // defaults unfilled and all project paths relative to the jiri root.
 func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
@@ -190,6 +204,7 @@ func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
 		}
 		projects = append(projects, project)
 	}
+	sort.Sort(ProjectsByPath(projects))
 	m.Projects = projects
 	data, err := m.ToBytes()
 	if err != nil {
