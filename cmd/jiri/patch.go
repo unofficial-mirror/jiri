@@ -18,11 +18,16 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
+var (
+	rebaseFlag bool
+)
+
 func init() {
 	cmdPatch.Flags.StringVar(&branchFlag, "branch", "", "Name of the branch the patch will be applied to")
 	cmdPatch.Flags.BoolVar(&deleteFlag, "delete", false, "Delete the existing branch if already exists")
 	cmdPatch.Flags.BoolVar(&forceFlag, "force", false, "Use force when deleting the existing branch")
-	cmdPatch.Flags.StringVar(&hostFlag, "host", "", `Gerrit host to use.  Defaults to gerrit host specified in manifest.`)
+	cmdPatch.Flags.BoolVar(&rebaseFlag, "rebase", false, "Rebase the change after downloading")
+	cmdPatch.Flags.StringVar(&hostFlag, "host", "", `Gerrit host to use. Defaults to gerrit host specified in manifest.`)
 }
 
 // cmdPatch represents the "jiri patch" command.
@@ -109,14 +114,8 @@ func runPatch(jirix *jiri.X, args []string) error {
 		}
 	}
 
+	var change gerrit.Change
 	if p, err := currentProject(jirix); err == nil {
-		if ps != -1 {
-			if err := patchProject(jirix, p, arg); err != nil {
-				return err
-			}
-			return nil
-		}
-
 		host := hostFlag
 		if host == "" {
 			if p.GerritHost == "" {
@@ -130,12 +129,18 @@ func runPatch(jirix *jiri.X, args []string) error {
 		}
 		g := jirix.Gerrit(hostUrl)
 
-		c, err := g.GetChange(cl)
+		change, err := g.GetChange(cl)
 		if err != nil {
 			return err
 		}
-		if err := patchProject(jirix, p, c.Reference()); err != nil {
-			return err
+		if ps != -1 {
+			if err := patchProject(jirix, p, arg); err != nil {
+				return err
+			}
+		} else {
+			if err := patchProject(jirix, p, change.Reference()); err != nil {
+				return err
+			}
 		}
 	} else {
 		host := hostFlag
@@ -148,7 +153,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 		}
 		g := jirix.Gerrit(hostUrl)
 
-		c, err := g.GetChange(cl)
+		change, err := g.GetChange(cl)
 		if err != nil {
 			return err
 		}
@@ -156,7 +161,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 		if ps != -1 {
 			ref = arg
 		} else {
-			ref = c.Reference()
+			ref = change.Reference()
 		}
 
 		projects, _, err := project.LoadManifest(jirix)
@@ -165,11 +170,25 @@ func runPatch(jirix *jiri.X, args []string) error {
 		}
 
 		for _, p := range projects {
-			if strings.HasSuffix(p.Remote, c.Project) {
+			if strings.HasSuffix(p.Remote, change.Project) {
 				if err := patchProject(jirix, p, ref); err != nil {
 					return err
 				}
+				break
 			}
+		}
+	}
+
+	if rebaseFlag {
+		git := gitutil.New(jirix.NewSeq())
+		if err := git.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+			return err
+		}
+		if err = git.Rebase("origin/" + change.Branch); err != nil {
+			if err := git.RebaseAbort(); err != nil {
+				return err
+			}
+			return fmt.Errorf("Cannot rebase the branch: %v", err)
 		}
 	}
 

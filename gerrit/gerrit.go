@@ -184,6 +184,7 @@ type Change struct {
 	Current_revision string
 	Project          string
 	Topic            string
+	Branch           string
 	Revisions        Revisions
 	Owner            Owner
 	Labels           map[string]map[string]interface{}
