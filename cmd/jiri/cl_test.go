@@ -205,7 +205,14 @@ func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	// Create origin.
 	originPath := createRepo(t, jirix, "origin")
 	chdir(t, jirix, originPath)
-	if err := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitWithMessage("initial commit"); err != nil {
+	git := gitutil.New(jirix.NewSeq())
+	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := git.Config("user.name", "John Doe"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := git.CommitWithMessage("initial commit"); err != nil {
 		t.Fatalf("%v", err)
 	}
 	// Create test repo.
@@ -319,7 +326,7 @@ func TestCreateReviewBranch(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -354,7 +361,7 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -377,7 +384,7 @@ func TestSendReview(t *testing.T) {
 	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -451,7 +458,7 @@ func TestSendReviewNoChangeID(t *testing.T) {
 	fake, _, _, gerritPath, cleanup := setupTest(t, false)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -474,7 +481,7 @@ func TestEndToEnd(t *testing.T) {
 	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -511,7 +518,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	defer cleanup()
 	s := fake.X.NewSeq()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -622,7 +629,7 @@ func TestDirtyBranch(t *testing.T) {
 	defer cleanup()
 	s := fake.X.NewSeq()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -690,7 +697,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	defer cleanup()
 	s := fake.X.NewSeq()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -804,7 +811,7 @@ Change-Id: I0000000000000000000000000000000000000000`,
 Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	for _, test := range testCases {
 		review, err := newReview(fake.X, git, project.Project{}, gerrit.CLOpts{
 			Autosubmit: test.autosubmit,
@@ -870,7 +877,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	defer cleanup()
 	chdir(t, fake.X, originPath)
 	commitFiles(t, fake.X, []string{"A", "B"})
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 
 	chdir(t, fake.X, repoPath)
 	if err := syncCL(fake.X, git); err != nil {
@@ -942,7 +949,7 @@ func TestParallelDev(t *testing.T) {
 	// * conflicting changes in a file
 	createCLWithFiles(t, fake.X, "feature1-A", "A")
 
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 	if err := git.CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -1021,7 +1028,7 @@ func TestParallelDev(t *testing.T) {
 func TestCLSync(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X.NewSeq())
 
 	// Create some dependent CLs.
 	if err := newCL(fake.X, []string{"feature1"}); err != nil {
@@ -1086,7 +1093,14 @@ func TestMultiPart(t *testing.T) {
 	}
 
 	git := func(dir string) *gitutil.Git {
-		return gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
+		git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+		if err := git.Config("user.email", "john.doe@example.com"); err != nil {
+			t.Fatalf("%v", err)
+		}
+		if err := git.Config("user.name", "John Doe"); err != nil {
+			t.Fatalf("%v", err)
+		}
+		return git
 	}
 
 	// Paths that contain the various test projects -- many functions in `jiri cl` depend on the current
