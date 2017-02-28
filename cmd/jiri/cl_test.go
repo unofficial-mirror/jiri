@@ -217,8 +217,22 @@ func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	}
 	// Create test repo.
 	repoPath := createRepoFromOrigin(t, jirix, "test", originPath)
+	git = gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(repoPath))
+	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := git.Config("user.name", "John Doe"); err != nil {
+		t.Fatalf("%v", err)
+	}
 	// Add Gerrit remote.
 	gerritPath := createRepoFromOrigin(t, jirix, "gerrit", originPath)
+	git = gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(gerritPath))
+	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := git.Config("user.name", "John Doe"); err != nil {
+		t.Fatalf("%v", err)
+	}
 	// Switch back to test repo.
 	chdir(t, jirix, repoPath)
 	return repoPath, originPath, gerritPath
