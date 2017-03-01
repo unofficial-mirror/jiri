@@ -13,7 +13,6 @@ pkg project, func LocalProjects(*jiri.X, ScanMode) (Projects, error)
 pkg project, func MakeProjectKey(string, string) ProjectKey
 pkg project, func ManifestFromBytes([]byte) (*Manifest, error)
 pkg project, func ManifestFromFile(*jiri.X, string) (*Manifest, error)
-pkg project, func PollProjects(*jiri.X, map[string]struct{}) (Update, error)
 pkg project, func ProjectAtPath(*jiri.X, string) (Project, error)
 pkg project, func ProjectFromFile(*jiri.X, string) (*Project, error)
 pkg project, func UpdateUniverse(*jiri.X, bool) error

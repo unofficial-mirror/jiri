@@ -22,6 +22,7 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/googlesource"
 	"fuchsia.googlesource.com/jiri/log"
@@ -716,8 +717,8 @@ func setProjectRevisions(jirix *jiri.X, projects Projects) (Projects, error) {
 	jirix.TimerPush("set revisions")
 	defer jirix.TimerPop()
 	for name, project := range projects {
-		git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
-		revision, err := git.CurrentRevision()
+		g := git.NewGit(project.Path)
+		revision, err := g.CurrentRevision()
 		if err != nil {
 			return nil, fmt.Errorf("Can't get revision for project %q: %v", project.Name, err)
 		}
@@ -792,85 +793,6 @@ func projectsExistLocally(jirix *jiri.X, projects Projects) (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-// PollProjects returns the set of changelists that exist remotely but not
-// locally. Changes are grouped by projects and contain author identification
-// and a description of their content.
-func PollProjects(jirix *jiri.X, projectSet map[string]struct{}) (_ Update, e error) {
-	jirix.TimerPush("poll projects")
-	defer jirix.TimerPop()
-
-	// Switch back to current working directory when we're done.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-
-	// Gather local & remote project data.
-	localProjects, err := LocalProjects(jirix, FastScan)
-	if err != nil {
-		return nil, err
-	}
-	remoteProjects, _, err := LoadManifest(jirix)
-	if err != nil {
-		return nil, err
-	}
-
-	// Compute difference between local and remote.
-	update := Update{}
-	matchLocalWithRemote(localProjects, remoteProjects)
-	states, err := GetProjectStates(jirix, localProjects, false)
-	if err != nil {
-		return nil, err
-	}
-	ops := computeOperations(localProjects, remoteProjects, states, false /*gc*/, false /*snapshot*/)
-	s := jirix.NewSeq()
-	for _, op := range ops {
-		name := op.Project().Name
-
-		// If given a project set, limit our results to those projects in the set.
-		if len(projectSet) > 0 {
-			if _, ok := projectSet[name]; !ok {
-				continue
-			}
-		}
-
-		// We only inspect this project if an update operation is required.
-		cls := []CL{}
-		if updateOp, ok := op.(updateOperation); ok {
-			// Enter project directory - this assumes absolute paths.
-			if err := s.Chdir(updateOp.destination).Done(); err != nil {
-				return nil, err
-			}
-
-			// Fetch the latest from origin.
-			if err := gitutil.New(jirix.NewSeq()).FetchRefspec("origin", updateOp.project.RemoteBranch); err != nil {
-				return nil, err
-			}
-
-			// Collect commits visible from FETCH_HEAD that aren't visible from master.
-			commitsText, err := gitutil.New(jirix.NewSeq()).Log("FETCH_HEAD", "master", "%an%n%ae%n%B")
-			if err != nil {
-				return nil, err
-			}
-
-			// Format those commits and add them to the results.
-			for _, commitText := range commitsText {
-				if got, want := len(commitText), 3; got < want {
-					return nil, fmt.Errorf("Unexpected length of %v: got %v, want at least %v", commitText, got, want)
-				}
-				cls = append(cls, CL{
-					Author:      commitText[0],
-					Email:       commitText[1],
-					Description: strings.Join(commitText[2:], "\n"),
-				})
-			}
-		}
-		update[name] = cls
-	}
-	return update, nil
 }
 
 // LoadManifest loads the manifest, starting with the .jiri_manifest file,
@@ -1183,16 +1105,14 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 }
 
 func fetchAll(jirix *jiri.X, project Project) error {
-	s := jirix.NewSeq()
 	if project.Remote == "" {
 		return fmt.Errorf("project %q does not have a remote", project.Name)
 	}
-	git := gitutil.New(s, gitutil.RootDirOpt(project.Path))
-	if err := git.SetRemoteUrl("origin", project.Remote); err != nil {
+	g := git.NewGit(project.Path)
+	if err := g.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	err := git.Fetch("origin", gitutil.PruneOpt(true))
-	return err
+	return g.Fetch("origin", git.PruneOpt(true))
 }
 
 func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
@@ -1525,29 +1445,30 @@ func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, proje
 		}
 	}
 
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	g := git.NewGit(project.Path)
 	var currentRevision string
 	var err error
-	if git.IsOnBranch() {
-		currentRevision, err = git.CurrentBranchName()
+	if scm.IsOnBranch() {
+		currentRevision, err = scm.CurrentBranchName()
 	} else {
-		currentRevision, err = git.CurrentRevision()
+		currentRevision, err = g.CurrentRevision()
 	}
 	if err != nil {
 		return err
 	}
-	stashed, err := git.Stash()
+	stashed, err := scm.Stash()
 	if err != nil {
 		return err
 	}
 	// After running the function, checkout the original branch,
 	// and stash pop if necessary.
 	defer collect.Error(func() error {
-		if err := git.CheckoutBranch(currentRevision); err != nil {
+		if err := scm.CheckoutBranch(currentRevision); err != nil {
 			return err
 		}
 		if stashed {
-			return git.StashPop()
+			return scm.StashPop()
 		}
 		return nil
 	}, &e)
@@ -1652,6 +1573,7 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 				s := jirix.NewSeq()
 				if isPathDir(dir) {
 					// Cache already present, update it
+					// TODO : update this after implementing FetchAll using g
 					if err := gitutil.New(s, gitutil.RootDirOpt(dir)).Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
 						errs <- err
 						return
@@ -1722,19 +1644,25 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	errs := make(chan error)
 	states := make(map[ProjectKey]*ProjectState, len(localProjects))
 	go func() {
+		jirix.TimerPush("update cache")
 		if err := updateCache(jirix, remoteProjects); err != nil {
 			errs <- err
 			return
 		}
+		jirix.TimerPop()
+		jirix.TimerPush("fetch local projects")
 		if err := fetchLocalProjects(jirix, localProjects, remoteProjects); err != nil {
 			errs <- err
 			return
 		}
+		jirix.TimerPop()
+		jirix.TimerPush("get project states")
 		s, err := GetProjectStates(jirix, localProjects, false)
 		if err != nil {
 			errs <- err
 			return
 		}
+		jirix.TimerPop()
 		for k, v := range s {
 			states[k] = v
 		}

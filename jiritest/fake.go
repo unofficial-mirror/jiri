@@ -151,7 +151,15 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	if err := gitutil.New(fake.X.NewSeq()).Init(projectDir); err != nil {
 		return err
 	}
-	if err := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(projectDir)).CommitWithMessage("initial commit"); err != nil {
+	git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(projectDir))
+	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
+		return err
+	}
+	if err := git.Config("user.name", "John Doe"); err != nil {
+		return err
+	}
+
+	if err := git.CommitWithMessage("initial commit"); err != nil {
 		return err
 	}
 	fake.Projects[name] = projectDir

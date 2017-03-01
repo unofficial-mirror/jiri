@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/tool"
 )
@@ -33,12 +34,8 @@ type ProjectState struct {
 func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch chan<- error) {
 	var err error
 	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(state.Project.Path))
-	branches, currentBranch, err := scm.GetBranches()
-	if err != nil {
-		ch <- err
-		return
-	}
-	m, err := scm.GetAllBranchesInfo()
+	g := git.NewGit(state.Project.Path)
+	branches, err := g.GetAllBranchesInfo()
 	if err != nil {
 		ch <- err
 		return
@@ -52,24 +49,26 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 	for _, branch := range branches {
 		b := BranchState{
 			&ReferenceState{
-				Name: branch,
+				Name:     branch.Name,
+				Revision: branch.Revision,
 			},
 			nil,
 		}
-		if v, ok := m[gitutil.LocalType+"/"+branch]; ok {
-			b.Revision = string(v.Revision)
-			if string(v.TrackingBranch) != "" {
-				b.Tracking = &ReferenceState{
-					Name: string(v.TrackingBranch),
-				}
-				if v, ok := m[gitutil.RemoteType+"/"+b.Tracking.Name]; ok {
-					b.Tracking.Revision = string(v.Revision)
-				}
+		if branch.Tracking != nil {
+			b.Tracking = &ReferenceState{
+				Name:     branch.Tracking.Name,
+				Revision: branch.Tracking.Revision,
 			}
 		}
 		state.Branches = append(state.Branches, b)
-		if currentBranch == branch {
+		if branch.IsHead {
 			state.CurrentBranch = b
+		}
+	}
+	if state.CurrentBranch.Name == "" {
+		if state.CurrentBranch.Revision, err = g.CurrentRevision(); err != nil {
+			ch <- err
+			return
 		}
 	}
 	if checkDirty {

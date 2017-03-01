@@ -12,6 +12,7 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/gerrit"
+	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 )
 
@@ -49,11 +50,11 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	if err != nil {
 		return err
 	}
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
-	if !git.IsOnBranch() {
+	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
+	if !scm.IsOnBranch() {
 		return fmt.Errorf("The project is not on any branch.")
 	}
-	remoteBranch, err := git.RemoteBranchName()
+	remoteBranch, err := scm.RemoteBranchName()
 	if err != nil {
 		return err
 	}
@@ -61,7 +62,7 @@ func runUpload(jirix *jiri.X, _ []string) error {
 		return fmt.Errorf("Current branch is un-tracked or tracks a local un-tracked branch.")
 	}
 	if uploadRebaseFlag {
-		if changes, err := git.HasUncommittedChanges(); err != nil {
+		if changes, err := scm.HasUncommittedChanges(); err != nil {
 			return err
 		} else if changes {
 			return fmt.Errorf("project has uncommited changes, please commit them or stash them. Cannot rebase before pushing.")
@@ -106,15 +107,16 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	}
 
 	if uploadRebaseFlag {
-		if err := git.Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+		g := git.NewGit(p.Path)
+		if err := g.Fetch("origin", git.PruneOpt(true)); err != nil {
 			return err
 		}
-		trackingBranch, err := git.TrackingBranchName()
+		trackingBranch, err := scm.TrackingBranchName()
 		if err != nil {
 			return err
 		}
-		if err = git.Rebase(trackingBranch); err != nil {
-			if err2 := git.RebaseAbort(); err2 != nil {
+		if err = scm.Rebase(trackingBranch); err != nil {
+			if err2 := scm.RebaseAbort(); err2 != nil {
 				return err2
 			}
 			return fmt.Errorf("Not able to rebase the branch to %v, please rebase manually: %v", trackingBranch, err)

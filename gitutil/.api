@@ -23,7 +23,6 @@ pkg gitutil, method (*Git) CreateAndCheckoutBranch(string) error
 pkg gitutil, method (*Git) CreateBranch(string) error
 pkg gitutil, method (*Git) CreateBranchWithUpstream(string, string) error
 pkg gitutil, method (*Git) CurrentBranchName() (string, error)
-pkg gitutil, method (*Git) CurrentRevision() (string, error)
 pkg gitutil, method (*Git) CurrentRevisionOfBranch(string) (string, error)
 pkg gitutil, method (*Git) DeleteBranch(string, ...DeleteBranchOpt) error
 pkg gitutil, method (*Git) DirExistsOnBranch(string, string) bool

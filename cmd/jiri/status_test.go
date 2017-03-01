@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
@@ -54,15 +55,15 @@ func TestStatus(t *testing.T) {
 	s := fake.X.NewSeq()
 	for i, localProject := range localProjects {
 		setDummyUser(t, fake.X, fake.Projects[localProject.Name])
-		gitRemote := gitutil.New(s, gitutil.RootDirOpt(fake.Projects[localProject.Name]))
+		gr := git.NewGit(fake.Projects[localProject.Name])
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file1"+strconv.Itoa(i), "file1"+strconv.Itoa(i))
-		file1CommitRev, _ := gitRemote.CurrentRevision()
+		file1CommitRev, _ := gr.CurrentRevision()
 		file1CommitRevs = append(file1CommitRevs, file1CommitRev)
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file2"+strconv.Itoa(i), "file2"+strconv.Itoa(i))
-		file2CommitRev, _ := gitRemote.CurrentRevision()
+		file2CommitRev, _ := gr.CurrentRevision()
 		file2CommitRevs = append(file2CommitRevs, file2CommitRev)
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file3"+strconv.Itoa(i), "file3"+strconv.Itoa(i))
-		file3CommitRev, _ := gitRemote.CurrentRevision()
+		file3CommitRev, _ := gr.CurrentRevision()
 		latestCommitRevs = append(latestCommitRevs, file3CommitRev)
 		relativePath, _ := filepath.Rel(cwd, localProject.Path)
 		relativePaths = append(relativePaths, relativePath)
