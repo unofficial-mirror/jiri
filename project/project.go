@@ -1036,10 +1036,29 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifes
 // all the local changes. If "cleanupBranches" is true, it will also delete all
 // the non-master branches.
 func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e error) {
+	cleanLimit := make(chan struct{}, jirix.Jobs)
+	errs := make(chan error, len(projects))
+	var wg sync.WaitGroup
 	for _, project := range projects {
-		if err := resetLocalProject(jirix, project, cleanupBranches); err != nil {
-			return err
-		}
+		wg.Add(1)
+		cleanLimit <- struct{}{}
+		go func(project Project) {
+			defer func() { <-cleanLimit }()
+			defer wg.Done()
+			if err := resetLocalProject(jirix, project, cleanupBranches); err != nil {
+				errs <- fmt.Errorf("Erorr cleaning project %q: %v", project.Name, err)
+			}
+		}(project)
+	}
+	wg.Wait()
+	close(errs)
+
+	multiErr := make(MultiError, 0)
+	for err := range errs {
+		multiErr = append(multiErr, err)
+	}
+	if len(multiErr) != 0 {
+		return multiErr
 	}
 	return nil
 }
@@ -1066,9 +1085,6 @@ func resetLocalProject(jirix *jiri.X, project Project, cleanupBranches bool) err
 		return err
 	}
 	for _, branch := range branches {
-		if branch == "master" {
-			continue
-		}
 		if err := git.DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
