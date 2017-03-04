@@ -210,6 +210,7 @@ type Commit struct {
 	Message string
 }
 type Owner struct {
+	Name string
 	Email string
 }
 type Files map[string]struct{}

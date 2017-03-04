@@ -89,12 +89,12 @@ func patchProject(jirix *jiri.X, project project.Project, ref string) error {
 }
 
 // rebaseProject rebases the current branch on top of a given branch.
-func rebaseProject(jirix *jiri.X, project project.Project, branch string) error {
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
-	if err := git.FetchRefspec("origin", branch); err != nil {
+func rebaseProject(jirix *jiri.X, project project.Project, change *gerrit.Change) error {
+	git := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt(change.Owner.Name), gitutil.UserEmailOpt(change.Owner.Email), gitutil.RootDirOpt(project.Path))
+	if err := git.FetchRefspec("origin", change.Branch); err != nil {
 		return err
 	}
-	if err := git.Rebase("origin/" + branch); err != nil {
+	if err := git.Rebase("origin/" + change.Branch); err != nil {
 		if err := git.RebaseAbort(); err != nil {
 			return err
 		}
@@ -145,7 +145,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 			}
 		}
 		if rebaseFlag {
-			if err := rebaseProject(jirix, p, change.Branch); err != nil {
+			if err := rebaseProject(jirix, p, change); err != nil {
 				return err
 			}
 		}
@@ -182,7 +182,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 					return err
 				}
 				if rebaseFlag {
-					if err := rebaseProject(jirix, p, change.Branch); err != nil {
+					if err := rebaseProject(jirix, p, change); err != nil {
 						return err
 					}
 				}
