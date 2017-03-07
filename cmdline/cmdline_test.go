@@ -2306,7 +2306,7 @@ The global flags are:
 }
 
 func TestHideGlobalFlags(t *testing.T) {
-	HideGlobalFlagsExcept(regexp.MustCompile(`^global2$`))
+	HideGlobalFlags(regexp.MustCompile(`^global1$`))
 	cmdChild := &Command{
 		Name:   "child",
 		Short:  "description of child command.",
@@ -2390,11 +2390,11 @@ The global flags are:
 		},
 	}
 	runTestCases(t, prog, tests)
-	nonHiddenGlobalFlags = nil
+	hiddenGlobalFlags = nil
 }
 
 func TestHideGlobalFlagsRootNoChildren(t *testing.T) {
-	HideGlobalFlagsExcept(regexp.MustCompile(`^global2$`))
+	HideGlobalFlags(regexp.MustCompile(`^global1$`))
 	prog := &Command{
 		Name:   "program",
 		Short:  "Test hiding global flags, root no children.",
@@ -2434,7 +2434,7 @@ The global flags are:
 		},
 	}
 	runTestCases(t, prog, tests)
-	nonHiddenGlobalFlags = nil
+	hiddenGlobalFlags = nil
 }
 
 func TestRootCommandFlags(t *testing.T) {

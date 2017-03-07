@@ -451,14 +451,16 @@ func flagsUsage(w *textutil.WrapWriter, path []*Command, config *helpConfig) boo
 }
 
 func globalFlagsUsage(w *textutil.WrapWriter, config *helpConfig) bool {
-	numCompact := countFlags(globalFlags, nonHiddenGlobalFlags, true)
-	numFull := countFlags(globalFlags, nonHiddenGlobalFlags, false)
+	regex := regexp.MustCompilePOSIX("^test\\..*$")
+	HideGlobalFlags(regex)
+	numCompact := countFlags(globalFlags, hiddenGlobalFlags, false)
+	numFull := countFlags(globalFlags, hiddenGlobalFlags, true)
 	if config.style == styleCompact {
 		// Compact style, only show compact flags.
 		if numCompact > 0 {
 			fmt.Fprintln(w)
 			fmt.Fprintln(w, "The global flags are:")
-			printFlags(w, globalFlags, nil, config.style, nonHiddenGlobalFlags, true)
+			printFlags(w, globalFlags, nil, config.style, hiddenGlobalFlags, false)
 		}
 		return numFull > 0
 	}
@@ -466,11 +468,11 @@ func globalFlagsUsage(w *textutil.WrapWriter, config *helpConfig) bool {
 	if numCompact > 0 || numFull > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "The global flags are:")
-		printFlags(w, globalFlags, nil, config.style, nonHiddenGlobalFlags, true)
+		printFlags(w, globalFlags, nil, config.style, hiddenGlobalFlags, false)
 		if numCompact > 0 && numFull > 0 {
 			fmt.Fprintln(w)
 		}
-		printFlags(w, globalFlags, nil, config.style, nonHiddenGlobalFlags, false)
+		printFlags(w, globalFlags, nil, config.style, hiddenGlobalFlags, true)
 	}
 	return false
 }
@@ -523,19 +525,17 @@ func matchRegexps(regexps []*regexp.Regexp, name string) bool {
 	return false
 }
 
-var nonHiddenGlobalFlags []*regexp.Regexp
+var hiddenGlobalFlags []*regexp.Regexp
 
-// HideGlobalFlagsExcept hides global flags from the default compact-style usage
-// message, except for the given regexps.  Global flag names that match any of
-// the regexps will still be shown in the compact usage message.  Multiple calls
-// behave as if all regexps were provided in a single call.
+// HideGlobalFlags hides global flags from the default compact-style usage
+// message.  Global flag names that match any of the regexps will not be shown
+// in the compact usage message.  Multiple calls behave as if all regexps were
+// provided in a single call.
 //
 // All global flags are always shown in non-compact style usage messages.
-func HideGlobalFlagsExcept(regexps ...*regexp.Regexp) {
-	// NOTE: nonHiddenGlobalFlags is used as the argument to matchRegexps, where
-	// nil means "all names match" and empty means "no names match".
-	nonHiddenGlobalFlags = append(nonHiddenGlobalFlags, regexps...)
-	if nonHiddenGlobalFlags == nil {
-		nonHiddenGlobalFlags = []*regexp.Regexp{}
+func HideGlobalFlags(regexps ...*regexp.Regexp) {
+	hiddenGlobalFlags = append(hiddenGlobalFlags, regexps...)
+	if hiddenGlobalFlags == nil {
+		hiddenGlobalFlags = []*regexp.Regexp{}
 	}
 }
