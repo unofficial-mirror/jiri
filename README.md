@@ -48,9 +48,9 @@ and "bar", which are hosted on github and bitbucket respectively.
 </manifest>
 ```
 When you run `jiri update` for the first time, the "foo" and "bar" repos will
-be cloned into `foo` and `bar` respectively.  Running `jiri update`
-again will sync the master branch of these repos with the remote master
-branch.
+be cloned into `foo` and `bar` respectively and repos would be put on DETACHED
+HEAD.  Running `jiri update` again will update all the remote refs and
+rebase your current branch to its upstream branch.
 
 Note that the project paths do not need to be immediate children of the jiri
 root.  We could have decided to set the `path` attribute for the "bar" project
@@ -137,7 +137,7 @@ You should now see the jiri project in
 `$MY_ROOT/src/fuchsia.googlesource.com/jiri`.
 
 Running `jiri update` again will sync the local repos to the remotes, and
-rebuild the jiri tool.
+update the jiri tool.
 
 ### Managing your projects with jiri
 
@@ -226,26 +226,35 @@ For general documentation, including a list of subcommands, run `jiri help`.
 To find documentation about a specific topic or subcommand, run `jiri help
 <command>`.
 
-You can read all the command-line documentation in a single page here:
-http://godoc.org/fuchsia.googlesource.com/jiri.
+### Main commands are:
+```
+   cl          Manage changelists for multiple projects
+   grep        Search across projects
+   import      Adds imports to .jiri\_manifest file
+   init        Create a new jiri root
+   patch       Patch in the existing change
+   project     Manage the jiri projects
+   snapshot    Create a new project snapshot
+   status      Prints status of all the projects
+   update      Update all jiri projects
+   upload      Upload a changelist for review
+   version     Print the jiri version
+   runp        Run a command in parallel across jiri projects
+   help        Display help for commands or topics
+```
+Run `jiri help [command]` for command usage.
 
 ## Filesystem
 
-<!-- TODO(nlacasse): Figure out a way to keep the canonical documentation in
-one place but mirror it to the README and cmdline docs. -->
-
-See the jiri [filesystem godocs](https://godoc.org/fuchsia.googlesource.com/jiri/cmd/jiri#hdr-Jiri_filesystem___Description_of_jiri_file_system_layout).
+See the jiri [filesystem docs][filesystem doc].
 
 ## Manifests<a name="manifests"></a>
 
-<!-- TODO(nlacasse): Figure out a way to keep the canonical documentation in
-one place but mirror it to the README and cmdline docs. -->
-
-See the jiri [manifest godocs](https://godoc.org/fuchsia.googlesource.com/jiri/cmd/jiri#hdr-Jiri_manifest___Description_of_manifest_files).
+See the jiri [manifest docs][manifest doc].
 
 ## Snapshots
 
-TODO(nlacasse): Write me.
+TODO(anmittal): Write me.
 
 ## Gerrit CL workflow
 
@@ -443,15 +452,8 @@ We pronounce "jiri" like "yiree".
 
 The actual Czech name [Jiří][jiri-wiki] is pronounced something like "yirzhee".
 
-### Why can't I commit to my master branch?
-
-Jiri keeps the master branch of each project in the state described in the
-manifest.  Any changes that are made to the master branch would be lost during
-the next `jiri update`.
-
-<!-- TODO(nlacasse): Answer these.
-### Why not repo/gclient/etc?
 ### How can I test changes to a manifest without pushing it upstream?
+see [Jiri local update][hacking doc]
 -->
 
 [android repo]: https://source.android.com/source/using-repo.html "Repo command reference"
@@ -464,3 +466,6 @@ the next `jiri update`.
 [jiri-wiki]: https://en.wikipedia.org/wiki/Ji%C5%99%C3%AD "Jiří"
 [manifests]: #manifests "manifests"
 [minimal manifest]: https://fuchsia.googlesource.com/manifest/+/refs/heads/master/minimal "minimal manifest"
+[manifest doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/manifest.md "Jiri manifest"
+[filesystem doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/filesystem.md "Jiri filesystem"
+[hacking doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/HACKING.md "Jiri local updates"
