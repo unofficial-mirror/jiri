@@ -1042,20 +1042,29 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifes
 // heads, resets to the specified revision if there is one, and gets rid of
 // all the local changes. If "cleanupBranches" is true, it will also delete all
 // the non-master branches.
-func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e error) {
+func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool) (e error) {
+	remoteProjects, _, _, err := LoadUpdatedManifest(jirix, localProjects, true)
+	if err != nil {
+		return err
+	}
 	cleanLimit := make(chan struct{}, jirix.Jobs)
-	errs := make(chan error, len(projects))
+	errs := make(chan error, len(localProjects))
 	var wg sync.WaitGroup
-	for _, project := range projects {
+	for _, local := range localProjects {
 		wg.Add(1)
 		cleanLimit <- struct{}{}
-		go func(project Project) {
+		go func(local Project) {
 			defer func() { <-cleanLimit }()
 			defer wg.Done()
-			if err := resetLocalProject(jirix, project, cleanupBranches); err != nil {
-				errs <- fmt.Errorf("Erorr cleaning project %q: %v", project.Name, err)
+			remote, ok := remoteProjects[local.Key()]
+			if !ok {
+				jirix.Logger.Errorf("Not cleaning project %q(%v). It was not found in manifest", local.Name, local.Path)
+				return
 			}
-		}(project)
+			if err := resetLocalProject(jirix, local, remote, cleanupBranches); err != nil {
+				errs <- fmt.Errorf("Erorr cleaning project %q: %v", local.Name, err)
+			}
+		}(local)
 	}
 	wg.Wait()
 	close(errs)
@@ -1072,11 +1081,20 @@ func CleanupProjects(jirix *jiri.X, projects Projects, cleanupBranches bool) (e 
 
 // resetLocalProject checks out the detached_head, cleans up untracked files
 // and uncommitted changes, and optionally deletes all the branches except master.
-func resetLocalProject(jirix *jiri.X, project Project, cleanupBranches bool) error {
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
-
-	if err := checkoutHeadRevision(jirix, project, true); err != nil {
+func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches bool) error {
+	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(local.Path))
+	headRev, err := GetHeadRevision(jirix, remote)
+	if err != nil {
 		return err
+	} else {
+		if headRev, err = git.CurrentRevisionOfBranch(headRev); err != nil {
+			return err
+		}
+	}
+	if local.Revision != headRev {
+		if err := git.CheckoutBranch(headRev, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+			return err
+		}
 	}
 	// Cleanup changes.
 	if err := git.RemoveUntrackedFiles(); err != nil {
