@@ -353,6 +353,142 @@ func TestUpdateUniverseWithSharedCache(t *testing.T) {
 	testWithCache(t, true)
 }
 
+func TestProjectUpdateWhenNoUpdate(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	lc := project.LocalConfig{NoUpdate: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	// Commit to master branch of a project 1.
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
+	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
+	remoteRev, _ := gitRemote.CurrentRevision()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := git.NewGit(localProjects[1].Path)
+	localRev, _ := gitLocal.CurrentRevision()
+
+	if remoteRev == localRev {
+		t.Fatal("local project should not be updated")
+	}
+}
+
+func TestProjectUpdateWhenIgnore(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	lc := project.LocalConfig{Ignore: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	// Commit to master branch of a project 1.
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
+	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
+	remoteRev, _ := gitRemote.CurrentRevision()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := git.NewGit(localProjects[1].Path)
+	localRev, _ := gitLocal.CurrentRevision()
+
+	if remoteRev == localRev {
+		t.Fatal("local project should not be updated")
+	}
+}
+
+func TestLocalProjectWithConfig(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	project.WriteUpdateHistorySnapshot(fake.X, "", false)
+
+	lc := project.LocalConfig{Ignore: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	scanModes := []project.ScanMode{project.FullScan, project.FastScan}
+	for _, scanMode := range scanModes {
+		newLocalProjects, err := project.LocalProjects(fake.X, scanMode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for k, p := range newLocalProjects {
+			expectedIgnore := k == localProjects[1].Key()
+			if p.LocalConfig.Ignore != expectedIgnore {
+				t.Errorf("local config ignore: got %t, want %t", p.LocalConfig.Ignore, expectedIgnore)
+			}
+
+			if p.LocalConfig.NoUpdate != false {
+				t.Errorf("local config no-update: got %t, want %t", p.LocalConfig.NoUpdate, false)
+			}
+
+			if p.LocalConfig.NoRebase != false {
+				t.Errorf("local config no-rebase: got %t, want %t", p.LocalConfig.NoUpdate, false)
+			}
+		}
+	}
+}
+
+func TestProjectUpdateWhenNoRebase(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	lc := project.LocalConfig{NoRebase: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	// Commit to master branch of a project 1.
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
+	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
+	remoteRev, _ := gitRemote.CurrentRevision()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := git.NewGit(localProjects[1].Path)
+	localRev, _ := gitLocal.CurrentRevision()
+
+	if remoteRev != localRev {
+		t.Fatal("local project should be updated")
+	}
+}
+
+func TestBranchUpdateWhenNoRebase(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
+	gitLocal.CheckoutBranch("master")
+
+	lc := project.LocalConfig{NoRebase: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	// Commit to master branch of a project 1.
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
+	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
+	remoteRev, _ := gitRemote.CurrentRevision()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gl := git.NewGit(localProjects[1].Path)
+	localRev, _ := gl.CurrentRevision()
+
+	if remoteRev == localRev {
+		t.Fatal("local branch master should be updated")
+	}
+}
+
 // TestHookLoadSimple tests that manifest is loaded correctly
 // with correct project path in hook
 func TestHookLoadSimple(t *testing.T) {
@@ -647,6 +783,47 @@ func TestUpdateUniverseMovedProject(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "initial readme")
 }
 
+func TestIgnoredProjectsNotMoved(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the local path at which project 1 is located.
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lc := project.LocalConfig{Ignore: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	oldProjectPath := localProjects[1].Path
+	localProjects[1].Path = filepath.Join(fake.X.Root, "new-project-path")
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == localProjects[1].Name {
+			p.Path = localProjects[1].Path
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that UpdateUniverse() does not move the local copy of the project 1.
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AssertDirExists(oldProjectPath).Done(); err != nil {
+		t.Fatalf("expected project %q at path %q to exist but it did not: %s", localProjects[1].Name, oldProjectPath, err)
+	}
+	if err := s.AssertDirExists(localProjects[2].Path).Done(); err != nil {
+		t.Fatalf("expected project %q at path %q to not exist but it did", localProjects[1].Name, localProjects[1].Path)
+	}
+}
+
 // TestUpdateUniverseRenamedProject checks that UpdateUniverse can update
 // renamed project.
 func TestUpdateUniverseRenamedProject(t *testing.T) {
@@ -734,6 +911,40 @@ func TestUpdateUniverseDeletedProject(t *testing.T) {
 	}
 	if err := s.AssertDirExists(localProjects[1].Path).Done(); err == nil {
 		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, localProjects[1].Path)
+	}
+}
+
+func TestIgnoredProjectsNotDeleted(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	s := fake.X.NewSeq()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete project 1.
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == localProjects[1].Name {
+			continue
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+	lc := project.LocalConfig{Ignore: true}
+	project.WriteLocalConfig(fake.X, localProjects[1], lc)
+	if err := fake.UpdateUniverse(true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AssertDirExists(localProjects[1].Path).Done(); err != nil {
+		t.Fatalf("expected project %q at path %q to exist but it did not: %s", localProjects[1].Name, localProjects[1].Path, err)
 	}
 }
 
