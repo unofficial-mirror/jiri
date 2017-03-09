@@ -719,7 +719,7 @@ func setProjectRevisions(jirix *jiri.X, projects Projects) (Projects, error) {
 		git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
 		revision, err := git.CurrentRevision()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Can't get revision for project %q: %v", project.Name, err)
 		}
 		project.Revision = revision
 		projects[name] = project
