@@ -102,6 +102,7 @@ func init() {
 	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
 	flag.BoolVar(&colorFlag, "color", true, "Use color to format output.")
 	flag.BoolVar(&quietVerboseFlag, "quiet", false, "Only print user actionable messages.")
+	flag.BoolVar(&quietVerboseFlag, "q", false, "Same as -quiet")
 	flag.BoolVar(&debugVerboseFlag, "v", false, "Print debug level output.")
 	flag.BoolVar(&traceVerboseFlag, "vv", false, "Print trace level output.")
 	flag.BoolVar(&allVerboseFlag, "vvv", false, "Print all output.")
