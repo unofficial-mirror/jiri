@@ -48,8 +48,8 @@ to update is described in the manifest.
 
 Run "jiri help manifest" for details on manifests.
 `,
-	ArgsName: "<snapshot>",
-	ArgsLong: "<snapshot> is the snapshot manifest file.",
+	ArgsName: "<file or url>",
+	ArgsLong: "<file or url> points to snapshot to checkout.",
 }
 
 func runUpdate(jirix *jiri.X, args []string) error {
