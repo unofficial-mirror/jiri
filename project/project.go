@@ -965,7 +965,11 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifes
 // all the local changes. If "cleanupBranches" is true, it will also delete all
 // the non-master branches.
 func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool) (e error) {
-	remoteProjects, _, _, err := LoadUpdatedManifest(jirix, localProjects, true)
+	lProjects, err := LocalProjects(jirix, FastScan)
+	if err != nil {
+		return err
+	}
+	remoteProjects, _, _, err := LoadUpdatedManifest(jirix, lProjects, true)
 	if err != nil {
 		return err
 	}
