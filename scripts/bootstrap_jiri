@@ -21,9 +21,6 @@ readonly JIRI_REPO_URL="https://fuchsia.googlesource.com/jiri"
 # Google Storage bucket that contains prebuilt versions of jiri.
 readonly GS_BUCKET_URL="https://fuchsia-build.storage.googleapis.com/jiri"
 
-# Location where we keep the version of jiri to download.
-readonly VERSION_BASE_URL="https://fuchsia.googlesource.com/jiri/version/+/master/bootstrap"
-
 # fatal prints an error message, followed by the usage string, and then exits.
 fatal() {
   usage='
@@ -64,11 +61,6 @@ if [[ -e "${ROOT_DIR}" ]]; then
   fi
 fi
 
-# Check that go is on the PATH.
-if ! go version >& /dev/null ; then
-  fatal 'ERROR: "go" tool not found, see https://golang.org/doc/install'
-fi
-
 # Remove the root_dir if this script fails so as to not leave the environment in a strange half-state.
 trap "rm -rf ${ROOT_DIR}" INT TERM EXIT
 
@@ -80,20 +72,29 @@ mkdir -p "${BIN_DIR}"
 readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
 readonly TARGET="${HOST_OS}-amd64"
 readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/master?format=JSON"
+readonly LOG_URL="${JIRI_REPO_URL}/+log/refs/heads/master?format=JSON"
 readonly VERSION=$(curl -sSf "${COMMIT_URL}" | sed -n 's/.*"value": "\([0-9a-f]\{40\}\)"/\1/p')
-if [[ -z ${VERSION} ]]; then
-  echo "Cannot determine the latest jiri version" 1>&2
+readonly VERSIONS=$(curl -sSf "${LOG_URL}" | sed -n 's/.*"commit": "\([0-9a-f]\{40\}\)".*/\1/p')
+
+JIRI_URL=""
+for version in ${VERSIONS}; do
+  url="${GS_BUCKET_URL}/${TARGET}/${version}"
+  if curl --output /dev/null --silent --head --fail "${url}"; then
+    JIRI_URL="${url}"
+	break
+  fi
+done
+
+if [[ -z "${JIRI_URL}" ]]; then
+  echo "Cannot find prebuilt Jiri binary." 1>&2
   exit 1
 fi
 
-# Download the jiri binary.
-readonly BIN_URL="${GS_BUCKET_URL}/${TARGET}/${VERSION}"
-if ! curl -sf -o "${BIN_DIR}/jiri" "${BIN_URL}"; then
-  echo "Failed downloading prebuilt jiri binary." 1>&2
-  echo "URL: ${BIN_URL}" 1>&2
+if ! curl -sf -o "${BIN_DIR}/jiri" "${JIRI_URL}"; then
+  echo "Failed downloading prebuilt Jiri binary." 1>&2
   exit 1
 fi
 chmod 755 "${BIN_DIR}/jiri"
-
 echo "Please add ${BIN_DIR} to your PATH"
+
 trap - EXIT

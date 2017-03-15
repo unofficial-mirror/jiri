@@ -26,49 +26,40 @@
 # This has the notable side-effect of only being able to upload jiri binaries
 # from source that's actually checked in.
 
-set -e
-set -x
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly GIT_DIR="$(dirname "${SCRIPT_DIR}")"
+
+readonly HOST_ARCH=$(uname -m)
+readonly HOST_OS="$(uname | tr '[:upper:]' '[:lower:]')"
 
 readonly PKG_PATH="fuchsia.googlesource.com/jiri"
 readonly GS_BUCKET="gs://fuchsia-build/jiri"
-
-# Accept the first argument as a list of OSes to build for.  Possible values
-# are valid GOOS strings from https://golang.org/doc/install/source#environment.
-if [[ $# -eq 1 ]]; then
-  readonly TARGETS="${1}"
-else
-  readonly TARGETS="linux darwin"
-fi
-
-# Do all our work in a temporary directory, then rm it when we're done.
-readonly TEMP_DIR="$(mktemp -d)"
-trap "rm -rf -- "${TEMP_DIR}"" EXIT
-
-# Check out the code into the kind of directory structure `go build` expects.
-readonly GIT_DIR="${TEMP_DIR}/src/${PKG_PATH}"
-git clone "https://${PKG_PATH}" "${GIT_DIR}"
 
 # Use the git SHA of the latest commit in the jiri repo as the version of the binaries.
 readonly VERSION="$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" log -1 --format=%H)"
 
 # These are embedded directly into jiri itself and are available through `jiri version`.
 readonly GIT_COMMIT=$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" rev-parse HEAD)
-readonly BUILD_TIME="$(date --rfc-3339=seconds)"
+readonly BUILD_TIME=$(python -c "import datetime; print datetime.datetime.utcnow().isoformat()")
 
-# For each target we support, build a jiri binary.
-for os in ${TARGETS}; do
-  if ! GOPATH="${TEMP_DIR}" GOOS="${os}" GOARCH="amd64" go build -ldflags "-X \"fuchsia.googlesource.com/jiri/version.GitCommit=${GIT_COMMIT}\" -X \"fuchsia.googlesource.com/jiri/version.BuildTime=${BUILD_TIME}\"" -a -o "${TEMP_DIR}/jiri-${os}" "${PKG_PATH}/cmd/jiri"; then
-    set +x
-    echo ""
-    echo "'go build' failed.  Ensure you have a standard, working Go toolchain"
-    echo "that is capable of cross compiling for the specified targets."
-    echo ""
-    echo "The latest packages from https://golang.org/dl should work."
-    exit 1
-  fi
-done
+set -eo pipefail; [[ "${TRACE}" ]] && set -x
 
-# Upload all the binaries.
-for os in ${TARGETS}; do
-  gsutil cp "${TEMP_DIR}/jiri-${os}" "${GS_BUCKET}/${os}-amd64/${VERSION}"
-done
+# Build libgit2
+mkdir -p "${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/libgit2/build"
+pushd "${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/libgit2/build"
+cmake -GNinja \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DCMAKE_C_FLAGS=-fPIC \
+  -DTHREADSAFE=ON \
+  -DBUILD_CLAR=OFF \
+  -DBUILD_SHARED_LIBS=OFF \
+  ..
+ninja
+popd
+
+# Build Jiri
+readonly GO_DIR="$(cd ../../.. && pwd)"
+GOPATH="${GO_DIR}" go build -ldflags "-X \"fuchsia.googlesource.com/jiri/version.GitCommit=${GIT_COMMIT}\" -X \"fuchsia.googlesource.com/jiri/version.BuildTime=${BUILD_TIME}\"" -a -o "jiri" "${PKG_PATH}/cmd/jiri"
+
+# Upload the binary
+gsutil cp "jiri" "${GS_BUCKET}/${HOST_OS}-amd64/${VERSION}"
