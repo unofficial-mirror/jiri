@@ -1112,7 +1112,11 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if err := g.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	return g.Fetch("origin", git.PruneOpt(true))
+	if strings.HasPrefix(project.Remote, "sso://") {
+		return gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
+	} else {
+		return g.Fetch("origin", git.PruneOpt(true))
+	}
 }
 
 func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
@@ -1441,7 +1445,7 @@ func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, proje
 	// fetch on updates; non-updates just perform the reset.
 	if ld.update {
 		if err := fetchAll(jirix, project); err != nil {
-			return err
+			return fmt.Errorf("Fetch failed for project(%v), %v", project.Path, err)
 		}
 	}
 
