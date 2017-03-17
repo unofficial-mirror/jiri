@@ -198,7 +198,7 @@ func (projects ProjectsByPath) Swap(i, j int) {
 	projects[i], projects[j] = projects[j], projects[i]
 }
 func (projects ProjectsByPath) Less(i, j int) bool {
-	return projects[i].Path < projects[j].Path
+	return projects[i].Path+string(filepath.Separator) < projects[j].Path+string(filepath.Separator)
 }
 
 // ToFile writes the manifest m to a file with the given filename, with
@@ -1690,6 +1690,91 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 	return nil
 }
 
+// This function creates worktree and runs create operation in parallel
+func runCreateOperations(jirix *jiri.X, ops operations) MultiError {
+	type workTree struct {
+		// dir is the top level directory in which operations will be performed
+		dir string
+		// op is an ordered list of operations that must be performed serially,
+		// affecting dir
+		ops []operation
+		// after contains a tree of work that must be performed after ops
+		after map[string]*workTree
+	}
+	head := &workTree{
+		dir:   "",
+		ops:   []operation{},
+		after: make(map[string]*workTree),
+	}
+	count := 0
+
+	for _, op := range ops {
+		if op.Kind() != "create" {
+			continue
+		}
+		count++
+
+		node := head
+		parts := strings.Split(op.Project().Path, string(filepath.Separator))
+		// walk down the file path tree, creating any work tree nodes as required
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			next, ok := node.after[part]
+			if !ok {
+				next = &workTree{
+					dir:   part,
+					ops:   []operation{},
+					after: make(map[string]*workTree),
+				}
+				node.after[part] = next
+			}
+			node = next
+		}
+		node.ops = append(node.ops, op)
+	}
+	if count == 0 {
+		return nil
+	}
+
+	workQueue := make(chan *workTree, count)
+	errs := make(chan error, count)
+	var wg sync.WaitGroup
+	processTree := func(tree *workTree) {
+		defer wg.Done()
+		for _, op := range tree.ops {
+			jirix.Logger.Debugf("%v", op)
+			if err := op.Run(jirix, false, false); err != nil {
+				errs <- fmt.Errorf("error creating project %q: %v", op.Project().Name, err)
+				return
+			}
+		}
+		for _, v := range tree.after {
+			wg.Add(1)
+			workQueue <- v
+		}
+	}
+	wg.Add(1)
+	workQueue <- head
+	for i := uint(0); i < jirix.Jobs; i++ {
+		go func() {
+			for tree := range workQueue {
+				processTree(tree)
+			}
+		}()
+	}
+	wg.Wait()
+	close(workQueue)
+	close(errs)
+
+	var multiErr MultiError
+	for err := range errs {
+		multiErr = append(multiErr, err)
+	}
+	return multiErr
+}
+
 func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, runHookTimeout uint, rebaseUntracked, snapshot bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
@@ -1744,13 +1829,16 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 			return err
 		}
 	}
-	s := jirix.NewSeq()
 	for _, op := range ops {
-		updateFn := func() error { return op.Run(jirix, rebaseUntracked, snapshot) }
-		jirix.Logger.Debugf("%v", op)
-		if err := s.Call(updateFn, "").Done(); err != nil {
-			return fmt.Errorf("error updating project %q: %v", op.Project().Name, err)
+		if op.Kind() != "create" {
+			jirix.Logger.Debugf("%v", op)
+			if err := op.Run(jirix, rebaseUntracked, snapshot); err != nil {
+				return fmt.Errorf("error updating project %q: %v, %v", op.Project().Name, op, err)
+			}
 		}
+	}
+	if err := runCreateOperations(jirix, ops); err != nil {
+		return err
 	}
 	for _, project := range ps {
 		project.writeJiriHeadFile(jirix)
@@ -1946,15 +2034,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 // identified by the given path.
 func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	metadataDir := filepath.Join(dir, jiri.ProjectMetaDir)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	defer collect.Error(func() error { return jirix.NewSeq().Chdir(cwd).Done() }, &e)
-
-	s := jirix.NewSeq()
-	if err := s.MkdirAll(metadataDir, os.FileMode(0755)).
-		Chdir(metadataDir).Done(); err != nil {
+	if err := os.MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
 		return err
 	}
 	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
@@ -2064,14 +2144,6 @@ func (op createOperation) Run(jirix *jiri.X, rebaseUntracked bool, snapshot bool
 	}
 
 	if err := gitutil.New(s).Clone(op.project.Remote, tmpDir, cache); err != nil {
-		return err
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	defer collect.Error(func() error { return s.Chdir(cwd).Done() }, &e)
-	if err := s.Chdir(tmpDir).Done(); err != nil {
 		return err
 	}
 	if err := writeMetadata(jirix, op.project, tmpDir); err != nil {
@@ -2296,7 +2368,7 @@ func (ops operations) Less(i, j int) bool {
 	if vals[0] != vals[1] {
 		return vals[0] < vals[1]
 	}
-	return ops[i].Project().Path < ops[j].Project().Path
+	return ops[i].Project().Path+string(filepath.Separator) < ops[j].Project().Path+string(filepath.Separator)
 }
 
 // Swap swaps two elements of the collection.

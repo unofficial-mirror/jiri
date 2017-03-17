@@ -219,7 +219,7 @@ func setupUniverse(t *testing.T) ([]project.Project, *jiritest.FakeJiriRoot, fun
 	}()
 
 	// Create some projects and add them to the remote manifest.
-	numProjects := 3
+	numProjects := 7
 	localProjects := []project.Project{}
 	for i := 0; i < numProjects; i++ {
 		name := projectName(i)
@@ -233,6 +233,12 @@ func setupUniverse(t *testing.T) ([]project.Project, *jiritest.FakeJiriRoot, fun
 			Remote: fake.Projects[name],
 		}
 		localProjects = append(localProjects, p)
+	}
+	localProjects[3].Path = filepath.Join(localProjects[2].Path, fmt.Sprintf("path-%d", 3))
+	localProjects[4].Path = filepath.Join(localProjects[3].Path, fmt.Sprintf("path-%d", 4))
+	localProjects[5].Path = filepath.Join(localProjects[2].Path, fmt.Sprintf("path-%d", 5))
+	localProjects[6].Path = filepath.Join(localProjects[0].Path, fmt.Sprintf("path-%d", 6))
+	for _, p := range localProjects {
 		if err := fake.AddProject(p); err != nil {
 			t.Fatal(err)
 		}
@@ -841,9 +847,15 @@ func TestCheckoutSnapshot(t *testing.T) {
 
 	// Test case when snapshot specifies latest revision
 	manifest.Projects[2].Revision = latestCommitRevs[2]
+
+	manifest.Projects[3].Revision = oldCommitRevs[3]
+	manifest.Projects[4].Revision = latestCommitRevs[4]
+	manifest.Projects[5].Revision = oldCommitRevs[5]
+	manifest.Projects[6].Revision = latestCommitRevs[6]
 	snapshotFile := filepath.Join(dir, "snapshot")
 	manifest.ToFile(fake.X, snapshotFile)
 	project.CheckoutSnapshot(fake.X, snapshotFile, false, project.DefaultHookTimeout)
+	sort.Sort(project.ProjectsByPath(localProjects))
 	for i, localProject := range localProjects {
 		gl := git.NewGit(localProject.Path)
 		rev, _ := gl.CurrentRevision()
