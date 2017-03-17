@@ -59,7 +59,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 
 	if autoupdateFlag {
 		// Try to update Jiri itself.
-		err := jiri.Update(forceAutoupdateFlag)
+		err := jiri.UpdateAndExecute(forceAutoupdateFlag)
 		if err != nil {
 			fmt.Printf("warning: automatic update failed: %v\n", err)
 		}

@@ -26,11 +26,17 @@ const (
 	JiriStorageBucket = "https://storage.googleapis.com/fuchsia-build/jiri"
 )
 
+var (
+	updateTestVersionErr = fmt.Errorf("Jiri has test version")
+	updateVersionErr     = fmt.Errorf("Jiri is already at latest version")
+	updateNotAvaiableErr = fmt.Errorf("Latest version of jiri not available")
+)
+
 // Update checks whether a new version of Jiri is available and if so,
 // it will download it and replace the current version with the new one.
 func Update(force bool) error {
 	if !force && version.GitCommit == "" {
-		return nil
+		return updateTestVersionErr
 	}
 	commit, err := getCurrentCommit(JiriRepository)
 	if err != nil {
@@ -43,7 +49,7 @@ func Update(force bool) error {
 			return err
 		}
 		if !has {
-			return nil
+			return updateNotAvaiableErr
 		}
 
 		// New version is available, download and update to it.
@@ -55,18 +61,28 @@ func Update(force bool) error {
 		if err != nil {
 			return err
 		}
-		if err := updateExecutable(path, b); err != nil {
-			return err
-		}
+		return updateExecutable(path, b)
+	}
+	return updateVersionErr
+}
 
-		// This will overwrite previous force autoupdate if present
-		os.Args = append(os.Args, "-force-autoupdate=false")
-		// Run the update version.
-		if err := syscall.Exec(path, os.Args, os.Environ()); err != nil {
+func UpdateAndExecute(force bool) error {
+	if err := Update(force); err != nil {
+		if err != updateNotAvaiableErr && err != updateVersionErr &&
+			err != updateTestVersionErr {
 			return err
+		} else {
+			return nil
 		}
 	}
-	return nil
+	// This will overwrite previous force autoupdate if present
+	os.Args = append(os.Args, "-force-autoupdate=false")
+	// Run the update version.
+	path, err := osutil.Executable()
+	if err != nil {
+		return err
+	}
+	return syscall.Exec(path, os.Args, os.Environ())
 }
 
 func getCurrentCommit(repository string) (string, error) {
