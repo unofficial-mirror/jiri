@@ -25,6 +25,9 @@ Run git grep across all projects.
 }
 
 func doGrep(jirix *jiri.X, args []string) ([]string, error) {
+	if len(args) != 1 {
+		return nil, jirix.UsageErrorf("grep requires one argument")
+	}
 	projects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return nil, err
