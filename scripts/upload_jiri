@@ -8,23 +8,11 @@
 # Upload jiri prebuilt for the current OS.
 # > ./scripts/upload_jiri
 #
-# Upload cross-compiled jiri prebuilts for the given OSes.
-# > ./scripts/upload_jiri "darwin linux freebsd"
 
 # This script uploads jiri binaries to Google storage, therefore it expects to
 # be run in an environment with the credentials necessary for uploading to
 # gs://fuchsia-build.  The binaries stored in a convention which matches the
 # expectations of bootstrap_jiri.
-
-# There's a fundamental disagreement between the way Fuchsia organizes its
-# repos and the way Go wants to organize code: Fuchsia has a /jiri repo that
-# contains all the code, Go wants the code to live in a directory structure
-# that reflects the import paths (i.e. fuchsia.googlesource.com/jiri/...).
-#
-# To deal with that, and to keep your environment tidy, this script creates a
-# temporary directory and checks out a fresh copy of jiri into that structure.
-# This has the notable side-effect of only being able to upload jiri binaries
-# from source that's actually checked in.
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly GIT_DIR="$(dirname "${SCRIPT_DIR}")"
@@ -37,29 +25,6 @@ readonly GS_BUCKET="gs://fuchsia-build/jiri"
 
 # Use the git SHA of the latest commit in the jiri repo as the version of the binaries.
 readonly VERSION="$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" log -1 --format=%H)"
-
-# These are embedded directly into jiri itself and are available through `jiri version`.
-readonly GIT_COMMIT=$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" rev-parse HEAD)
-readonly BUILD_TIME=$(python -c "import datetime; print datetime.datetime.utcnow().isoformat()")
-
-set -eo pipefail; [[ "${TRACE}" ]] && set -x
-
-# Build libgit2
-mkdir -p "${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/libgit2/build"
-pushd "${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/libgit2/build"
-cmake -GNinja \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DCMAKE_C_FLAGS=-fPIC \
-  -DTHREADSAFE=ON \
-  -DBUILD_CLAR=OFF \
-  -DBUILD_SHARED_LIBS=OFF \
-  ..
-ninja
-popd
-
-# Build Jiri
-readonly GO_DIR="$(cd ../../.. && pwd)"
-GOPATH="${GO_DIR}" go build -ldflags "-X \"fuchsia.googlesource.com/jiri/version.GitCommit=${GIT_COMMIT}\" -X \"fuchsia.googlesource.com/jiri/version.BuildTime=${BUILD_TIME}\"" -a -o "jiri" "${PKG_PATH}/cmd/jiri"
 
 # Upload the binary
 gsutil cp "jiri" "${GS_BUCKET}/${HOST_OS}-amd64/${VERSION}"
