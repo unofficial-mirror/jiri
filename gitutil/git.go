@@ -104,6 +104,11 @@ func (g *Git) Add(file string) error {
 	return g.run("add", file)
 }
 
+// Add adds a file to staging.
+func (g *Git) AddUpdatedFiles() error {
+	return g.run("add", "-u")
+}
+
 // AddRemote adds a new remote with the given name and path.
 func (g *Git) AddRemote(name, path string) error {
 	return g.run("remote", "add", name, path)

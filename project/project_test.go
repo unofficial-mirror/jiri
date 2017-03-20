@@ -453,6 +453,53 @@ func TestUpdateUniverseWithRevision(t *testing.T) {
 	}
 }
 
+func commitChanges(t *testing.T, jirix *jiri.X, dir string) {
+	scm := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
+	if err := scm.AddUpdatedFiles(); err != nil {
+		t.Fatal(err)
+	}
+	if err := scm.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestSubDirToNestedProj checks that UpdateUniverse will correctly update when
+// nested folder is converted to nested project
+func TestSubDirToNestedProj(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	folderName := "nested_folder"
+	nestedFolderPath := filepath.Join(fake.Projects[localProjects[1].Name], folderName)
+	os.MkdirAll(nestedFolderPath, os.FileMode(0755))
+	writeReadme(t, fake.X, nestedFolderPath, "nested folder")
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	os.RemoveAll(nestedFolderPath)
+	commitChanges(t, fake.X, fake.Projects[localProjects[1].Name])
+
+	// Create nested project
+	if err := fake.CreateRemoteProject(folderName); err != nil {
+		t.Fatal(err)
+	}
+	writeReadme(t, fake.X, fake.Projects[folderName], "nested folder")
+	p := project.Project{
+		Name:   folderName,
+		Path:   filepath.Join(localProjects[1].Path, folderName),
+		Remote: fake.Projects[folderName],
+	}
+	if err := fake.AddProject(p); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	checkReadme(t, fake.X, p, "nested folder")
+}
+
 // TestUpdateUniverseWithUncommitted checks that uncommitted files are not droped
 // by UpdateUniverse(). This ensures that the "git reset --hard" mechanism used
 // for pointing the master branch to a fixed revision does not lose work in

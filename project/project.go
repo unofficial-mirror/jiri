@@ -1987,6 +1987,18 @@ func (op createOperation) Run(jirix *jiri.X, rebaseUntracked bool, snapshot bool
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	tmpDirPrefix := strings.Replace(op.Project().Name, "/", ".", -1) + "-"
 
+	// Check the local file system.
+	if _, err := os.Stat(op.destination); err != nil {
+		if !runutil.IsNotExist(err) {
+			return err
+		}
+	} else {
+		if isEmpty, err := isEmpty(op.destination); err != nil {
+			return err
+		} else if !isEmpty {
+			return fmt.Errorf("cannot create %q as it already exists and is not empty", op.destination)
+		}
+	}
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
 	// root directory in an inconsistent state.
@@ -2029,15 +2041,21 @@ func (op createOperation) String() string {
 	return fmt.Sprintf("create project %q in %q and advance it to %q", op.project.Name, op.destination, fmtRevision(op.project.Revision))
 }
 
-func (op createOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
-	// Check the local file system.
-	if _, err := jirix.NewSeq().Stat(op.destination); err != nil {
-		if !runutil.IsNotExist(err) {
-			return err
-		}
-	} else if !updates.isDeleted(op.destination) {
-		return fmt.Errorf("cannot create %q as it already exists", op.destination)
+func isEmpty(path string) (bool, error) {
+	dir, err := os.Open(path)
+	if err != nil {
+		return false, err
 	}
+	defer dir.Close()
+
+	if _, err = dir.Readdirnames(1); err != nil && err == io.EOF {
+		return true, nil
+	} else {
+		return false, err
+	}
+}
+
+func (op createOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
 	return nil
 }
 
@@ -2220,9 +2238,9 @@ func (ops operations) Less(i, j int) bool {
 			vals[idx] = 0
 		case "move":
 			vals[idx] = 1
-		case "create":
-			vals[idx] = 2
 		case "update":
+			vals[idx] = 2
+		case "create":
 			vals[idx] = 3
 		case "null":
 			vals[idx] = 4
