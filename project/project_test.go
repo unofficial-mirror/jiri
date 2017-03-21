@@ -508,6 +508,62 @@ func TestSubDirToNestedProj(t *testing.T) {
 	checkReadme(t, fake.X, p, "nested folder")
 }
 
+// TestMoveNestedProjects checks that UpdateUniverse will correctly move nested projects
+func TestMoveNestedProjects(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	folderName := "nested_proj"
+	// Create nested project
+	if err := fake.CreateRemoteProject(folderName); err != nil {
+		t.Fatal(err)
+	}
+	writeReadme(t, fake.X, fake.Projects[folderName], "nested folder")
+	p := project.Project{
+		Name:   folderName,
+		Path:   filepath.Join(localProjects[1].Path, folderName),
+		Remote: fake.Projects[folderName],
+	}
+	if err := fake.AddProject(p); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	oldProjectPath := localProjects[1].Path
+	localProjects[1].Path = filepath.Join(fake.X.Root, "new-project-path")
+	p.Path = filepath.Join(localProjects[1].Path, folderName)
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := []project.Project{}
+	for _, proj := range m.Projects {
+		if proj.Name == localProjects[1].Name {
+			proj.Path = localProjects[1].Path
+		}
+		if proj.Name == p.Name {
+			proj.Path = p.Path
+		}
+		projects = append(projects, proj)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	checkReadme(t, fake.X, localProjects[1], "initial readme")
+	checkReadme(t, fake.X, p, "nested folder")
+	if err := fake.X.NewSeq().AssertDirExists(oldProjectPath).Done(); err == nil {
+		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, oldProjectPath)
+	}
+}
+
 // TestUpdateUniverseWithUncommitted checks that uncommitted files are not droped
 // by UpdateUniverse(). This ensures that the "git reset --hard" mechanism used
 // for pointing the master branch to a fixed revision does not lose work in
