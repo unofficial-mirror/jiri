@@ -94,5 +94,5 @@ ${NINJA_PROGRAM}
 popd
 
 # Build Jiri
-readonly GO_DIR="$(cd ../../.. && pwd)"
-GOPATH="${GO_DIR}" ${GO_PROGRAM:-go} build -ldflags "-X \"${PKG_PATH}/version.GitCommit=${GIT_COMMIT}\" -X \"${PKG_PATH}/version.BuildTime=${BUILD_TIME}\"" -a -o "jiri" "${PKG_PATH}/cmd/jiri"
+export GOPATH="$(cd ${GIT_DIR}/../../.. && pwd)"
+${GO_PROGRAM:-go} build -ldflags "-X \"${PKG_PATH}/version.GitCommit=${GIT_COMMIT}\" -X \"${PKG_PATH}/version.BuildTime=${BUILD_TIME}\"" -a -o "jiri" "${PKG_PATH}/cmd/jiri"
