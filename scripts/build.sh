@@ -14,7 +14,11 @@ readonly BUILD_TIME=$(python -c "import datetime; print datetime.datetime.utcnow
 
 readonly CMAKE_PROGRAM=${CMAKE_PROGRAM:-cmake}
 readonly NINJA_PROGRAM=${NINJA_PROGRAM:-ninja}
-readonly GO_PROGRAM=${GO_PROGRAM:-go}
+
+if [[ -n "${GO_PROGRAM}" ]]; then
+  readonly CMAKE_EXTRA_ARGS="-DGO_EXECUTABLE=${GO_PROGRAM}"
+  export GOROOT="$(dirname "$(dirname ${GO_PROGRAM})")"
+fi
 
 BORINGSSL_SRC="${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/boringssl"
 BORINGSSL_BUILD="${BORINGSSL_SRC}/build"
@@ -24,6 +28,7 @@ pushd "${BORINGSSL_BUILD}"
   -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS=-fPIC \
+  ${CMAKE_EXTRA_ARGS:-} \
   ..
 ${NINJA_PROGRAM}
 popd
@@ -90,4 +95,4 @@ popd
 
 # Build Jiri
 readonly GO_DIR="$(cd ../../.. && pwd)"
-GOPATH="${GO_DIR}" ${GO_PROGRAM} build -ldflags "-X \"${PKG_PATH}/version.GitCommit=${GIT_COMMIT}\" -X \"${PKG_PATH}/version.BuildTime=${BUILD_TIME}\"" -a -o "jiri" "${PKG_PATH}/cmd/jiri"
+GOPATH="${GO_DIR}" ${GO_PROGRAM:-go} build -ldflags "-X \"${PKG_PATH}/version.GitCommit=${GIT_COMMIT}\" -X \"${PKG_PATH}/version.BuildTime=${BUILD_TIME}\"" -a -o "jiri" "${PKG_PATH}/cmd/jiri"
