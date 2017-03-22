@@ -20,7 +20,8 @@ BORINGSSL_SRC="${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/boringssl"
 BORINGSSL_BUILD="${BORINGSSL_SRC}/build"
 mkdir -p -- "${BORINGSSL_BUILD}"
 pushd "${BORINGSSL_BUILD}"
-[[ -f "${BORINGSSL_BUILD}/build.ninja" ]] || cmake -GNinja \
+[[ -f "${BORINGSSL_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
+  -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS=-fPIC \
   ..
@@ -32,6 +33,7 @@ LIBSSH2_BUILD="${LIBSSH2_SRC}/build"
 mkdir -p -- "${LIBSSH2_BUILD}"
 pushd "${LIBSSH2_BUILD}"
 [[ -f "${LIBSSH2_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
+  -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DENABLE_ZLIB_COMPRESSION=ON \
@@ -50,6 +52,7 @@ CURL_BUILD="${CURL_SRC}/build"
 mkdir -p -- "${CURL_BUILD}"
 pushd "${CURL_BUILD}"
 [[ -f "${CURL_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
+  -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_CURL_EXE=OFF \
   -DBUILD_TESTING=OFF \
@@ -71,6 +74,7 @@ LIBGIT2_BUILD="${LIBGIT2_SRC}/build"
 mkdir -p "${LIBGIT2_BUILD}"
 pushd "${LIBGIT2_BUILD}"
 [[ -f "${LIBGIT2_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
+  -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS=-fPIC \
   -DTHREADSAFE=ON \
