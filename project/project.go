@@ -1116,11 +1116,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if err := g.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	if strings.HasPrefix(project.Remote, "sso://") {
-		return gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
-	} else {
-		return g.Fetch("origin", git.PruneOpt(true))
-	}
+	return gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
 }
 
 func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
