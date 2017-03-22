@@ -86,7 +86,8 @@ pushd "${LIBGIT2_BUILD}"
   -DBUILD_CLAR=OFF \
   -DBUILD_SHARED_LIBS=OFF \
   -DOPENSSL_INCLUDE_DIR="${BORINGSSL_SRC}/include" \
-  -DOPENSSL_LIBRARIES="${BORINGSSL_BUILD}/ssl/libssl.a" \
+  -DOPENSSL_SSL_LIBRARY="${BORINGSSL_BUILD}/ssl/libssl.a" \
+  -DOPENSSL_CRYPTO_LIBRARY="${BORINGSSL_BUILD}/crypto/libcrypto.a" \
   -DCURL_INCLUDE_DIRS="${CURL_BUILD}/include/curl;${CURL_SRC}/include" \
   -DCURL_LIBRARIES="${CURL_BUILD}/libcurl.a" \
   ..
