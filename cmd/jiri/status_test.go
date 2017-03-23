@@ -91,14 +91,24 @@ func expectedOutput(t *testing.T, fake *jiritest.FakeJiriRoot, localProjects []p
 		includeProject := (statusFlags.branch == "" && (includeForNotHead || includeForChanges || includeForCommits)) ||
 			(statusFlags.branch != "" && statusFlags.branch == currentBranch[i])
 		if includeProject {
-			want = fmt.Sprintf("%s%s(%s): ", want, localProject.Name, relativePaths[i])
+			gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProject.Path))
+			currentLog, err := gitLocal.OneLineLog(currentCommits[i])
+			if err != nil {
+				t.Error(err)
+			}
+			want = fmt.Sprintf("%s%s: ", want, relativePaths[i])
 			if currentCommits[i] != latestCommitRevs[i] && statusFlags.checkHead {
-				want = fmt.Sprintf("%sShould be on revision %q, but is on revision %q", want, latestCommitRevs[i], currentCommits[i])
+				log, err := gitLocal.OneLineLog(latestCommitRevs[i])
+				if err != nil {
+					t.Error(err)
+				}
+				want = fmt.Sprintf("%s\nJIRI_HEAD: %s", want, log)
+				want = fmt.Sprintf("%s\nCurrent Revision: %s", want, currentLog)
 			}
 			want = fmt.Sprintf("%s\nBranch: ", want)
 			branchmsg := currentBranch[i]
 			if branchmsg == "" {
-				branchmsg = fmt.Sprintf("DETACHED-HEAD(%s)", currentCommits[i])
+				branchmsg = fmt.Sprintf("DETACHED-HEAD(%s)", currentLog)
 			}
 			want = fmt.Sprintf("%s%s", want, branchmsg)
 			if extraCommitLogs != nil && statusFlags.commits && len(extraCommitLogs[i]) != 0 {
@@ -341,7 +351,7 @@ func executeStatus(t *testing.T, fake *jiritest.FakeJiriRoot, args ...string) st
 func writeFile(t *testing.T, jirix *jiri.X, projectDir, fileName, message string) {
 	path, perm := filepath.Join(projectDir, fileName), os.FileMode(0644)
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
-		t.Fatalf("WriteFile(%s, %s) failed: %s", path, perm, err)
+		t.Fatalf("WriteFile(%s, %d) failed: %s", path, perm, err)
 	}
 	if err := gitutil.New(jirix, gitutil.RootDirOpt(projectDir),
 		gitutil.UserNameOpt("John Doe"),

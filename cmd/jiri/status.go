@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
@@ -42,6 +43,18 @@ func init() {
 	flags.StringVar(&statusFlags.branch, "branch", "", "Display all projects only on this branch along with thier status.")
 }
 
+func colorFormatGitLog(jirix *jiri.X, log string) string {
+	strs := strings.SplitN(log, " ", 2)
+	strs[0] = jirix.Color.Green(strs[0])
+	return strings.Join(strs, " ")
+}
+
+func colorFormatGitiStatusLog(jirix *jiri.X, log string) string {
+	strs := strings.SplitN(log, " ", 2)
+	strs[0] = jirix.Color.Red(strs[0])
+	return strings.Join(strs, " ")
+}
+
 func runStatus(jirix *jiri.X, args []string) error {
 	localProjects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
@@ -74,11 +87,23 @@ func runStatus(jirix *jiri.X, args []string) error {
 			return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
 		}
 		revisionMessage := ""
+		git := gitutil.New(jirix, gitutil.RootDirOpt(state.Project.Path))
+		currentLog, err := git.OneLineLog(state.CurrentBranch.Revision)
+		if err != nil {
+			return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
+		}
+		currentLog = colorFormatGitLog(jirix, currentLog)
 		if statusFlags.checkHead {
 			if headRev == "" {
 				revisionMessage = "Can't find project in manifest, can't get revision status"
 			} else if headRev != state.CurrentBranch.Revision {
-				revisionMessage = fmt.Sprintf("Should be on revision %q, but is on revision %q", headRev, state.CurrentBranch.Revision)
+				headLog, err := git.OneLineLog(headRev)
+				if err != nil {
+					return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
+				}
+				headLog = colorFormatGitLog(jirix, headLog)
+				revisionMessage = fmt.Sprintf("\n%s: %s", jirix.Color.Yellow("JIRI_HEAD"), headLog)
+				revisionMessage = fmt.Sprintf("%s\n%s: %s", revisionMessage, jirix.Color.Yellow("Current Revision"), currentLog)
 			}
 		}
 		if statusFlags.branch != "" || changes != "" || revisionMessage != "" ||
@@ -87,21 +112,24 @@ func runStatus(jirix *jiri.X, args []string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("%s: %s", jirix.Color.Yellow("%s(%s)", localProject.Name, relativePath), revisionMessage)
+			fmt.Printf("%s: %s", jirix.Color.Yellow(relativePath), revisionMessage)
 			fmt.Println()
 			branch := state.CurrentBranch.Name
 			if branch == "" {
-				branch = fmt.Sprintf("DETACHED-HEAD(%s)", state.CurrentBranch.Revision)
+				branch = fmt.Sprintf("DETACHED-HEAD(%s)", currentLog)
 			}
 			fmt.Printf("%s: %s\n", jirix.Color.Yellow("Branch"), branch)
 			if len(extraCommits) != 0 {
 				fmt.Printf("%s: %d commit(s) not merged to remote\n", jirix.Color.Yellow("Commits"), len(extraCommits))
 				for _, commitLog := range extraCommits {
-					fmt.Println(commitLog)
+					fmt.Println(colorFormatGitLog(jirix, commitLog))
 				}
 			}
 			if changes != "" {
-				fmt.Println(changes)
+				changesArr := strings.Split(changes, "\n")
+				for _, change := range changesArr {
+					fmt.Println(colorFormatGitiStatusLog(jirix, change))
+				}
 			}
 			fmt.Println()
 		}
