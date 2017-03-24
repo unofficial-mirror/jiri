@@ -9,7 +9,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/git"
-	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/tool"
 )
 
@@ -33,7 +32,6 @@ type ProjectState struct {
 
 func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch chan<- error) {
 	var err error
-	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(state.Project.Path))
 	g := git.NewGit(state.Project.Path)
 	branches, err := g.GetAllBranchesInfo()
 	if err != nil {
@@ -72,14 +70,14 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 		}
 	}
 	if checkDirty {
-		state.HasUncommitted, err = scm.HasUncommittedChanges()
+		state.HasUncommitted, err = g.HasUncommittedChanges()
 		if err != nil {
-			ch <- err
+			ch <- fmt.Errorf("Cannot get uncommited changes for project %q: %v", state.Project.Name, err)
 			return
 		}
-		state.HasUntracked, err = scm.HasUntrackedFiles()
+		state.HasUntracked, err = g.HasUntrackedFiles()
 		if err != nil {
-			ch <- err
+			ch <- fmt.Errorf("Cannot get untracked changes for project %q: %v", state.Project.Name, err)
 			return
 		}
 	}

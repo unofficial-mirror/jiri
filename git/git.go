@@ -97,6 +97,125 @@ type Branch struct {
 	Tracking *Reference
 }
 
+// CurrentRevisionForRef gets current rev for ref/branch/tags
+func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return "", err
+	}
+	defer repo.Free()
+	if obj, err := repo.RevparseSingle(ref); err != nil {
+		return "", err
+	} else {
+		defer obj.Free()
+		if obj.Type() == git2go.ObjectTag {
+			tag, err := obj.AsTag()
+			if err != nil {
+				return "", err
+			}
+			defer tag.Free()
+			return tag.TargetId().String(), nil
+		}
+		return obj.Id().String(), nil
+	}
+}
+
+func (g *Git) HasUntrackedFiles() (bool, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return false, err
+	}
+	opts := &git2go.StatusOptions{}
+	opts.Show = git2go.StatusShowIndexAndWorkdir
+	opts.Flags = git2go.StatusOptIncludeUntracked
+
+	statusList, err := repo.StatusList(opts)
+	if err != nil {
+		return false, err
+	}
+
+	defer statusList.Free()
+	entryCount, err := statusList.EntryCount()
+	if err != nil {
+		return false, err
+	}
+	for i := 0; i < entryCount; i++ {
+		entry, err := statusList.ByIndex(i)
+		if err != nil {
+			return false, err
+		}
+		if (entry.Status & git2go.StatusWtNew) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+func (g *Git) HasUncommittedChanges() (bool, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return false, err
+	}
+	opts := &git2go.StatusOptions{}
+	opts.Show = git2go.StatusShowIndexAndWorkdir
+
+	statusList, err := repo.StatusList(opts)
+	if err != nil {
+		return false, err
+	}
+
+	defer statusList.Free()
+	entryCount, err := statusList.EntryCount()
+	if err != nil {
+		return false, err
+	}
+	uncommitedFlag := git2go.StatusWtModified | git2go.StatusWtDeleted |
+		git2go.StatusWtTypeChange | git2go.StatusIndexModified |
+		git2go.StatusIndexNew | git2go.StatusIndexDeleted |
+		git2go.StatusIndexTypeChange | git2go.StatusConflicted
+
+	for i := 0; i < entryCount; i++ {
+		entry, err := statusList.ByIndex(i)
+		if err != nil {
+			return false, err
+		}
+		if (entry.Status & uncommitedFlag) > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// GetBranches returns a slice of the local branches of the current
+// repository, followed by the name of the current branch.
+func (g *Git) GetBranches() ([]string, string, error) {
+	branches, current := []string{}, ""
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return nil, "", err
+	}
+	defer repo.Free()
+	bi, err := repo.NewBranchIterator(git2go.BranchLocal)
+	if err != nil {
+		return nil, "", err
+	}
+	err = bi.ForEach(func(b *git2go.Branch, bt git2go.BranchType) error {
+		isHead, err := b.IsHead()
+		if err != nil {
+			return err
+		}
+		name, err := b.Name()
+		if err != nil {
+			return err
+		}
+		branches = append(branches, name)
+		if isHead {
+			current = name
+		}
+		return nil
+	})
+	return branches, current, nil
+}
+
 func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 	var branches []Branch
 	repo, err := git2go.OpenRepository(g.rootDir)
@@ -104,14 +223,11 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 		return nil, err
 	}
 	defer repo.Free()
-	bi, err := repo.NewBranchIterator(git2go.BranchAll)
+	bi, err := repo.NewBranchIterator(git2go.BranchLocal)
 	if err != nil {
 		return nil, err
 	}
 	err = bi.ForEach(func(b *git2go.Branch, bt git2go.BranchType) error {
-		if bt == git2go.BranchRemote {
-			return nil
-		}
 		isHead, err := b.IsHead()
 		if err != nil {
 			return err
@@ -136,7 +252,7 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 		} else if u != nil {
 			defer u.Free()
 			branch.Tracking = &Reference{
-				Name: u.Shorthand(),
+				Name:     u.Shorthand(),
 				Revision: u.Target().String(),
 			}
 		}

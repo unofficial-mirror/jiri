@@ -370,19 +370,6 @@ func (g *Git) IsOnBranch() bool {
 	return err == nil
 }
 
-// CurrentRevisionOfBranch returns the current revision of the given branch.
-func (g *Git) CurrentRevisionOfBranch(branch string) (string, error) {
-	// Using rev-list instead of rev-parse as latter doesn't work well with tag
-	out, err := g.runOutput("rev-list", "-n", "1", branch)
-	if err != nil {
-		return "", err
-	}
-	if got, want := len(out), 1; got != want {
-		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
-	}
-	return out[0], nil
-}
-
 func (g *Git) CherryPick(rev string) error {
 	err := g.run("cherry-pick", rev)
 	return err
@@ -508,26 +495,6 @@ func (g *Git) Grep(query string) ([]string, error) {
 	// TODO(ianloic): handle different pattern types (-i, -P, -E, etc)
 	// TODO(ianloic): handle different response types (--full-name, -v, --name-only, etc)
 	return g.runOutput("grep", query)
-}
-
-// HasUncommittedChanges checks whether the current branch contains
-// any uncommitted changes.
-func (g *Git) HasUncommittedChanges() (bool, error) {
-	out, err := g.FilesWithUncommittedChanges()
-	if err != nil {
-		return false, err
-	}
-	return len(out) != 0, nil
-}
-
-// HasUntrackedFiles checks whether the current branch contains any
-// untracked files.
-func (g *Git) HasUntrackedFiles() (bool, error) {
-	out, err := g.UntrackedFiles()
-	if err != nil {
-		return false, err
-	}
-	return len(out) != 0, nil
 }
 
 // Init initializes a new git repository.
@@ -818,15 +785,6 @@ func (g *Git) TopLevel() (string, error) {
 // TrackedFiles returns the list of files that are tracked.
 func (g *Git) TrackedFiles() ([]string, error) {
 	out, err := g.runOutput("ls-files")
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// UntrackedFiles returns the list of files that are not tracked.
-func (g *Git) UntrackedFiles() ([]string, error) {
-	out, err := g.runOutput("ls-files", "--others", "--directory", "--exclude-standard")
 	if err != nil {
 		return nil, err
 	}

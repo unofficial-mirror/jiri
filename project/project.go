@@ -545,14 +545,14 @@ func (p *Project) CacheDirPath(jirix *jiri.X) (string, error) {
 }
 
 func (p *Project) writeJiriHeadFile(jirix *jiri.X) error {
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
+	g := git.NewGit(p.Path)
 	fn := filepath.Join(p.Path, ".git", "JIRI_HEAD")
 	head := "ref: refs/remotes/origin/master"
 	var err error
 	if p.Revision != "" {
-		head, err = git.CurrentRevisionOfBranch(p.Revision)
+		head, err = g.CurrentRevisionForRef(p.Revision)
 		if err != nil {
-			return err
+			return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", p.Revision, p.Name, err)
 		}
 	} else if p.RemoteBranch != "" {
 		head = "ref: refs/remotes/origin/" + p.RemoteBranch
@@ -1008,22 +1008,23 @@ func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool
 // resetLocalProject checks out the detached_head, cleans up untracked files
 // and uncommitted changes, and optionally deletes all the branches except master.
 func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches bool) error {
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(local.Path))
+	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(local.Path))
+	g := git.NewGit(local.Path)
 	headRev, err := GetHeadRevision(jirix, remote)
 	if err != nil {
 		return err
 	} else {
-		if headRev, err = git.CurrentRevisionOfBranch(headRev); err != nil {
-			return err
+		if headRev, err = g.CurrentRevisionForRef(headRev); err != nil {
+			return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", headRev, local.Name, err)
 		}
 	}
 	if local.Revision != headRev {
-		if err := git.CheckoutBranch(headRev, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+		if err := scm.CheckoutBranch(headRev, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
 	// Cleanup changes.
-	if err := git.RemoveUntrackedFiles(); err != nil {
+	if err := scm.RemoveUntrackedFiles(); err != nil {
 		return err
 	}
 	if !cleanupBranches {
@@ -1031,12 +1032,12 @@ func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches boo
 	}
 
 	// Delete all the other branches.
-	branches, _, err := git.GetBranches()
+	branches, _, err := g.GetBranches()
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot get branches for project %q: %v", local.Name, err)
 	}
 	for _, branch := range branches {
-		if err := git.DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
+		if err := scm.DeleteBranch(branch, gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -1185,17 +1186,18 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 
 func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
 
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
-	changes, err := git.HasUncommittedChanges()
+	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	g := git.NewGit(project.Path)
+	changes, err := g.HasUncommittedChanges()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Cannot get uncommited changes for project %q", project.Name, err)
 	}
 	if changes {
 		return false, nil
 	}
-	err = git.Rebase(branch)
+	err = scm.Rebase(branch)
 	if err != nil {
-		err := git.RebaseAbort()
+		err := scm.RebaseAbort()
 		return false, err
 	}
 	return true, nil
@@ -1205,12 +1207,13 @@ func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
 // else it rebases current branch onto its tracking branch
 func syncProjectMaster(jirix *jiri.X, project Project, rebaseUntracked bool, snapshot bool) error {
 	s := jirix.NewSeq()
-	git := gitutil.New(s, gitutil.RootDirOpt(project.Path))
-	if !git.IsOnBranch() || snapshot {
-		if changes, err := git.HasUncommittedChanges(); err != nil {
-			return err
+	scm := gitutil.New(s, gitutil.RootDirOpt(project.Path))
+	g := git.NewGit(project.Path)
+	if !scm.IsOnBranch() || snapshot {
+		if changes, err := g.HasUncommittedChanges(); err != nil {
+			return fmt.Errorf("Cannot get uncommited changes for project %q", project.Name, err)
 		} else if changes {
-			jirix.Logger.Errorf("NOTE: %q(%v) contains uncommited changes.", project.Name, project.Path)
+			jirix.Logger.Errorf("NOTE: %v(%v) contains uncommited changes.", project.Name, project.Path)
 			jirix.Logger.Errorf("Commit or discard the changes and try again.")
 			return nil
 		}
@@ -1224,11 +1227,11 @@ func syncProjectMaster(jirix *jiri.X, project Project, rebaseUntracked bool, sna
 		}
 		return nil
 	} else {
-		branch, err := git.CurrentBranchName()
+		branch, err := scm.CurrentBranchName()
 		if err != nil {
 			return err
 		}
-		trackingBranch, err := git.TrackingBranchName()
+		trackingBranch, err := scm.TrackingBranchName()
 		if err != nil {
 			return err
 		}
@@ -2115,18 +2118,18 @@ func (op deleteOperation) Run(jirix *jiri.X, rebaseUntracked bool, snapshot bool
 	if op.gc {
 		// Never delete projects with non-master branches, uncommitted
 		// work, or untracked content.
-		git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(op.project.Path))
-		branches, _, err := git.GetBranches()
+		g := git.NewGit(op.project.Path)
+		branches, _, err := g.GetBranches()
 		if err != nil {
-			return err
+			return fmt.Errorf("Cannot get branches for project %q: %v", op.Project().Name, err)
 		}
-		uncommitted, err := git.HasUncommittedChanges()
+		uncommitted, err := g.HasUncommittedChanges()
 		if err != nil {
-			return err
+			return fmt.Errorf("Cannot get uncommited changes for project %q", op.Project().Name, err)
 		}
-		untracked, err := git.HasUntrackedFiles()
+		untracked, err := g.HasUntrackedFiles()
 		if err != nil {
-			return err
+			return fmt.Errorf("Cannot get untracked changes for project %q: %v", op.Project().Name, err)
 		}
 		extraBranches := false
 		for _, branch := range branches {

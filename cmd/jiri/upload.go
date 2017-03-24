@@ -61,11 +61,12 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	if remoteBranch == "" {
 		return fmt.Errorf("Current branch is un-tracked or tracks a local un-tracked branch.")
 	}
+	g := git.NewGit(p.Path)
 	if uploadRebaseFlag {
-		if changes, err := scm.HasUncommittedChanges(); err != nil {
-			return err
+		if changes, err := g.HasUncommittedChanges(); err != nil {
+			return fmt.Errorf("Cannot get uncommited changes for project %q", p.Name, err)
 		} else if changes {
-			return fmt.Errorf("project has uncommited changes, please commit them or stash them. Cannot rebase before pushing.")
+			return fmt.Errorf("Project has uncommited changes, please commit them or stash them. Cannot rebase before pushing.")
 		}
 	}
 
@@ -107,7 +108,6 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	}
 
 	if uploadRebaseFlag {
-		g := git.NewGit(p.Path)
 		if err := g.Fetch("origin", git.PruneOpt(true)); err != nil {
 			return err
 		}

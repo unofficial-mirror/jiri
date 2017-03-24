@@ -23,15 +23,11 @@ pkg gitutil, method (*Git) CreateAndCheckoutBranch(string) error
 pkg gitutil, method (*Git) CreateBranch(string) error
 pkg gitutil, method (*Git) CreateBranchWithUpstream(string, string) error
 pkg gitutil, method (*Git) CurrentBranchName() (string, error)
-pkg gitutil, method (*Git) CurrentRevisionOfBranch(string) (string, error)
 pkg gitutil, method (*Git) DeleteBranch(string, ...DeleteBranchOpt) error
 pkg gitutil, method (*Git) DirExistsOnBranch(string, string) bool
 pkg gitutil, method (*Git) Fetch(string, ...FetchOpt) error
 pkg gitutil, method (*Git) FetchRefspec(string, string, ...FetchOpt) error
 pkg gitutil, method (*Git) FilesWithUncommittedChanges() ([]string, error)
-pkg gitutil, method (*Git) GetBranches(...string) ([]string, string, error)
-pkg gitutil, method (*Git) HasUncommittedChanges() (bool, error)
-pkg gitutil, method (*Git) HasUntrackedFiles() (bool, error)
 pkg gitutil, method (*Git) Init(string) error
 pkg gitutil, method (*Git) IsFileCommitted(string) bool
 pkg gitutil, method (*Git) LatestCommitMessage() (string, error)
@@ -54,7 +50,6 @@ pkg gitutil, method (*Git) StashPop() error
 pkg gitutil, method (*Git) StashSize() (int, error)
 pkg gitutil, method (*Git) TopLevel() (string, error)
 pkg gitutil, method (*Git) TrackedFiles() ([]string, error)
-pkg gitutil, method (*Git) UntrackedFiles() ([]string, error)
 pkg gitutil, method (*Git) Version() (int, int, error)
 pkg gitutil, method (GitError) Error() string
 pkg gitutil, type AuthorDateOpt string

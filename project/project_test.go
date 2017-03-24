@@ -38,7 +38,7 @@ func checkReadme(t *testing.T, jirix *jiri.X, p project.Project, message string)
 }
 
 func checkJiriHead(t *testing.T, jirix *jiri.X, p project.Project) {
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
+	g := git.NewGit(p.Path)
 
 	headFile := filepath.Join(p.Path, ".git", "JIRI_HEAD")
 	data, err := ioutil.ReadFile(headFile)
@@ -46,9 +46,9 @@ func checkJiriHead(t *testing.T, jirix *jiri.X, p project.Project) {
 		t.Fatalf("ReadFile(%v) failed: %v", headFile, err)
 	}
 	headFileContents := string(data)
-	headFileCommit, err := git.CurrentRevisionOfBranch(headFileContents)
+	headFileCommit, err := g.CurrentRevisionForRef(headFileContents)
 	if err != nil {
-		t.Fatalf("git.CurrentRevisionOfBranch failed: %v", err)
+		t.Fatalf("CurrentRevisionForRef failed: %v", err)
 	}
 
 	projectRevision := p.Revision
@@ -59,9 +59,9 @@ func checkJiriHead(t *testing.T, jirix *jiri.X, p project.Project) {
 			projectRevision = "origin/" + p.RemoteBranch
 		}
 	}
-	revisionCommit, err := git.CurrentRevisionOfBranch(projectRevision)
+	revisionCommit, err := g.CurrentRevisionForRef(projectRevision)
 	if err != nil {
-		t.Fatalf("git.CurrentRevisionOfBranch failed: %v", err)
+		t.Fatalf("CurrentRevisionForRef failed: %v", err)
 	}
 
 	if revisionCommit != headFileCommit {
