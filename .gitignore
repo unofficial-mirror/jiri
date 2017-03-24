@@ -1,5 +1,7 @@
 /.jiri
 /infra/.recipe_deps
+/vendor/
+/tags
 
 # Ignore the binary
 /jiri
