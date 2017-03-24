@@ -1071,39 +1071,83 @@ func ProjectAtPath(jirix *jiri.X, path string) (Project, error) {
 // findLocalProjects scans the filesystem for all projects.  Note that project
 // directories can be nested recursively.
 func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
-	isLocal, err := isLocalProject(jirix, path)
-	if err != nil {
-		return err
-	}
-	if isLocal {
-		project, err := ProjectAtPath(jirix, path)
-		if err != nil {
-			return err
-		}
-		if path != project.Path {
-			jirix.Logger.Errorf("NOTE: project %v has path %v", project.Name, project.Path)
-			jirix.Logger.Errorf("but was found in %v.", path)
-			jirix.Logger.Errorf("jiri will treat it as a stale project. To remove this warning")
-			jirix.Logger.Errorf("please delete this or move it out of your root folder")
-			return nil
-		}
-		if p, ok := projects[project.Key()]; ok {
-			return fmt.Errorf("name conflict: both %v and %v contain project with key %v", p.Path, project.Path, project.Key())
-		}
-		projects[project.Key()] = project
-	}
-
-	// Recurse into all the sub directories.
-	fileInfos, err := jirix.NewSeq().ReadDir(path)
-	if err != nil {
-		return err
-	}
-	for _, fileInfo := range fileInfos {
-		if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
-			if err := findLocalProjects(jirix, filepath.Join(path, fileInfo.Name()), projects); err != nil {
-				return err
+	log := make(chan []string, 1)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for strs := range log {
+			for _, str := range strs {
+				jirix.Logger.Errorf("%s", str)
 			}
 		}
+	}()
+	errs := make(chan error, 1)
+	multiErr := make(MultiError, 0)
+	go func() {
+		defer wg.Done()
+		for err := range errs {
+			multiErr = append(multiErr, err)
+		}
+	}()
+	var pwg sync.WaitGroup
+	limit := make(chan struct{}, jirix.Jobs)
+	var processPath func(path string)
+	projectsMutex := &sync.Mutex{}
+	processPath = func(path string) {
+		defer pwg.Done()
+		limit <- struct{}{}
+		defer func() { <-limit }()
+		isLocal, err := isLocalProject(jirix, path)
+		if err != nil {
+			errs <- fmt.Errorf("Error while processing path %q: %v", path, err)
+			return
+		}
+		if isLocal {
+			project, err := ProjectAtPath(jirix, path)
+			if err != nil {
+				errs <- fmt.Errorf("Error while processing path %q: %v", path, err)
+				return
+			}
+			if path != project.Path {
+				logs := []string{fmt.Sprintf("NOTE: project %v has path %v", project.Name, project.Path),
+					fmt.Sprintf("but was found in %v.", path),
+					fmt.Sprintf("jiri will treat it as a stale project. To remove this warning"),
+					fmt.Sprintf("please delete this or move it out of your root folder")}
+				log <- logs
+				return
+			}
+			projectsMutex.Lock()
+			if p, ok := projects[project.Key()]; ok {
+				projectsMutex.Unlock()
+				errs <- fmt.Errorf("name conflict: both %v and %v contain project with key %v", p.Path, project.Path, project.Key())
+				return
+			}
+			projects[project.Key()] = project
+			projectsMutex.Unlock()
+		}
+
+		// Recurse into all the sub directories.
+		fileInfos, err := ioutil.ReadDir(path)
+		if err != nil {
+			errs <- fmt.Errorf("cannot read dir %q: %v", path, err)
+			return
+		}
+		for _, fileInfo := range fileInfos {
+			if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
+				pwg.Add(1)
+				go processPath(filepath.Join(path, fileInfo.Name()))
+			}
+		}
+	}
+	pwg.Add(1)
+	processPath(path)
+	pwg.Wait()
+	close(errs)
+	close(log)
+	wg.Wait()
+	if len(multiErr) != 0 {
+		return multiErr
 	}
 	return nil
 }
