@@ -2040,6 +2040,10 @@ func (op createOperation) Run(jirix *jiri.X, rebaseUntracked bool, snapshot bool
 			return err
 		} else if !isEmpty {
 			return fmt.Errorf("cannot create %q as it already exists and is not empty", op.destination)
+		} else {
+			if err := os.RemoveAll(op.destination); err != nil {
+				return fmt.Errorf("Not able to delete %q", op.destination)
+			}
 		}
 	}
 	// Create a temporary directory for the initial setup of the
