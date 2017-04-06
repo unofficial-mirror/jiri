@@ -1427,7 +1427,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 			// The remote manifest project doesn't exist locally.  Clone it into a
 			// temp directory, and add it to ld.localProjects.
 			if ld.TmpDir == "" {
-				if ld.TmpDir, err = jirix.NewSeq().TempDir("", "jiri-load"); err != nil {
+				if ld.TmpDir, err = ioutil.TempDir("", "jiri-load"); err != nil {
 					return fmt.Errorf("TempDir() failed: %v", err)
 				}
 			}
