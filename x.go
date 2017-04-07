@@ -96,7 +96,6 @@ var (
 	quietVerboseFlag bool
 	debugVerboseFlag bool
 	traceVerboseFlag bool
-	allVerboseFlag   bool
 )
 
 func init() {
@@ -107,7 +106,6 @@ func init() {
 	flag.BoolVar(&quietVerboseFlag, "q", false, "Same as -quiet")
 	flag.BoolVar(&debugVerboseFlag, "v", false, "Print debug level output.")
 	flag.BoolVar(&traceVerboseFlag, "vv", false, "Print trace level output.")
-	flag.BoolVar(&allVerboseFlag, "vvv", false, "Print all output.")
 }
 
 // NewX returns a new execution environment, given a cmdline env.
@@ -118,8 +116,6 @@ func NewX(env *cmdline.Env) (*X, error) {
 	loggerLevel := log.InfoLevel
 	if quietVerboseFlag {
 		loggerLevel = log.WarningLevel
-	} else if allVerboseFlag {
-		loggerLevel = log.AllLevel
 	} else if traceVerboseFlag {
 		loggerLevel = log.TraceLevel
 	} else if debugVerboseFlag {
