@@ -1445,7 +1445,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 			p.Revision = "HEAD"
 			p.RemoteBranch = remote.RemoteBranch
 			if err := checkoutHeadRevision(jirix, p, false); err != nil {
-				return err
+				return fmt.Errorf("Not able to checkout head for %s(%s): %v", p.Name, p.Path, err)
 			}
 			ld.localProjects[key] = p
 		}
@@ -1551,7 +1551,7 @@ func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, proje
 		return nil
 	}, &e)
 	if err := checkoutHeadRevision(jirix, project, false); err != nil {
-		return err
+		return fmt.Errorf("Not able to checkout head for %s(%s): %v", project.Name, project.Path, err)
 	}
 	return ld.Load(jirix, root, file, cycleKey, localManifest)
 }
