@@ -20,6 +20,18 @@ if [[ -n "${GO_PROGRAM}" ]]; then
   export GOROOT="$(dirname "$(dirname ${GO_PROGRAM})")"
 fi
 
+ZLIB_SRC="${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/zlib"
+ZLIB_BUILD="${ZLIB_SRC}/build"
+mkdir -p -- "${ZLIB_BUILD}"
+pushd "${ZLIB_BUILD}"
+[[ -f "${BORINGSSL_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
+  -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_FLAGS=-fPIC \
+  ..
+${NINJA_PROGRAM} zlibstatic
+popd
+
 BORINGSSL_SRC="${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/boringssl"
 BORINGSSL_BUILD="${BORINGSSL_SRC}/build"
 mkdir -p -- "${BORINGSSL_BUILD}"
@@ -90,6 +102,8 @@ pushd "${LIBGIT2_BUILD}"
   -DOPENSSL_CRYPTO_LIBRARY="${BORINGSSL_BUILD}/crypto/libcrypto.a" \
   -DCURL_INCLUDE_DIRS="${CURL_BUILD}/include/curl;${CURL_SRC}/include" \
   -DCURL_LIBRARIES="${CURL_BUILD}/libcurl.a" \
+  -DZLIB_INCLUDE_DIR="${ZLIB_SRC};${ZLIB_BUILD}" \
+  -DZLIB_LIBRARY_RELEASE="${ZLIB_BUILD}/libz.a" \
   ..
 ${NINJA_PROGRAM}
 popd
