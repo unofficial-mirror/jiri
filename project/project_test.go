@@ -96,7 +96,7 @@ func commitFile(t *testing.T, jirix *jiri.X, dir, file, msg string) {
 	if err := jirix.NewSeq().Chdir(dir).Done(); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(file, msg); err != nil {
+	if err := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(file, msg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -147,7 +147,7 @@ func TestLocalProjects(t *testing.T) {
 
 		// Initialize empty git repository.  The commit is necessary, otherwise
 		// "git rev-parse master" fails.
-		git := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(path))
+		git := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(path))
 		if err := git.Init(path); err != nil {
 			t.Fatal(err)
 		}
@@ -476,7 +476,7 @@ func TestUpdateUniverseWithRevision(t *testing.T) {
 }
 
 func commitChanges(t *testing.T, jirix *jiri.X, dir string) {
-	scm := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
+	scm := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
 	if err := scm.AddUpdatedFiles(); err != nil {
 		t.Fatal(err)
 	}
@@ -776,7 +776,6 @@ func TestUpdateUniverseNewProjectSamePath(t *testing.T) {
 func TestUpdateUniverseRemoteBranch(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
@@ -784,7 +783,7 @@ func TestUpdateUniverseRemoteBranch(t *testing.T) {
 	// Commit to master branch of a project 1.
 	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
 	// Create and checkout a new branch of project 1 and make a new commit.
-	git := gitutil.New(s, gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	git := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
 	if err := git.CreateAndCheckoutBranch("non-master"); err != nil {
 		t.Fatal(err)
 	}
@@ -818,18 +817,17 @@ func TestUpdateUniverseRemoteBranch(t *testing.T) {
 func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
 
-	gitRemote := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	gitRemote := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
 	gr := git.NewGit(fake.Projects[localProjects[1].Name])
 	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
 		t.Fatal(err)
 	}
 
-	gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+	gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
 	gl := git.NewGit(localProjects[1].Path)
 	if err := gl.Fetch("origin", git.PruneOpt(true)); err != nil {
 		t.Fatal(err)
@@ -881,7 +879,6 @@ func TestCheckoutSnapshotFileSystem(t *testing.T) {
 func testCheckoutSnapshot(t *testing.T, testURL bool) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	var oldCommitRevs []string
 	var latestCommitRevs []string
 
@@ -900,7 +897,7 @@ func testCheckoutSnapshot(t *testing.T, testURL bool) {
 	}
 
 	for i, localProject := range localProjects {
-		gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
 		gl := git.NewGit(localProject.Path)
 		rev, _ := gl.CurrentRevision()
 		if rev != latestCommitRevs[i] {
@@ -967,18 +964,17 @@ func testCheckoutSnapshot(t *testing.T, testURL bool) {
 func TestUpdateWhenRemoteChangesMerged(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
 
-	gitRemote := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	gitRemote := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
 	gr := git.NewGit(fake.Projects[localProjects[1].Name])
 	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
 		t.Fatal(err)
 	}
 
-	gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+	gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
 	gl := git.NewGit(localProjects[1].Path)
 	if err := gl.Fetch("origin", git.PruneOpt(true)); err != nil {
 		t.Fatal(err)

@@ -50,7 +50,7 @@ func runUpload(jirix *jiri.X, _ []string) error {
 	if err != nil {
 		return err
 	}
-	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(p.Path))
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
 	if !scm.IsOnBranch() {
 		return fmt.Errorf("The project is not on any branch.")
 	}
@@ -97,7 +97,7 @@ func runUpload(jirix *jiri.X, _ []string) error {
 		Verify:       uploadVerifyFlag,
 		Topic:        uploadTopicFlag,
 	}
-	branch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	branch, err := gitutil.New(jirix).CurrentBranchName()
 	if err != nil {
 		return err
 	}

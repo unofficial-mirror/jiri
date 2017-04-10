@@ -36,11 +36,10 @@ func createCommits(t *testing.T, fake *jiritest.FakeJiriRoot, localProjects []pr
 	var file1CommitRevs []string
 	var latestCommitRevs []string
 	var relativePaths []string
-	s := fake.X.NewSeq()
 	for i, localProject := range localProjects {
 		setDummyUser(t, fake.X, fake.Projects[localProject.Name])
 		gr := git.NewGit(fake.Projects[localProject.Name])
-		gitRemote := gitutil.New(s, gitutil.RootDirOpt(fake.Projects[localProject.Name]))
+		gitRemote := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[localProject.Name]))
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file1"+strconv.Itoa(i), "file1"+strconv.Itoa(i))
 		gitRemote.CreateAndCheckoutBranch("file-1")
 		gitRemote.CheckoutBranch("master")
@@ -135,9 +134,9 @@ func TestStatus(t *testing.T) {
 	}
 
 	// Test when HEAD is on different revsion
-	gitLocal := gitutil.New(s, gitutil.RootDirOpt(localProjects[1].Path))
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
 	gitLocal.CheckoutBranch("HEAD~1")
-	gitLocal = gitutil.New(s, gitutil.RootDirOpt(localProjects[2].Path))
+	gitLocal = gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[2].Path))
 	gitLocal.CheckoutBranch("file-2")
 	got = executeStatus(t, fake, "")
 	currentCommits := []string{latestCommitRevs[0], file2CommitRevs[1], file1CommitRevs[2]}
@@ -186,7 +185,7 @@ func statusFlagsTest(t *testing.T) {
 	}
 	gitLocals := make([]*gitutil.Git, numProjects)
 	for i, localProject := range localProjects {
-		gitLocal := gitutil.New(s, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
 		gitLocals[i] = gitLocal
 	}
 
@@ -317,13 +316,13 @@ func writeFile(t *testing.T, jirix *jiri.X, projectDir, fileName, message string
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", path, perm, err)
 	}
-	if err := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(projectDir)).CommitFile(path, message); err != nil {
+	if err := gitutil.New(jirix, gitutil.RootDirOpt(projectDir)).CommitFile(path, message); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func setDummyUser(t *testing.T, jirix *jiri.X, projectDir string) {
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(projectDir))
+	git := gitutil.New(jirix, gitutil.RootDirOpt(projectDir))
 	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 		t.Fatalf("%v", err)
 	}

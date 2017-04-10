@@ -81,7 +81,7 @@ func init() {
 }
 
 func getCommitMessageFileName(jirix *jiri.X, branch string) (string, error) {
-	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
+	topLevel, err := gitutil.New(jirix).TopLevel()
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,7 @@ func getCommitMessageFileName(jirix *jiri.X, branch string) (string, error) {
 }
 
 func getDependencyPathFileName(jirix *jiri.X, branch string) (string, error) {
-	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
+	topLevel, err := gitutil.New(jirix).TopLevel()
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +149,7 @@ stops. Otherwise, it deletes the given branches.
 }
 
 func cleanupCL(jirix *jiri.X, branches []string) (e error) {
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	originalBranch, err := git.CurrentBranchName()
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func cleanupCL(jirix *jiri.X, branches []string) (e error) {
 }
 
 func cleanupBranch(jirix *jiri.X, branch string) error {
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	if err := git.CheckoutBranch(branch); err != nil {
 		return err
 	}
@@ -447,7 +447,7 @@ func initForMultiPart(jirix *jiri.X) (*multiPart, error) {
 // The keys are returned, sorted, to avoid the caller having to recreate
 // the them by iterating over the map.
 func projectStates(jirix *jiri.X, allowdirty bool) (map[project.ProjectKey]*project.ProjectState, project.ProjectKeys, error) {
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	branch, err := git.CurrentBranchName()
 	if err != nil {
 		return nil, nil, err
@@ -628,7 +628,7 @@ func runCLUpload(jirix *jiri.X, _ []string) error {
 	if err := runCLUploadCurrent(jirix, []string{}); err != nil {
 		return err
 	}
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	branch, err := git.CurrentBranchName()
 	if err != nil {
 		return err
@@ -659,7 +659,7 @@ func runCLUpload(jirix *jiri.X, _ []string) error {
 func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
 	// Check that working dir exist on remote branch.  Otherwise checking out
 	// remote branch will break the users working dir.
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -760,7 +760,7 @@ func parseEmails(value string) []string {
 // dependent CLs leading to (but not including) the current branch
 // have been exported to Gerrit.
 func checkDependents(jirix *jiri.X) (e error) {
-	originalBranch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	originalBranch, err := gitutil.New(jirix).CurrentBranchName()
 	if err != nil {
 		return err
 	}
@@ -815,7 +815,7 @@ func newReview(jirix *jiri.X, git *gitutil.Git, project project.Project, opts ge
 		return nil, err
 	}
 
-	branch, err := gitutil.New(jirix.NewSeq()).CurrentBranchName()
+	branch, err := gitutil.New(jirix).CurrentBranchName()
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +896,7 @@ func (review *review) confirmFlagChanges() (bool, error) {
 
 // cleanup cleans up after the review.
 func (review *review) cleanup(stashed bool) error {
-	git := gitutil.New(review.jirix.NewSeq())
+	git := gitutil.New(review.jirix)
 	if err := git.CheckoutBranch(review.CLOpts.Branch); err != nil {
 		return err
 	}
@@ -1094,7 +1094,7 @@ func (review *review) defaultCommitMessage() (string, error) {
 		commitMessages = string(msg)
 		err = tmpErr
 	} else {
-		commitMessages, err = gitutil.New(review.jirix.NewSeq()).CommitMessages(review.CLOpts.Branch, review.reviewBranch)
+		commitMessages, err = gitutil.New(review.jirix).CommitMessages(review.CLOpts.Branch, review.reviewBranch)
 	}
 	if err != nil {
 		return "", err
@@ -1115,7 +1115,7 @@ func (review *review) defaultCommitMessage() (string, error) {
 // ensureChangeID makes sure that the last commit contains a Change-Id, and
 // returns an error if it does not.
 func (review *review) ensureChangeID() error {
-	latestCommitMessage, err := gitutil.New(review.jirix.NewSeq()).LatestCommitMessage()
+	latestCommitMessage, err := gitutil.New(review.jirix).LatestCommitMessage()
 	if err != nil {
 		return err
 	}
@@ -1337,7 +1337,7 @@ func runCLNew(jirix *jiri.X, args []string) error {
 }
 
 func newCL(jirix *jiri.X, args []string) error {
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	topLevel, err := git.TopLevel()
 	if err != nil {
 		return err
@@ -1410,7 +1410,7 @@ before the command can be retried.
 }
 
 func runCLSync(jirix *jiri.X, _ []string) error {
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	return syncCL(jirix, git)
 }
 

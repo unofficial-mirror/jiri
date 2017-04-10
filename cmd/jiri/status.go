@@ -104,7 +104,7 @@ func runStatus(jirix *jiri.X, args []string) error {
 func getStatus(jirix *jiri.X, local project.Project, remote project.Project) (string, string, error) {
 	headRev := ""
 	changes := ""
-	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(local.Path))
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
 	g := git.NewGit(local.Path)
 	var err error
 	if statusFlags.changes {

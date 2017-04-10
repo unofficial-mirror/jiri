@@ -7,13 +7,14 @@ package gitutil
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"fuchsia.googlesource.com/jiri/runutil"
+	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 type GitError struct {
@@ -39,7 +40,7 @@ func (ge GitError) Error() string {
 }
 
 type Git struct {
-	s         runutil.Sequence
+	jirix     *jiri.X
 	opts      map[string]string
 	rootDir   string
 	userName  string
@@ -71,7 +72,7 @@ const (
 )
 
 // New is the Git factory.
-func New(s runutil.Sequence, opts ...gitOpt) *Git {
+func New(jirix *jiri.X, opts ...gitOpt) *Git {
 	rootDir := ""
 	userName := ""
 	userEmail := ""
@@ -91,7 +92,7 @@ func New(s runutil.Sequence, opts ...gitOpt) *Git {
 		}
 	}
 	return &Git{
-		s:         s,
+		jirix:     jirix,
 		opts:      env,
 		rootDir:   rootDir,
 		userName:  userName,
@@ -607,23 +608,6 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 	return nil
 }
 
-// MergeInProgress returns a boolean flag that indicates if a merge
-// operation is in progress for the current repository.
-func (g *Git) MergeInProgress() (bool, error) {
-	repoRoot, err := g.TopLevel()
-	if err != nil {
-		return false, err
-	}
-	mergeFile := filepath.Join(repoRoot, ".git", "MERGE_HEAD")
-	if _, err := g.s.Stat(mergeFile); err != nil {
-		if runutil.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
 // ModifiedFiles returns a slice of filenames that have changed
 // between <baseBranch> and <currentBranch>.
 func (g *Git) ModifiedFiles(baseBranch, currentBranch string) ([]string, error) {
@@ -838,8 +822,7 @@ func (g *Git) Version() (int, int, error) {
 
 func (g *Git) run(args ...string) error {
 	var stdout, stderr bytes.Buffer
-	capture := func(s runutil.Sequence) runutil.Sequence { return s.Capture(&stdout, &stderr) }
-	if err := g.runWithFn(capture, args...); err != nil {
+	if err := g.runGit(&stdout, &stderr, args...); err != nil {
 		return Error(stdout.String(), stderr.String(), args...)
 	}
 	return nil
@@ -855,8 +838,7 @@ func trimOutput(o string) []string {
 
 func (g *Git) runOutput(args ...string) ([]string, error) {
 	var stdout, stderr bytes.Buffer
-	fn := func(s runutil.Sequence) runutil.Sequence { return s.Capture(&stdout, &stderr) }
-	if err := g.runWithFn(fn, args...); err != nil {
+	if err := g.runGit(&stdout, &stderr, args...); err != nil {
 		return nil, Error(stdout.String(), stderr.String(), args...)
 	}
 	return trimOutput(stdout.String()), nil
@@ -866,25 +848,35 @@ func (g *Git) runInteractive(args ...string) error {
 	var stderr bytes.Buffer
 	// In order for the editing to work correctly with
 	// terminal-based editors, notably "vim", use os.Stdout.
-	capture := func(s runutil.Sequence) runutil.Sequence { return s.Capture(os.Stdout, &stderr) }
-	if err := g.runWithFn(capture, args...); err != nil {
+	if err := g.runGit(os.Stdout, &stderr, args...); err != nil {
 		return Error("", stderr.String(), args...)
 	}
 	return nil
 }
 
-func (g *Git) runWithFn(fn func(s runutil.Sequence) runutil.Sequence, args ...string) error {
-	g.s.Dir(g.rootDir)
+func (g *Git) runGit(stdout, stderr io.Writer, args ...string) error {
 	if g.userName != "" {
 		args = append([]string{"-c", fmt.Sprintf("user.name=%s", g.userName)}, args...)
 	}
 	if g.userEmail != "" {
 		args = append([]string{"-c", fmt.Sprintf("user.email=%s", g.userEmail)}, args...)
 	}
-	if fn == nil {
-		fn = func(s runutil.Sequence) runutil.Sequence { return s }
+	command := exec.Command("git", args...)
+	command.Dir = g.rootDir
+	command.Stdin = os.Stdin
+	command.Stdout = stdout
+	command.Stderr = stderr
+	command.Env = envvar.MapToSlice(g.opts)
+	dir := g.rootDir
+	if dir == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			dir = cwd
+		} else {
+			// ignore error
+		}
 	}
-	return fn(g.s).Env(g.opts).Last("git", args...)
+	g.jirix.Logger.Tracef("Run: git %s (%s)", strings.Join(args, " "), dir)
+	return command.Run()
 }
 
 // Committer encapsulates the process of create a commit.

@@ -95,7 +95,7 @@ func TestGrep(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(project.Path))
+		git := gitutil.New(fake.X, gitutil.RootDirOpt(project.Path))
 		git.Add(path)
 	}
 

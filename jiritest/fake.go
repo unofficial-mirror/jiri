@@ -121,7 +121,7 @@ func (fake FakeJiriRoot) AddHook(hook project.Hook) error {
 // repository.
 func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProjectPath))
-	if err := gitutil.New(fake.X.NewSeq(), dir).CheckoutBranch("master"); err != nil {
+	if err := gitutil.New(fake.X, dir).CheckoutBranch("master"); err != nil {
 		return err
 	}
 	return nil
@@ -131,12 +131,12 @@ func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 // repository.
 func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
 	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProjectPath))
-	if !gitutil.New(fake.X.NewSeq(), dir).BranchExists("non-master") {
-		if err := gitutil.New(fake.X.NewSeq(), dir).CreateBranch("non-master"); err != nil {
+	if !gitutil.New(fake.X, dir).BranchExists("non-master") {
+		if err := gitutil.New(fake.X, dir).CreateBranch("non-master"); err != nil {
 			return err
 		}
 	}
-	if err := gitutil.New(fake.X.NewSeq(), dir).CheckoutBranch("non-master"); err != nil {
+	if err := gitutil.New(fake.X, dir).CheckoutBranch("non-master"); err != nil {
 		return err
 	}
 	return nil
@@ -148,10 +148,10 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	if err := fake.X.NewSeq().MkdirAll(projectDir, os.FileMode(0700)).Done(); err != nil {
 		return err
 	}
-	if err := gitutil.New(fake.X.NewSeq()).Init(projectDir); err != nil {
+	if err := gitutil.New(fake.X).Init(projectDir); err != nil {
 		return err
 	}
-	git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(projectDir))
+	git := gitutil.New(fake.X, gitutil.RootDirOpt(projectDir))
 	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (fake FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
 }
 
 func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path string) error {
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
 	if err := manifest.ToFile(fake.X, path); err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ import (
 // assertCommitCount asserts that the commit count between two
 // branches matches the expectedCount.
 func assertCommitCount(t *testing.T, jirix *jiri.X, branch, baseBranch string, expectedCount int) {
-	got, err := gitutil.New(jirix.NewSeq()).CountCommits(branch, baseBranch)
+	got, err := gitutil.New(jirix).CountCommits(branch, baseBranch)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -78,7 +78,7 @@ func assertFilesDoNotExist(t *testing.T, jirix *jiri.X, files []string) {
 func assertFilesCommitted(t *testing.T, jirix *jiri.X, files []string) {
 	assertFilesExist(t, jirix, files)
 	for _, file := range files {
-		if !gitutil.New(jirix.NewSeq()).IsFileCommitted(file) {
+		if !gitutil.New(jirix).IsFileCommitted(file) {
 			t.Fatalf("expected file %v to be committed but it is not", file)
 		}
 	}
@@ -89,7 +89,7 @@ func assertFilesCommitted(t *testing.T, jirix *jiri.X, files []string) {
 func assertFilesNotCommitted(t *testing.T, jirix *jiri.X, files []string) {
 	assertFilesExist(t, jirix, files)
 	for _, file := range files {
-		if gitutil.New(jirix.NewSeq()).IsFileCommitted(file) {
+		if gitutil.New(jirix).IsFileCommitted(file) {
 			t.Fatalf("expected file %v not to be committed but it is", file)
 		}
 	}
@@ -100,7 +100,7 @@ func assertFilesNotCommitted(t *testing.T, jirix *jiri.X, files []string) {
 func assertFilesPushedToRef(t *testing.T, jirix *jiri.X, repoPath, gerritPath, pushedRef string, files []string) {
 	chdir(t, jirix, gerritPath)
 	assertCommitCount(t, jirix, pushedRef, "master", 1)
-	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(pushedRef); err != nil {
+	if err := gitutil.New(jirix).CheckoutBranch(pushedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertFilesCommitted(t, jirix, files)
@@ -110,7 +110,7 @@ func assertFilesPushedToRef(t *testing.T, jirix *jiri.X, repoPath, gerritPath, p
 // assertStashSize asserts that the stash size matches the expected
 // size.
 func assertStashSize(t *testing.T, jirix *jiri.X, want int) {
-	got, err := gitutil.New(jirix.NewSeq()).StashSize()
+	got, err := gitutil.New(jirix).StashSize()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -126,7 +126,7 @@ func commitFile(t *testing.T, jirix *jiri.X, filename string, content string) {
 		t.Fatalf("%v", err)
 	}
 	commitMessage := "Commit " + filename
-	if err := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(filename, commitMessage); err != nil {
+	if err := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(filename, commitMessage); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -150,7 +150,7 @@ func createRepo(t *testing.T, jirix *jiri.X, prefix string) string {
 	if err := os.Chmod(repoPath, 0777); err != nil {
 		t.Fatalf("Chmod(%v) failed: %v", repoPath, err)
 	}
-	if err := gitutil.New(jirix.NewSeq()).Init(repoPath); err != nil {
+	if err := gitutil.New(jirix).Init(repoPath); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := s.MkdirAll(filepath.Join(repoPath, jiri.ProjectMetaDir), os.FileMode(0755)).Done(); err != nil {
@@ -188,7 +188,7 @@ func chdir(t *testing.T, jirix *jiri.X, path string) {
 func createRepoFromOrigin(t *testing.T, jirix *jiri.X, subpath string, originPath string) string {
 	repoPath := createRepo(t, jirix, subpath)
 	chdir(t, jirix, repoPath)
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	if err := git.AddRemote("origin", originPath); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -205,7 +205,7 @@ func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	// Create origin.
 	originPath := createRepo(t, jirix, "origin")
 	chdir(t, jirix, originPath)
-	git := gitutil.New(jirix.NewSeq())
+	git := gitutil.New(jirix)
 	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -217,7 +217,7 @@ func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	}
 	// Create test repo.
 	repoPath := createRepoFromOrigin(t, jirix, "test", originPath)
-	git = gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(repoPath))
+	git = gitutil.New(jirix, gitutil.RootDirOpt(repoPath))
 	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -226,7 +226,7 @@ func createTestRepos(t *testing.T, jirix *jiri.X) (string, string, string) {
 	}
 	// Add Gerrit remote.
 	gerritPath := createRepoFromOrigin(t, jirix, "gerrit", originPath)
-	git = gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(gerritPath))
+	git = gitutil.New(jirix, gitutil.RootDirOpt(gerritPath))
 	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -248,7 +248,7 @@ func submit(t *testing.T, jirix *jiri.X, originPath string, gerritPath string, r
 	}
 	chdir(t, jirix, originPath)
 	expectedRef := gerrit.Reference(review.CLOpts)
-	if err := gitutil.New(jirix.NewSeq()).Pull(gerritPath, expectedRef); err != nil {
+	if err := gitutil.New(jirix).Pull(gerritPath, expectedRef); err != nil {
 		t.Fatalf("Pull gerrit to origin failed: %v", err)
 	}
 	chdir(t, jirix, cwd)
@@ -291,7 +291,7 @@ func TestCleanupClean(t *testing.T) {
 	fake, repoPath, originPath, _, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -316,7 +316,7 @@ func TestCleanupDirty(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -340,7 +340,7 @@ func TestCreateReviewBranch(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -375,7 +375,7 @@ func TestCreateReviewBranchWithEmptyChange(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -398,7 +398,7 @@ func TestSendReview(t *testing.T) {
 	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -472,7 +472,7 @@ func TestSendReviewNoChangeID(t *testing.T) {
 	fake, _, _, gerritPath, cleanup := setupTest(t, false)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -495,7 +495,7 @@ func TestEndToEnd(t *testing.T) {
 	fake, repoPath, _, gerritPath, cleanup := setupTest(t, true)
 	defer cleanup()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -532,7 +532,7 @@ func TestLabelsInCommitMessage(t *testing.T) {
 	defer cleanup()
 	s := fake.X.NewSeq()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -643,7 +643,7 @@ func TestDirtyBranch(t *testing.T) {
 	defer cleanup()
 	s := fake.X.NewSeq()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -711,7 +711,7 @@ func TestRunInSubdirectory(t *testing.T) {
 	defer cleanup()
 	s := fake.X.NewSeq()
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -825,7 +825,7 @@ Change-Id: I0000000000000000000000000000000000000000`,
 Change-Id: I0000000000000000000000000000000000000000`,
 		},
 	}
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	for _, test := range testCases {
 		review, err := newReview(fake.X, git, project.Project{}, gerrit.CLOpts{
 			Autosubmit: test.autosubmit,
@@ -891,7 +891,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 	defer cleanup()
 	chdir(t, fake.X, originPath)
 	commitFiles(t, fake.X, []string{"A", "B"})
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 
 	chdir(t, fake.X, repoPath)
 	if err := syncCL(fake.X, git); err != nil {
@@ -943,7 +943,7 @@ func TestDependentClsWithEditDelete(t *testing.T) {
 
 	chdir(t, fake.X, gerritPath)
 	expectedRef := gerrit.Reference(review.CLOpts)
-	if err := gitutil.New(fake.X.NewSeq()).CheckoutBranch(expectedRef); err != nil {
+	if err := gitutil.New(fake.X).CheckoutBranch(expectedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertFilesExist(t, fake.X, []string{"A"})
@@ -963,7 +963,7 @@ func TestParallelDev(t *testing.T) {
 	// * conflicting changes in a file
 	createCLWithFiles(t, fake.X, "feature1-A", "A")
 
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 	if err := git.CheckoutBranch("master"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -1042,7 +1042,7 @@ func TestParallelDev(t *testing.T) {
 func TestCLSync(t *testing.T) {
 	fake, _, _, _, cleanup := setupTest(t, true)
 	defer cleanup()
-	git := gitutil.New(fake.X.NewSeq())
+	git := gitutil.New(fake.X)
 
 	// Create some dependent CLs.
 	if err := newCL(fake.X, []string{"feature1"}); err != nil {
@@ -1107,7 +1107,7 @@ func TestMultiPart(t *testing.T) {
 	}
 
 	git := func(dir string) *gitutil.Git {
-		git := gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+		git := gitutil.New(fake.X, gitutil.RootDirOpt(dir))
 		if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 			t.Fatalf("%v", err)
 		}
@@ -1133,7 +1133,7 @@ func TestMultiPart(t *testing.T) {
 	relchdir(ra)
 	cleanupMultiPartFlag = true
 	got := initMP()
-	want := &multiPart{clean: true, states: got.states, keys: got.keys}  // Don't care about the states/keys in this test, just pass them through.
+	want := &multiPart{clean: true, states: got.states, keys: got.keys} // Don't care about the states/keys in this test, just pass them through.
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}

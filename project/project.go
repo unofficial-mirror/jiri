@@ -721,7 +721,7 @@ func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, error) {
 // directory by reading the jiri project metadata located in a directory at the
 // root of the current repository.
 func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
-	topLevel, err := gitutil.New(jirix.NewSeq()).TopLevel()
+	topLevel, err := gitutil.New(jirix).TopLevel()
 	if err != nil {
 		return "", nil
 	}
@@ -1035,7 +1035,7 @@ func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool
 // resetLocalProject checks out the detached_head, cleans up untracked files
 // and uncommitted changes, and optionally deletes all the branches except master.
 func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches bool) error {
-	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(local.Path))
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
 	g := git.NewGit(local.Path)
 	headRev, err := GetHeadRevision(jirix, remote)
 	if err != nil {
@@ -1188,7 +1188,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if err := g.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	return gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
+	return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
 }
 
 func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
@@ -1207,13 +1207,13 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 	if err != nil {
 		return err
 	}
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	git := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	return git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
 }
 
 func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
 
-	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	g := git.NewGit(project.Path)
 	changes, err := g.HasUncommittedChanges()
 	if err != nil {
@@ -1233,8 +1233,7 @@ func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
 // syncProjectMaster checks out latest detached head if project is on one
 // else it rebases current branch onto its tracking branch
 func syncProjectMaster(jirix *jiri.X, project Project, rebaseUntracked bool, snapshot bool) error {
-	s := jirix.NewSeq()
-	scm := gitutil.New(s, gitutil.RootDirOpt(project.Path))
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	g := git.NewGit(project.Path)
 	if !scm.IsOnBranch() || snapshot {
 		if changes, err := g.HasUncommittedChanges(); err != nil {
@@ -1439,7 +1438,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 			if err := jirix.NewSeq().MkdirAll(path, 0755).Done(); err != nil {
 				return err
 			}
-			if err := gitutil.New(jirix.NewSeq()).Clone(p.Remote, path, gitutil.NoCheckoutOpt(true)); err != nil {
+			if err := gitutil.New(jirix).Clone(p.Remote, path, gitutil.NoCheckoutOpt(true)); err != nil {
 				return err
 			}
 			p.Revision = "HEAD"
@@ -1523,7 +1522,7 @@ func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, proje
 		}
 	}
 
-	scm := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	g := git.NewGit(project.Path)
 	var currentRevision string
 	var err error
@@ -1649,19 +1648,16 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			go func(dir, remote string) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
-				// This should be crated inside loop, as when we set git directory,
-				// It changes the dir of previous git in the loop
-				s := jirix.NewSeq()
 				if isPathDir(dir) {
 					// Cache already present, update it
 					// TODO : update this after implementing FetchAll using g
-					if err := gitutil.New(s, gitutil.RootDirOpt(dir)).Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
 						errs <- err
 						return
 					}
 				} else {
 					// Create cache
-					if err := gitutil.New(s).CloneMirror(remote, dir); err != nil {
+					if err := gitutil.New(jirix).CloneMirror(remote, dir); err != nil {
 						errs <- err
 						return
 					}
@@ -2215,13 +2211,13 @@ func (op createOperation) Run(jirix *jiri.X, rebaseUntracked bool, snapshot bool
 	}
 
 	if jirix.Shared && cache != "" {
-		if err := gitutil.New(s).Clone(cache, tmpDir,
+		if err := gitutil.New(jirix).Clone(cache, tmpDir,
 			gitutil.SharedOpt(true),
 			gitutil.NoCheckoutOpt(true)); err != nil {
 			return err
 		}
 	} else {
-		if err := gitutil.New(s).Clone(op.project.Remote, tmpDir,
+		if err := gitutil.New(jirix).Clone(op.project.Remote, tmpDir,
 			gitutil.ReferenceOpt(cache),
 			gitutil.NoCheckoutOpt(true)); err != nil {
 			return err

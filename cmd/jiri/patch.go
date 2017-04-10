@@ -62,7 +62,7 @@ func patchProject(jirix *jiri.X, project project.Project, ref string) error {
 		branch = fmt.Sprintf("change/%v/%v", cl, ps)
 	}
 
-	git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+	git := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	if git.BranchExists(branch) {
 		if deleteFlag {
 			if err := git.CheckoutBranch("origin/master"); err != nil {
@@ -90,7 +90,7 @@ func patchProject(jirix *jiri.X, project project.Project, ref string) error {
 
 // rebaseProject rebases the current branch on top of a given branch.
 func rebaseProject(jirix *jiri.X, project project.Project, change *gerrit.Change) error {
-	git := gitutil.New(jirix.NewSeq(), gitutil.UserNameOpt(change.Owner.Name), gitutil.UserEmailOpt(change.Owner.Email), gitutil.RootDirOpt(project.Path))
+	git := gitutil.New(jirix, gitutil.UserNameOpt(change.Owner.Name), gitutil.UserEmailOpt(change.Owner.Email), gitutil.RootDirOpt(project.Path))
 	if err := git.FetchRefspec("origin", change.Branch); err != nil {
 		return err
 	}

@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"fuchsia.googlesource.com/jiri/collect"
-	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/runutil"
 )
 
@@ -210,7 +209,7 @@ type Commit struct {
 	Message string
 }
 type Owner struct {
-	Name string
+	Name  string
 	Email string
 }
 type Files map[string]struct{}
@@ -484,7 +483,7 @@ func Push(seq runutil.Sequence, clOpts CLOpts) error {
 	}
 	var stdout, stderr bytes.Buffer
 	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
-		return gitutil.Error(stdout.String(), stderr.String(), args...)
+		return fmt.Errorf("'git %s ' failed:\n%s", strings.Join(args, " "), stderr.String())
 	}
 	for _, line := range strings.Split(stderr.String(), "\n") {
 		if remoteRE.MatchString(line) {

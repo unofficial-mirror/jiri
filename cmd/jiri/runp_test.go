@@ -1,4 +1,4 @@
-	// Copyright 2015 The Vanadium Authors. All rights reserved.
+// Copyright 2015 The Vanadium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -163,7 +163,7 @@ func TestRunP(t *testing.T) {
 	}
 
 	git := func(dir string) *gitutil.Git {
-		return gitutil.New(fake.X.NewSeq(), gitutil.RootDirOpt(dir))
+		return gitutil.New(fake.X, gitutil.RootDirOpt(dir))
 	}
 
 	newfile(rb, "untracked.go")

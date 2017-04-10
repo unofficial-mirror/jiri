@@ -84,7 +84,7 @@ func assertUploadPushedFilesToRef(t *testing.T, jirix *jiri.X, gerritPath, pushe
 	if err := os.Chdir(gerritPath); err != nil {
 		t.Fatal(err)
 	}
-	if err := gitutil.New(jirix.NewSeq()).CheckoutBranch(pushedRef); err != nil {
+	if err := gitutil.New(jirix).CheckoutBranch(pushedRef); err != nil {
 		t.Fatalf("%v", err)
 	}
 	assertFilesCommitted(t, jirix, files)
@@ -117,7 +117,7 @@ func TestUploadSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
 	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -154,7 +154,7 @@ func TestUploadRebase(t *testing.T) {
 		t.Fatal(err)
 	}
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
 	if err := git.Config("user.email", "john.doe@example.com"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -209,7 +209,7 @@ func TestUploadMultipleCommits(t *testing.T) {
 		t.Fatal(err)
 	}
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
 	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -248,7 +248,7 @@ func TestUploadThrowsErrorWhenNotOnBranch(t *testing.T) {
 	if err := os.Chdir(localProjects[1].Path); err != nil {
 		t.Fatal(err)
 	}
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
 	if err := git.CheckoutBranch("HEAD", gitutil.DetachOpt(true)); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -279,7 +279,7 @@ func TestUploadFailsWhenNoGerritHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
 	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -313,7 +313,7 @@ func TestUploadFailsForUntrackedBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	branch := "my-branch"
-	git := gitutil.New(fake.X.NewSeq(), gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
 	if err := git.CreateAndCheckoutBranch(branch); err != nil {
 		t.Fatalf("%v", err)
 	}

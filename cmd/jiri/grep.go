@@ -41,7 +41,7 @@ func doGrep(jirix *jiri.X, args []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		git := gitutil.New(jirix.NewSeq(), gitutil.RootDirOpt(project.Path))
+		git := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 		// TODO(ianloic): allow args to be passed to `git grep`.
 		lines, err := git.Grep(args[0])
 		if err != nil {
