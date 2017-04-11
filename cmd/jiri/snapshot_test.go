@@ -93,7 +93,7 @@ func TestSnapshot(t *testing.T) {
 
 	// Create a snapshot.
 	var stdout bytes.Buffer
-	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout})
+	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout, Env:fake.X.Context.Env()})
 
 	tmpfile, err := ioutil.TempFile("", "jiri-snapshot-")
 	if err != nil {

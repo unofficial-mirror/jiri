@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/color"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/tool"
@@ -18,7 +19,7 @@ import (
 
 // NewX is similar to jiri.NewX, but is meant for usage in a testing environment.
 func NewX(t *testing.T) (*jiri.X, func()) {
-	ctx := tool.NewDefaultContext()
+	ctx := tool.NewContextFromEnv(cmdline.EnvFromOS(), false)
 	color := color.NewColor(false)
 	logger := log.NewLogger(log.InfoLevel, color)
 	root, err := ctx.NewSeq().TempDir("", "")
