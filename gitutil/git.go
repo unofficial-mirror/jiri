@@ -866,7 +866,9 @@ func (g *Git) runGit(stdout, stderr io.Writer, args ...string) error {
 	command.Stdin = os.Stdin
 	command.Stdout = stdout
 	command.Stderr = stderr
-	command.Env = envvar.MapToSlice(g.opts)
+	env := g.jirix.Env()
+	env = envvar.MergeMaps(g.opts, env)
+	command.Env = envvar.MapToSlice(env)
 	dir := g.rootDir
 	if dir == "" {
 		if cwd, err := os.Getwd(); err == nil {
