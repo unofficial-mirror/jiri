@@ -88,7 +88,6 @@ func NewColor(enableColor bool) Color {
 		switch term {
 		case "dumb", "":
 			enableColor = false
-			fmt.Println("Warning: your terminal doesn't support colors")
 		}
 	}
 	if enableColor {
