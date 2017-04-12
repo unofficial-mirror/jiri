@@ -653,7 +653,7 @@ func CreateSnapshot(jirix *jiri.X, file string, localManifest bool) error {
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	_, hooks, err := loadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest)
+	_, hooks, err := LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest)
 	if err != nil {
 		return err
 	}
@@ -714,7 +714,7 @@ func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, error) {
 		}
 
 	}
-	return loadManifestFile(jirix, snapshot, nil, false)
+	return LoadManifestFile(jirix, snapshot, nil, false)
 }
 
 // CurrentProjectKey gets the key of the current project from the current
@@ -836,18 +836,18 @@ func LoadManifest(jirix *jiri.X) (Projects, Hooks, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return loadManifestFile(jirix, file, localProjects, false)
+	return LoadManifestFile(jirix, file, localProjects, false)
 }
 
-// loadManifestFile loads the manifest starting with the given file, resolving
+// LoadManifestFile loads the manifest starting with the given file, resolving
 // remote and local imports.  Local projects are used to resolve remote imports;
 // if nil, encountering any remote import will result in an error.
 //
-// WARNING: loadManifestFile cannot be run multiple times in parallel!  It
+// WARNING: LoadManifestFile cannot be run multiple times in parallel!  It
 // invokes git operations which require a lock on the filesystem.  If you see
 // errors about ".git/index.lock exists", you are likely calling
-// loadManifestFile in parallel.
-func loadManifestFile(jirix *jiri.X, file string, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
+// LoadManifestFile in parallel.
+func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
 	ld := newManifestLoader(localProjects, false)
 	if err := ld.Load(jirix, "", file, "", localManifest); err != nil {
 		return nil, nil, err
@@ -992,11 +992,7 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifes
 // all the local changes. If "cleanupBranches" is true, it will also delete all
 // the non-master branches.
 func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool) (e error) {
-	lProjects, err := LocalProjects(jirix, FastScan)
-	if err != nil {
-		return err
-	}
-	remoteProjects, _, _, err := LoadUpdatedManifest(jirix, lProjects, true)
+	remoteProjects, _, err := LoadManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -1418,12 +1414,10 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 		key := remote.ProjectKey()
 		p, ok := ld.localProjects[key]
 		if !ok {
-			if !ld.update {
-				return fmt.Errorf("can't resolve remote import: project %q not found locally", key)
-			}
-			if localManifest {
+			if !ld.update || localManifest {
 				jirix.Logger.Infof("Note: import %q not found locally, getting from server.", remote.Name)
 			}
+
 			// The remote manifest project doesn't exist locally.  Clone it into a
 			// temp directory, and add it to ld.localProjects.
 			if ld.TmpDir == "" {
