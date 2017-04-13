@@ -2288,15 +2288,15 @@ func (op deleteOperation) Run(jirix *jiri.X, rebaseUntracked bool, snapshot bool
 			}
 		}
 		if extraBranches || uncommitted || untracked {
-			msg := fmt.Sprintf("Project %q was not found in the project manifest", op.project.Name)
-			msg += fmt.Sprintf("\nhowever this project either contains non-master branches, uncommitted work, or untracked files and will thus not be deleted\n\n")
+			msg := fmt.Sprintf("Project %q won't be deleted as it might contain changes", op.project.Name)
+			msg += fmt.Sprintf("\nIf you no longer need it, invoke 'rm -rf %q'\n\n", op.source)
 			jirix.Logger.Warningf(msg)
 			return nil
 		}
 		return s.RemoveAll(op.source).Done()
 	}
 	msg := fmt.Sprintf("Project %q was not found in the project manifest", op.project.Name)
-	msg += fmt.Sprintf("\nit was not automatically removed to avoid deleting uncommitted work if you no longer need it, invoke 'rm -rf %s' or invoke 'jiri update -gc' to remove all such local projects\n\n", op.source)
+	msg += fmt.Sprintf("\nit was not automatically removed to avoid deleting uncommitted work if you no longer need it, invoke 'rm -rf %q' or invoke 'jiri update -gc' to remove all such local projects\n\n", op.source)
 	jirix.Logger.Warningf(msg)
 	return nil
 }
