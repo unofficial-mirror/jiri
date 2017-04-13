@@ -71,9 +71,11 @@ func TestBranch(t *testing.T) {
 	}
 
 	testBranch := "testBranch"
+	testBranch2 := "testBranch2"
 
 	defaultWant := ""
 	branchWant := ""
+	listWant := ""
 	cDir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -88,42 +90,62 @@ func TestBranch(t *testing.T) {
 	// current branch is not testBranch
 	i := 0
 	gitLocals[i].CreateBranch(testBranch)
-	defaultWant = fmt.Sprintf("%v%v(%v)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	branchWant = fmt.Sprintf("%s%s(%s)\n", branchWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, master\n\n", defaultWant, testBranch)
 
 	i = 2
 	gitLocals[i].CreateBranch(testBranch)
-	defaultWant = fmt.Sprintf("%v%v(%v)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	gitLocals[i].CreateBranch(testBranch2)
+	branchWant = fmt.Sprintf("%s%s(%s)\n", branchWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, %s, master\n\n", defaultWant, testBranch, testBranch2)
 
 	i = 3
 	gitLocals[i].CreateBranch(testBranch)
-	defaultWant = fmt.Sprintf("%v%v(%v)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	branchWant = fmt.Sprintf("%s%s(%s)\n", branchWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, master\n\n", defaultWant, testBranch)
 
 	// current branch is test branch
 	i = 1
 	gitLocals[i].CreateBranch(testBranch)
 	gitLocals[i].CheckoutBranch(testBranch)
-	branchWant = fmt.Sprintf("%v%v(%v)\n", branchWant, localProjects[i].Name, relativePath[i])
+	gitLocals[i].CreateBranch(testBranch2)
+	gitLocals[i].DeleteBranch("master")
+	listWant = fmt.Sprintf("%s%s(%s)\n", listWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, %s\n\n", defaultWant, testBranch, testBranch2)
 
 	i = 6
 	gitLocals[i].CreateBranch(testBranch)
 	gitLocals[i].CheckoutBranch(testBranch)
-	branchWant = fmt.Sprintf("%v%v(%v)\n", branchWant, localProjects[i].Name, relativePath[i])
+	listWant = fmt.Sprintf("%s%s(%s)\n", listWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, master\n\n", defaultWant, testBranch)
 
 	i = 4
 	gitLocals[i].CreateBranch(testBranch)
 	gitLocals[i].CheckoutBranch(testBranch)
-	branchWant = fmt.Sprintf("%v%v(%v)\n", branchWant, localProjects[i].Name, relativePath[i])
-	defaultWant = fmt.Sprintf("%v%v", defaultWant, branchWant)
+	gitLocals[i].CreateBranch(testBranch2)
+	listWant = fmt.Sprintf("%s%s(%s)\n", listWant, localProjects[i].Name, relativePath[i])
+	branchWant = fmt.Sprintf("%s%s", branchWant, listWant)
+	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, %s, master\n\n", defaultWant, testBranch, testBranch2)
 
 	// Run default
-	if got := executeBranch(t, fake, testBranch); !equalBranchOut(got, defaultWant) {
-		t.Errorf("got %v, want %v", got, defaultWant)
+	if got := executeBranch(t, fake); !equalDefaultBranchOut(got, defaultWant) {
+		t.Errorf("got %s, want %s", got, defaultWant)
+	}
+	// Run with branch
+	if got := executeBranch(t, fake, testBranch); !equalBranchOut(got, branchWant) {
+		t.Errorf("got %s, want %s", got, branchWant)
 	}
 
 	// Run with listFlag
 	branchFlags.listFlag = true
-	if got := executeBranch(t, fake, testBranch); !equalBranchOut(got, branchWant) {
-		t.Errorf("got %v, want %v", got, branchWant)
+	if got := executeBranch(t, fake, testBranch); !equalBranchOut(got, listWant) {
+		t.Errorf("got %s, want %s", got, listWant)
 	}
 }
 
@@ -267,6 +289,23 @@ func equalBranchOut(first, second string) bool {
 	second = strings.TrimSpace(second)
 	firstStrings := strings.Split(first, "\n")
 	secondStrings := strings.Split(second, "\n")
+	if len(firstStrings) != len(secondStrings) {
+		return false
+	}
+	sort.Strings(firstStrings)
+	sort.Strings(secondStrings)
+	for i, first := range firstStrings {
+		if first != secondStrings[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalDefaultBranchOut(first, second string) bool {
+	second = strings.TrimSpace(second)
+	firstStrings := strings.Split(first, "\n\n")
+	secondStrings := strings.Split(second, "\n\n")
 	if len(firstStrings) != len(secondStrings) {
 		return false
 	}

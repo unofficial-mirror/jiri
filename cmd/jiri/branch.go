@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
@@ -18,7 +19,7 @@ import (
 var branchFlags struct {
 	deleteFlag      bool
 	forceDeleteFlag bool
-	listFlag     bool
+	listFlag        bool
 }
 
 var cmdBranch = &cmdline.Command{
@@ -27,7 +28,7 @@ var cmdBranch = &cmdline.Command{
 	Short:  "Show or delete branches",
 	Long: `
 Show all the projects having branch <branch> .If -d or -D is passed, <branch>
-is deleted `,
+is deleted. if <branch> is not passed, show all projects which have branches other than "master"`,
 	ArgsName: "<branch>",
 	ArgsLong: "<branch> is the name branch",
 }
@@ -51,7 +52,6 @@ func displayProjects(jirix *jiri.X, branch string) error {
 	}
 
 	jirix.TimerPop()
-	foundProj := false
 	cDir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -61,40 +61,55 @@ func displayProjects(jirix *jiri.X, branch string) error {
 		if err != nil {
 			return err
 		}
-		if branchFlags.listFlag {
+		if branch == "" {
+			var branches []string
+			hasMaster := false
+			for _, b := range state.Branches {
+				if b.Name != "master" {
+					branches = append(branches, b.Name)
+				} else {
+					hasMaster = true
+				}
+			}
+			if len(branches) != 0 {
+				if hasMaster {
+					branches = append(branches, "master")
+				}
+				fmt.Printf("%s: %s(%s)\n", jirix.Color.Yellow("Project"), state.Project.Name, relativePath)
+				fmt.Printf("%s: %s\n\n", jirix.Color.Yellow("Branch(es)"), strings.Join(branches, ", "))
+			}
+
+		} else if branchFlags.listFlag {
 			if state.CurrentBranch.Name == branch {
 				fmt.Printf("%s(%s)\n", state.Project.Name, relativePath)
-				foundProj = true
 			}
 		} else {
 			for _, b := range state.Branches {
 				if b.Name == branch {
 					fmt.Printf("%s(%s)\n", state.Project.Name, relativePath)
-					foundProj = true
 					break
 				}
 			}
 		}
 	}
 	jirix.TimerPop()
-
-	if !foundProj {
-		fmt.Println(jirix.Color.Red("Cannot find any project with branch %q\n", branch))
-	}
 	return nil
 }
 
 func runBranch(jirix *jiri.X, args []string) error {
-	if len(args) == 0 {
-		return jirix.UsageErrorf("Please specify branch")
-	}
+	branch := ""
 	if len(args) > 1 {
 		return jirix.UsageErrorf("Please provide only one branch")
+	} else if len(args) == 1 {
+		branch = args[0]
 	}
 	if !branchFlags.deleteFlag && !branchFlags.forceDeleteFlag {
-		return displayProjects(jirix, args[0])
+		return displayProjects(jirix, branch)
 	}
-	return deleteBranches(jirix, args[0])
+	if branch == "" {
+		return jirix.UsageErrorf("Please provide branch to delete")
+	}
+	return deleteBranches(jirix, branch)
 }
 
 func deleteBranches(jirix *jiri.X, branchToDelete string) error {
