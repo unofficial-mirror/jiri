@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/color"
@@ -80,14 +81,23 @@ func ConfigFromFile(filename string) (*Config, error) {
 // including the manifest and related operations.
 type X struct {
 	*tool.Context
-	Root   string
-	Usage  func(format string, args ...interface{}) error
-	config *Config
-	Cache  string
-	Shared bool
-	Jobs   uint
-	Color  color.Color
-	Logger *log.Logger
+	Root     string
+	Usage    func(format string, args ...interface{}) error
+	config   *Config
+	Cache    string
+	Shared   bool
+	Jobs     uint
+	Color    color.Color
+	Logger   *log.Logger
+	failures uint32
+}
+
+func (jirix *X) IncrementFailures() {
+	atomic.AddUint32(&jirix.failures, 1)
+}
+
+func (jirix *X) Failures() uint32 {
+	return atomic.LoadUint32(&jirix.failures)
 }
 
 var (
@@ -277,13 +287,14 @@ func FindRoot() string {
 // Clone returns a clone of the environment.
 func (x *X) Clone(opts tool.ContextOpts) *X {
 	return &X{
-		Context: x.Context.Clone(opts),
-		Root:    x.Root,
-		Usage:   x.Usage,
-		Jobs:    x.Jobs,
-		Cache:   x.Cache,
-		Color:   x.Color,
-		Logger:  x.Logger,
+		Context:  x.Context.Clone(opts),
+		Root:     x.Root,
+		Usage:    x.Usage,
+		Jobs:     x.Jobs,
+		Cache:    x.Cache,
+		Color:    x.Color,
+		Logger:   x.Logger,
+		failures: x.failures,
 	}
 }
 

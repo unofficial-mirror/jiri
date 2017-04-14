@@ -78,5 +78,11 @@ func runUpdate(jirix *jiri.X, args []string) error {
 	}, retry.AttemptsOpt(attemptsFlag)); err != nil {
 		return err
 	}
-	return project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag)
+	if err := project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag); err != nil {
+		return err
+	}
+	if jirix.Failures() != 0 {
+		return fmt.Errorf("Project update completed with non-fatal errors")
+	}
+	return nil
 }

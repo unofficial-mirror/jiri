@@ -1072,6 +1072,7 @@ func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool
 			remote, ok := remoteProjects[local.Key()]
 			if !ok {
 				jirix.Logger.Errorf("Not cleaning project %q(%v). It was not found in manifest\n\n", local.Name, local.Path)
+				jirix.IncrementFailures()
 				return
 			}
 			if err := resetLocalProject(jirix, local, remote, cleanupBranches); err != nil {
@@ -1306,6 +1307,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 		msg := fmt.Sprintf("Project %s(%s) contains uncommited changes.", project.Name, relativePath)
 		msg += fmt.Sprintf("\nCommit or discard the changes and try again.\n\n")
 		jirix.Logger.Errorf(msg)
+		jirix.IncrementFailures()
 		return nil
 	}
 
@@ -1318,6 +1320,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 			msg := fmt.Sprintf("For project %q, not able to checkout latest, error: %s", project.Name, err)
 			msg += fmt.Sprintf("\nPlease checkout manually use: 'git -C %q checkout --detach %s'\n\n", err, relativePath, revision)
 			jirix.Logger.Errorf(msg)
+			jirix.IncrementFailures()
 		}
 		if snapshot || !rebaseAll {
 			return nil
@@ -1358,6 +1361,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, branch.Tracking.Name)
 				msg += "\nPlease do it manually\n\n"
 				jirix.Logger.Errorf(msg)
+				jirix.IncrementFailures()
 				continue
 			}
 			rebaseSuccess, err := tryRebase(jirix, project, branch.Tracking.Name)
@@ -1370,6 +1374,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, branch.Tracking.Name)
 				msg += "\nPlease do it manually\n\n"
 				jirix.Logger.Errorf(msg)
+				jirix.IncrementFailures()
 				continue
 			}
 		} else {
@@ -1387,6 +1392,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 					msg := fmt.Sprintf("For project %s(%s), not able to rebase your untracked branch %q onto JIRI_HEAD.", project.Name, relativePath, branch.Name)
 					msg += "\nPlease do it manually\n\n"
 					jirix.Logger.Errorf(msg)
+					jirix.IncrementFailures()
 					continue
 				}
 				rebaseSuccess, err := tryRebase(jirix, project, revision)
@@ -1399,6 +1405,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 					msg := fmt.Sprintf("For project %s(%s), not able to rebase your untracked branch %q onto JIRI_HEAD.", project.Name, relativePath, branch.Name)
 					msg += "\nPlease do it manually\n\n"
 					jirix.Logger.Errorf(msg)
+					jirix.IncrementFailures()
 					continue
 				}
 			} else if !rebaseUntrackedMessage {
@@ -2084,6 +2091,7 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 		}()
 		if out.err != nil && runutil.IsTimeout(out.err) {
 			jirix.Logger.Errorf("Timeout while executing hook")
+			jirix.IncrementFailures()
 			if out.outFile != nil {
 				out.outFile.Sync()
 				out.outFile.Seek(0, 0)
