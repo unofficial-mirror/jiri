@@ -82,7 +82,7 @@ func runStatus(jirix *jiri.X, args []string) error {
 		if statusFlags.branch != "" && (statusFlags.branch != state.CurrentBranch.Name) {
 			continue
 		}
-		changes, headRev, extraCommits, err := getStatus(jirix, localProject, remoteProject, state.CurrentBranch.Name)
+		changes, headRev, extraCommits, err := getStatus(jirix, localProject, remoteProject, state.CurrentBranch)
 		if err != nil {
 			return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
 		}
@@ -138,7 +138,7 @@ func runStatus(jirix *jiri.X, args []string) error {
 	return nil
 }
 
-func getStatus(jirix *jiri.X, local project.Project, remote project.Project, currentBranch string) (string, string, []string, error) {
+func getStatus(jirix *jiri.X, local project.Project, remote project.Project, currentBranch project.BranchState) (string, string, []string, error) {
 	var extraCommits []string
 	headRev := ""
 	changes := ""
@@ -161,8 +161,12 @@ func getStatus(jirix *jiri.X, local project.Project, remote project.Project, cur
 		}
 	}
 
-	if currentBranch != "" && statusFlags.commits {
-		commits, err := scm.ExtraCommits(statusFlags.branch, "origin")
+	if currentBranch.Name != "" && statusFlags.commits {
+		remoteBranch := "remotes/origin/" + remote.RemoteBranch
+		if currentBranch.Tracking != nil {
+			remoteBranch = currentBranch.Tracking.Name
+		}
+		commits, err := scm.ExtraCommits(currentBranch.Name, remoteBranch)
 		if err != nil {
 			return "", "", nil, err
 		}
