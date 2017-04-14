@@ -63,17 +63,21 @@ func displayProjects(jirix *jiri.X, branch string) error {
 		}
 		if branch == "" {
 			var branches []string
-			hasMaster := false
+			master := ""
 			for _, b := range state.Branches {
+				name := b.Name
+				if state.CurrentBranch.Name == b.Name {
+					name = "*" + jirix.Color.Green("%s", b.Name)
+				}
 				if b.Name != "master" {
-					branches = append(branches, b.Name)
+					branches = append(branches, name)
 				} else {
-					hasMaster = true
+					master = name
 				}
 			}
 			if len(branches) != 0 {
-				if hasMaster {
-					branches = append(branches, "master")
+				if master != "" {
+					branches = append(branches, master)
 				}
 				fmt.Printf("%s: %s(%s)\n", jirix.Color.Yellow("Project"), state.Project.Name, relativePath)
 				fmt.Printf("%s: %s\n\n", jirix.Color.Yellow("Branch(es)"), strings.Join(branches, ", "))

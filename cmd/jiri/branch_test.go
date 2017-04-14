@@ -90,9 +90,10 @@ func TestBranch(t *testing.T) {
 	// current branch is not testBranch
 	i := 0
 	gitLocals[i].CreateBranch(testBranch)
+	gitLocals[i].CheckoutBranch("master")
 	branchWant = fmt.Sprintf("%s%s(%s)\n", branchWant, localProjects[i].Name, relativePath[i])
 	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
-	defaultWant = fmt.Sprintf("%sBranch(es): %s, master\n\n", defaultWant, testBranch)
+	defaultWant = fmt.Sprintf("%sBranch(es): %s, *master\n\n", defaultWant, testBranch)
 
 	i = 2
 	gitLocals[i].CreateBranch(testBranch)
@@ -115,14 +116,14 @@ func TestBranch(t *testing.T) {
 	gitLocals[i].DeleteBranch("master")
 	listWant = fmt.Sprintf("%s%s(%s)\n", listWant, localProjects[i].Name, relativePath[i])
 	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
-	defaultWant = fmt.Sprintf("%sBranch(es): %s, %s\n\n", defaultWant, testBranch, testBranch2)
+	defaultWant = fmt.Sprintf("%sBranch(es): *%s, %s\n\n", defaultWant, testBranch, testBranch2)
 
 	i = 6
 	gitLocals[i].CreateBranch(testBranch)
 	gitLocals[i].CheckoutBranch(testBranch)
 	listWant = fmt.Sprintf("%s%s(%s)\n", listWant, localProjects[i].Name, relativePath[i])
 	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
-	defaultWant = fmt.Sprintf("%sBranch(es): %s, master\n\n", defaultWant, testBranch)
+	defaultWant = fmt.Sprintf("%sBranch(es): *%s, master\n\n", defaultWant, testBranch)
 
 	i = 4
 	gitLocals[i].CreateBranch(testBranch)
@@ -131,7 +132,7 @@ func TestBranch(t *testing.T) {
 	listWant = fmt.Sprintf("%s%s(%s)\n", listWant, localProjects[i].Name, relativePath[i])
 	branchWant = fmt.Sprintf("%s%s", branchWant, listWant)
 	defaultWant = fmt.Sprintf("%sProject: %s(%s)\n", defaultWant, localProjects[i].Name, relativePath[i])
-	defaultWant = fmt.Sprintf("%sBranch(es): %s, %s, master\n\n", defaultWant, testBranch, testBranch2)
+	defaultWant = fmt.Sprintf("%sBranch(es): *%s, %s, master\n\n", defaultWant, testBranch, testBranch2)
 
 	// Run default
 	if got := executeBranch(t, fake); !equalDefaultBranchOut(got, defaultWant) {
