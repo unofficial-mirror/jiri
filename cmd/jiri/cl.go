@@ -124,8 +124,8 @@ var cmdCL *cmdline.Command
 func newCmdCL() *cmdline.Command {
 	return &cmdline.Command{
 		Name:     "cl",
-		Short:    "Manage changelists for multiple projects",
-		Long:     "Manage changelists for multiple projects.",
+		Short:    "Manage changelists for multiple projects(deprecated, use jiri upload)",
+		Long:     "Manage changelists for multiple projects. This has been deprecated, please use jiri upload",
 		Children: []*cmdline.Command{cmdCLCleanup, cmdCLMail, cmdCLNew, cmdCLSync, cmdCLUpload},
 	}
 }
@@ -137,7 +137,7 @@ func newCmdCL() *cmdline.Command {
 var cmdCLCleanup = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runCLCleanup),
 	Name:   "cleanup",
-	Short:  "Clean up changelists that have been merged",
+	Short:  "Clean up changelists that have been merged(deprecated, use jiri upload)",
 	Long: `
 Command "cleanup" checks that the given branches have been merged into
 the corresponding remote branch. If a branch differs from the
@@ -260,6 +260,7 @@ func cleanupBranch(jirix *jiri.X, branch string) error {
 }
 
 func runCLCleanup(jirix *jiri.X, args []string) error {
+	jirix.Logger.Warningf("jiri cl has been deprecated please use jiri upload. It will be removed soon.")
 	if len(args) == 0 {
 		return jirix.UsageErrorf("cleanup requires at least one argument")
 	}
@@ -276,7 +277,7 @@ func newCmdCLUpload(name string, runner func(*jiri.X, []string) error) *cmdline.
 	cmdCLUpload := &cmdline.Command{
 		Runner: jiri.RunnerFunc(runner),
 		Name:   name,
-		Short:  "Upload a changelist for review",
+		Short:  "Upload a changelist for review(deprecated, use jiri upload)",
 		Long: `
 Command "upload" squashes all commits of a local branch into a single
 "changelist" and uploads this changelist to Gerrit as a single
@@ -600,13 +601,14 @@ func clUploadMultiFlags() []string {
 
 // runCLMail is a wrapper around runCLUpload
 func runCLMail(jirix *jiri.X, args []string) error {
-	fmt.Printf("WARNING: `jiri cl mail` command has been renamed to `jiri cl upload`\n")
+	jirix.Logger.Warningf("jiri cl has been deprecated please use jiri upload. It will be removed soon.")
 	return runCLUpload(jirix, args)
 }
 
 // runCLUpload is a wrapper that sets up and runs a review instance across
 // multiple projects.
 func runCLUpload(jirix *jiri.X, _ []string) error {
+	jirix.Logger.Warningf("jiri cl has been deprecated please use jiri upload. It will be removed soon.")
 	mp, err := initForMultiPart(jirix)
 	if err != nil {
 		return err
@@ -657,6 +659,7 @@ func runCLUpload(jirix *jiri.X, _ []string) error {
 }
 
 func runCLUploadCurrent(jirix *jiri.X, _ []string) error {
+	jirix.Logger.Warningf("jiri cl has been deprecated please use jiri upload. It will be removed soon.")
 	// Check that working dir exist on remote branch.  Otherwise checking out
 	// remote branch will break the users working dir.
 	git := gitutil.New(jirix)
@@ -1316,7 +1319,7 @@ func (review *review) updateReviewMessage(git *gitutil.Git, file string) error {
 var cmdCLNew = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runCLNew),
 	Name:   "new",
-	Short:  "Create a new local branch for a changelist",
+	Short:  "Create a new local branch for a changelist(deprecated, use jiri upload)",
 	Long: fmt.Sprintf(`
 Command "new" creates a new local branch for a changelist. In
 particular, it forks a new branch with the given name from the current
@@ -1330,6 +1333,7 @@ by the "jiri cl sync" and "jiri cl upload" commands.
 }
 
 func runCLNew(jirix *jiri.X, args []string) error {
+	jirix.Logger.Warningf("jiri cl has been deprecated please use jiri upload. It will be removed soon.")
 	if got, want := len(args), 1; got != want {
 		return jirix.UsageErrorf("unexpected number of arguments: got %v, want %v", got, want)
 	}
@@ -1391,7 +1395,7 @@ func newCL(jirix *jiri.X, args []string) error {
 var cmdCLSync = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runCLSync),
 	Name:   "sync",
-	Short:  "Bring a changelist up to date",
+	Short:  "Bring a changelist up to date(deprecated, use jiri upload)",
 	Long: fmt.Sprintf(`
 Command "sync" brings the CL identified by the current branch up to
 date with the branch tracking the remote branch this CL pertains
@@ -1410,6 +1414,7 @@ before the command can be retried.
 }
 
 func runCLSync(jirix *jiri.X, _ []string) error {
+	jirix.Logger.Warningf("jiri cl has been deprecated please use jiri upload. It will be removed soon.")
 	git := gitutil.New(jirix)
 	return syncCL(jirix, git)
 }

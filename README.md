@@ -229,7 +229,7 @@ To find documentation about a specific topic or subcommand, run `jiri help
 ### Main commands are:
 ```
    branch      Show or delete branches
-   cl          Manage changelists for multiple projects
+   cl          Manage changelists for multiple projects(deprecated, use jiri upload)
    grep        Search across projects
    import      Adds imports to .jiri_manifest file
    init        Create a new jiri root
@@ -272,27 +272,15 @@ reference][android repo] or Go's [contributing instructions][go contrib] for
 examples of how intricate the workflow for resolving conflicts between the
 pending code change and the remote master is.
 
-The `jiri cl` command enables interaction with Gerrit without having to use
-such a complex and error-prone workflow.  With `jiri cl`, users commit as often
-as they want on feature branches, and `jiri cl` handles the hard work of
-squashing all commits into a single commit and sending to Gerrit.
-
 The rest of this section describes common development operations using `jiri
-cl`.  The term "CL" (short for "ChangeList") refers to a set of code changes
-uploaded for review.
+upload`.
 
 ### Using feature branches
 
-The "master" branch of each local repository is reserved for tracking its
-remote counterpart.  All development should take place on a non-master
-"feature" branch.  Once the code is reviewed and approved, it is merged into
-the remote master via the Gerrit code review system.  The change can then be
-merged into the local master branch with `jiri update`.
-
-<!-- TODO(nlacasse): dje is changing this behavior.  The plan is that "master"
-will be the default reserved branch for each repo, but that can be overridden
-with the `localbranch` attribute in the manifest.  Update this section once
-this change lands. -->
+All development should take place on a non-master "feature" branch.  Once the
+code is reviewed and approved, it is merged into the remote master via the
+Gerrit code review system.  The change can then be merged into the local
+branches with `jiri update -rebase-all`.
 
 ### Creating a new CL
 
@@ -302,7 +290,7 @@ this change lands. -->
   ```
 2. Create a new feature branch for the CL.
   ```
-  jiri cl new <branch-name>
+  jiri checkout -b <branch-name> --track origin/master
   ```
 3. Make modifications to the project source code.
 4. Stage any changed files for commit.
@@ -313,7 +301,6 @@ this change lands. -->
   ```
   git commit
   ```
-6. Repeat steps 3-5 as necessary.
 
 ### Syncing a CL with the remote
 
@@ -327,7 +314,7 @@ this change lands. -->
   ```
 3. Sync the feature branch with the master branch.
   ```
-  jiri cl sync
+  jiri rebase origin/master
   ```
 4. If there are no conflicts between the master and the feature branch, the CL
    has been successfully synced with the remote.
@@ -339,7 +326,7 @@ this change lands. -->
     ```
   3. Commit the changes.
     ```
-    git commit
+    git commit --amend
     ```
 
 ### Requesting a code review
@@ -350,15 +337,15 @@ this change lands. -->
   ```
 2.  Upload the CL to Gerrit.
   ```
-  jiri cl upload
+  jiri upload
   ```
 
 If the CL upload is  successful, this will print the URL of the CL hosted on
 Gerrit.  You can add reviewers and comments through the [Gerrit web UI][gerrit
 web ui] at that URL.
 
-Note that there are many useful flags for `jiri cl`.  You can learn about them
-by running `jiri cl --help`.
+Note that there are many useful flags for `jiri upload`.  You can learn about them
+by running `jiri help upload`.
 
 ### Reviewing a CL
 
@@ -374,19 +361,21 @@ by running `jiri cl --help`.
   ```
   git checkout <branch-name>
   ```
-2. Modify and commit the code as described above.
+2. Modify and commit the code.
+  ```
+  git commit --amend
+  ```
 3. Reply to each Gerrit comment and click the "Reply" button to send them.
 4. Send the updated CL to Gerrit.
   ```
-  jiri cl upload
+  jiri upload
   ```
 
 ### Submitting a CL
-1. Note that if the CL conflicts with any changes that have been submitted
-   since the last update of the CL, these conflicts need to be resolved before
-   the CL can be submitted.  To do so, follow the steps in the "Syncing a CL
-   with the remote" section above and then upload the updated CL to Gerrit.
-  ```
+1. Note that if the CL conflicts with any changes that have been submitted since
+   the last update of the CL, these conflicts need to be resolved before the CL
+   can be submitted.  To do so, rebase your changes then upload the updated CL
+   to Gerrit.  ```
   jiri cl upload
   ```
 2. Once a CL meets the conditions for being submitted, it can be merged into
@@ -399,18 +388,8 @@ by running `jiri cl --help`.
     ```
   2. Safely delete the feature branch that corresponds to the CL.
     ```
-    jiri cl cleanup <branch-name>
+    git checkout JIRI_HEAD && git branch -d <branch-name>
     ```
-
-Note that deleting the feature branch with `git branch -d <branch-name>` won't
-work in general because the git history on the local feature branch differs
-from the history on the remote master.  The local feature branch might have
-many small commits, while the remote will have the same changes squashed into a
-single commit.  This difference in the history will prevent git from letting
-you do `git branch -d <branch-name>`.  You *can* use `git branch -D
-<branch-name>`, but that can potentially cause you to lose work if the branch
-has not been merged into master yet.  For this reason, we recommend using `jiri
-cl cleanup` to delete the feature branch safely.
 
 ### Dependent CLs
 If you have changes A and B, and B depends on A, you can still submit distinct
@@ -422,7 +401,7 @@ for review according to the instructions above.
 
 Then, while still on the feature branch for A, create your feature branch for B.
 ```
-jiri cl new feature-B
+jiri checkout -b feature-B --track origin/master
 ```
 Then make your change and upload the CL for review according to the
 instructions above.
@@ -434,15 +413,15 @@ and upload a new patch set for feature B.
 ```
 jiri update # fetch update that includes feature A
 git checkout feature-B
-jiri cl cleanup feature-A
-git merge master # merge feature A into feature B branch
-jiri cl upload # send new patch set for feature B
+git rebase -i origin/master # if u see commit from A, delete it and then rebase
+properly
+jiri upload # send new patch set for feature B
 ```
 The CL for feature B can now be submitted.
 
 This process can be extended for more than 2 CLs.  You must keep two things in mind:
-* always create the dependent feature branch with `jiri cl new` from the parent feature branch, and
-* after a parent feature has been submitted, cleanup the parent feature branch with `jiri cl cleanup`, and merge master into all dependent CLs and upload new patch sets.
+* always create the dependent feature branch from the parent feature branch, and
+* after a parent feature has been submitted, rebase feature-B onto origin/master
 
 ## FAQ
 
