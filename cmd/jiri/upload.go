@@ -32,6 +32,14 @@ var (
 	uploadBranchFlag    string
 )
 
+type uploadError string
+
+func (e uploadError) Error() string {
+	result := "sending code review failed\n\n"
+	result += string(e)
+	return result
+}
+
 var cmdUpload = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runUpload),
 	Name:   "upload",
@@ -220,13 +228,32 @@ func runUpload(jirix *jiri.X, _ []string) error {
 					fmt.Printf("%s", gitErr.Output)
 					fmt.Printf("%s", gitErr.ErrorOutput)
 				} else {
-					return gerritError(err.Error())
+					return uploadError(err.Error())
 				}
 			} else {
-				return gerritError(err.Error())
+				return uploadError(err.Error())
 			}
 		}
 		fmt.Println()
 	}
 	return nil
+}
+
+// parseEmails input a list of comma separated tokens and outputs a
+// list of email addresses. The tokens can either be email addresses
+// or Google LDAPs in which case the suffix @google.com is appended to
+// them to turn them into email addresses.
+func parseEmails(value string) []string {
+	var emails []string
+	tokens := strings.Split(value, ",")
+	for _, token := range tokens {
+		if token == "" {
+			continue
+		}
+		if !strings.Contains(token, "@") {
+			token += "@google.com"
+		}
+		emails = append(emails, token)
+	}
+	return emails
 }

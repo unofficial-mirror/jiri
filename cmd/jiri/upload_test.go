@@ -17,6 +17,7 @@ import (
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 func projectName(i int) string {
@@ -424,5 +425,50 @@ func TestUploadFailsForUntrackedBranch(t *testing.T) {
 		t.Fatalf("Should have got a error here.")
 	} else if !strings.Contains(err.Error(), fmt.Sprintf("branch %q is un-tracked or tracks a local un-tracked branch", branch)) {
 		t.Fatalf("Wrong error: %s", err)
+	}
+}
+
+// commitFile commits a file with the specified content into a branch
+func commitFile(t *testing.T, jirix *jiri.X, filename string, content string) {
+	s := jirix.NewSeq()
+	if err := s.WriteFile(filename, []byte(content), 0644).Done(); err != nil {
+		t.Fatalf("%v", err)
+	}
+	commitMessage := "Commit " + filename
+	if err := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(filename, commitMessage); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// commitFiles commits the given files into to current branch.
+func commitFiles(t *testing.T, jirix *jiri.X, filenames []string) {
+	// Create and commit the files one at a time.
+	for _, filename := range filenames {
+		content := "This is file " + filename
+		commitFile(t, jirix, filename, content)
+	}
+}
+
+// assertFilesCommitted asserts that the files exist and are committed
+// in the current branch.
+func assertFilesCommitted(t *testing.T, jirix *jiri.X, files []string) {
+	assertFilesExist(t, jirix, files)
+	for _, file := range files {
+		if !gitutil.New(jirix).IsFileCommitted(file) {
+			t.Fatalf("expected file %v to be committed but it is not", file)
+		}
+	}
+}
+
+// assertFilesExist asserts that the files exist.
+func assertFilesExist(t *testing.T, jirix *jiri.X, files []string) {
+	s := jirix.NewSeq()
+	for _, file := range files {
+		if _, err := s.Stat(file); err != nil {
+			if runutil.IsNotExist(err) {
+				t.Fatalf("expected file %v to exist but it did not", file)
+			}
+			t.Fatalf("%v", err)
+		}
 	}
 }
