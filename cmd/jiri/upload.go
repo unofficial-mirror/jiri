@@ -216,7 +216,7 @@ func runUpload(jirix *jiri.X, _ []string) error {
 		fmt.Printf("Pushing project %s(%s)\n", gerritPushOption.Project.Name, gerritPushOption.relativePath)
 		if err := gerrit.Push(jirix.NewSeq().Dir(gerritPushOption.Project.Path), gerritPushOption.CLOpts); err != nil {
 			if strings.Contains(err.Error(), "(no new changes)") {
-				if gitErr, ok := err.(gitutil.GitError); ok {
+				if gitErr, ok := err.(gerrit.PushError); ok {
 					fmt.Printf("%s", gitErr.Output)
 					fmt.Printf("%s", gitErr.ErrorOutput)
 				} else {

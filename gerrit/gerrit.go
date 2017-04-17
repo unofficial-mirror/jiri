@@ -469,6 +469,20 @@ func Reference(opts CLOpts) string {
 	return ref
 }
 
+type PushError struct {
+	Args        []string
+	Output      string
+	ErrorOutput string
+}
+
+func (ge PushError) Error() string {
+	result := "'git "
+	result += strings.Join(ge.Args, " ")
+	result += "' failed:\n"
+	result += ge.ErrorOutput
+	return result
+}
+
 // Push pushes the current branch to Gerrit.
 func Push(seq runutil.Sequence, clOpts CLOpts) error {
 	refspec := "HEAD:" + Reference(clOpts)
@@ -483,7 +497,7 @@ func Push(seq runutil.Sequence, clOpts CLOpts) error {
 	}
 	var stdout, stderr bytes.Buffer
 	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
-		return fmt.Errorf("'git %s ' failed:\n%s", strings.Join(args, " "), stderr.String())
+		return PushError{args, stdout.String(), stderr.String()}
 	}
 	for _, line := range strings.Split(stderr.String(), "\n") {
 		if remoteRE.MatchString(line) {
