@@ -120,6 +120,44 @@ func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
 	}
 }
 
+func (g *Git) SetUpstream(branch, upstream string) error {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return err
+	}
+	defer repo.Free()
+	b, err := repo.LookupBranch(branch, git2go.BranchLocal)
+	if err != nil {
+		return err
+	}
+	return b.SetUpstream(upstream)
+}
+
+func (g *Git) CreateBranchFromRef(branch, ref string) error {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return err
+	}
+	defer repo.Free()
+	obj, err := repo.RevparseSingle(ref)
+	if err != nil {
+		return err
+	}
+	defer obj.Free()
+	c, err := obj.Peel(git2go.ObjectCommit)
+	if err != nil {
+		return err
+	}
+	defer c.Free()
+	commit, err := c.AsCommit()
+	if err != nil {
+		return err
+	}
+	defer commit.Free()
+	_, err = repo.CreateBranch(branch, commit, false)
+	return err
+}
+
 func (g *Git) HasUntrackedFiles() (bool, error) {
 	repo, err := git2go.OpenRepository(g.rootDir)
 	if err != nil {

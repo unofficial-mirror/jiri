@@ -367,6 +367,10 @@ func (g *Gerrit) Query(query string) (_ CLList, e error) {
 	return parseQueryResults(res.Body)
 }
 
+func (g *Gerrit) ListOpenChangesByTopic(topic string) (CLList, error) {
+	return g.Query("topic:\"" + topic + "\" status:open")
+}
+
 // GetChange returns a Change object for the given changeId number.
 func (g *Gerrit) GetChange(changeNumber int) (*Change, error) {
 	clList, err := g.Query(fmt.Sprintf("%d", changeNumber))
@@ -382,6 +386,10 @@ func (g *Gerrit) GetChange(changeNumber int) (*Change, error) {
 		return nil, fmt.Errorf("Too many changes returned for query '%d'", changeNumber)
 	}
 	return &clList[0], nil
+}
+
+func (g *Gerrit) GetChangeURL(changeNumber int) string {
+	return fmt.Sprintf("%s/c/%d", g.host, changeNumber)
 }
 
 // Submit submits the given changelist through Gerrit.
