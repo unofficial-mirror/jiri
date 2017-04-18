@@ -13,6 +13,10 @@ Jiri has an extensible plugin model, making it easy to create new sub-commands.
 
 Jiri is open-source.  See the contributor guidelines [here][contributing].
 
+## Manually build jiri
+We have [prebuilts](#bootstrapping) for linux and darwin `x86_64` systems. In
+rder to build jiri manually use these [instructions][build jiri].
+
 ## Jiri Basics
 Jiri organizes a set of repositories on your local filesystem according to a
 [manifest][manifests].  These repositories are referred to as "projects", and
@@ -104,10 +108,10 @@ https://raw.githubusercontent.com/fuchsia-mirror/jiri/master/scripts/bootstrap_j
 ```
 
 The `jiri` command line tool will be installed in
-`$MY_ROOT/.jiri_root/scripts/jiri`, so add that to your `PATH`.
+`$MY_ROOT/.jiri_root/bin/jiri`, so add that to your `PATH`.
 
 ```
-export PATH="$MY_ROOT"/.jiri_root/scripts:$PATH
+export PATH="$MY_ROOT"/.jiri_root/bin:$PATH
 ```
 
 Next, use the `jiri import` command to import the "minimal" manifest from the
@@ -449,3 +453,4 @@ see [Jiri local update][hacking doc]
 [manifest doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/manifest.md "Jiri manifest"
 [filesystem doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/filesystem.md "Jiri filesystem"
 [hacking doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/HACKING.md "Jiri local updates"
+[build jiri]:https://fuchsia.googlesource.com/jiri/+/HEAD/BUILD.md "Build jiri"
