@@ -6,7 +6,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,32 +25,7 @@ import (
 	"fuchsia.googlesource.com/jiri/tool"
 )
 
-var (
-	cmdRunP   *cmdline.Command
-	runpFlags runpFlagValues
-)
-
-func newRunP() *cmdline.Command {
-	return &cmdline.Command{
-		Runner: jiri.RunnerFunc(runRunp),
-		Name:   "runp",
-		Short:  "Run a command in parallel across jiri projects",
-		Long: `
-Run a command in parallel across one or more jiri projects. Commands are run
-using the shell specified by the users $SHELL environment variable, or "sh"
-if that's not set. Thus commands are run as $SHELL -c "args..."
- `,
-		ArgsName: "<command line>",
-		ArgsLong: `
-	A command line to be run in each project specified by the supplied command
-line flags. Any environment variables intended to be evaluated when the
-command line is run must be quoted to avoid expansion before being passed to
-runp by the shell.
-`,
-	}
-}
-
-type runpFlagValues struct {
+var runpFlags struct {
 	projectKeys    string
 	verbose        bool
 	interactive    bool
@@ -66,27 +40,35 @@ type runpFlagValues struct {
 	branch         string
 }
 
-func registerCommonFlags(flags *flag.FlagSet, values *runpFlagValues) {
-	flags.BoolVar(&values.verbose, "v", false, "Print verbose logging information")
-	flags.StringVar(&values.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project unless it is run from outside of a project in which case it will default to using all projects.")
-	flags.BoolVar(&values.uncommitted, "uncommitted", false, "Match projects that have uncommitted changes")
-	flags.BoolVar(&values.noUncommitted, "no-uncommitted", false, "Match projects that have no uncommitted changes")
-	flags.BoolVar(&values.untracked, "untracked", false, "Match projects that have untracked files")
-	flags.BoolVar(&values.noUntracked, "no-untracked", false, "Match projects that have no untracked files")
-	flags.BoolVar(&values.interactive, "interactive", false, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
-	flags.BoolVar(&values.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-key-prefix or -collate-stdout.")
-	flags.BoolVar(&values.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix or -collate-stdout")
-	flags.BoolVar(&values.collateOutput, "collate-stdout", true, "Collate all stdout output from each parallel invocation and display it as if had been generated sequentially. This flag cannot be used with -show-name-prefix, -show-key-prefix or -interactive.")
-	flags.BoolVar(&values.exitOnError, "exit-on-error", false, "If set, all commands will killed as soon as one reports an error, otherwise, each will run to completion.")
-	flags.StringVar(&values.branch, "branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
+var cmdRunP = &cmdline.Command{
+	Runner: jiri.RunnerFunc(runRunp),
+	Name:   "runp",
+	Short:  "Run a command in parallel across jiri projects",
+	Long: `Run a command in parallel across one or more jiri projects. Commands are run
+using the shell specified by the users $SHELL environment variable, or "sh"
+if that's not set. Thus commands are run as $SHELL -c "args..."
+ `,
+	ArgsName: "<command line>",
+	ArgsLong: `A command line to be run in each project specified by the supplied command
+line flags. Any environment variables intended to be evaluated when the
+command line is run must be quoted to avoid expansion before being passed to
+runp by the shell.
+`,
 }
 
 func init() {
-	// Avoid an intialization loop between cmdline.Command.Runner which
-	// refers to cmdRunP and runRunp referring back to cmdRunP.ParsedFlags.
-	cmdRunP = newRunP()
-	cmdRoot.Children = append(cmdRoot.Children, cmdRunP)
-	registerCommonFlags(&cmdRunP.Flags, &runpFlags)
+	cmdRunP.Flags.BoolVar(&runpFlags.verbose, "v", false, "Print verbose logging information")
+	cmdRunP.Flags.StringVar(&runpFlags.projectKeys, "projects", "", "A Regular expression specifying project keys to run commands in. By default, runp will use projects that have the same branch checked as the current project unless it is run from outside of a project in which case it will default to using all projects.")
+	cmdRunP.Flags.BoolVar(&runpFlags.uncommitted, "uncommitted", false, "Match projects that have uncommitted changes")
+	cmdRunP.Flags.BoolVar(&runpFlags.noUncommitted, "no-uncommitted", false, "Match projects that have no uncommitted changes")
+	cmdRunP.Flags.BoolVar(&runpFlags.untracked, "untracked", false, "Match projects that have untracked files")
+	cmdRunP.Flags.BoolVar(&runpFlags.noUntracked, "no-untracked", false, "Match projects that have no untracked files")
+	cmdRunP.Flags.BoolVar(&runpFlags.interactive, "interactive", false, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
+	cmdRunP.Flags.BoolVar(&runpFlags.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-key-prefix or -collate-stdout.")
+	cmdRunP.Flags.BoolVar(&runpFlags.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix or -collate-stdout")
+	cmdRunP.Flags.BoolVar(&runpFlags.collateOutput, "collate-stdout", true, "Collate all stdout output from each parallel invocation and display it as if had been generated sequentially. This flag cannot be used with -show-name-prefix, -show-key-prefix or -interactive.")
+	cmdRunP.Flags.BoolVar(&runpFlags.exitOnError, "exit-on-error", false, "If set, all commands will killed as soon as one reports an error, otherwise, each will run to completion.")
+	cmdRunP.Flags.StringVar(&runpFlags.branch, "branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
 }
 
 type mapInput struct {
@@ -292,7 +274,7 @@ func (r *runner) Reduce(mr *simplemr.MR, key string, values []interface{}) error
 	return nil
 }
 
-func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
+func runRunp(jirix *jiri.X, args []string) error {
 	if runpFlags.interactive {
 		runpFlags.collateOutput = false
 	}
@@ -425,8 +407,4 @@ func runp(jirix *jiri.X, cmd *cmdline.Command, args []string) error {
 	<-out
 	jirix.TimerPop()
 	return mr.Error()
-}
-
-func runRunp(jirix *jiri.X, args []string) error {
-	return runp(jirix, cmdRunP, args)
 }
