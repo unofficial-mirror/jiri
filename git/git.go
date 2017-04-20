@@ -163,6 +163,7 @@ func (g *Git) HasUntrackedFiles() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer repo.Free()
 	opts := &git2go.StatusOptions{}
 	opts.Show = git2go.StatusShowIndexAndWorkdir
 	opts.Flags = git2go.StatusOptIncludeUntracked
@@ -193,6 +194,7 @@ func (g *Git) HasUncommittedChanges() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer repo.Free()
 	opts := &git2go.StatusOptions{}
 	opts.Show = git2go.StatusShowIndexAndWorkdir
 
