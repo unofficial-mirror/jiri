@@ -20,16 +20,17 @@ import (
 )
 
 var (
-	uploadCcsFlag       string
-	uploadHostFlag      string
-	uploadPresubmitFlag string
-	uploadReviewersFlag string
-	uploadTopicFlag     string
-	uploadVerifyFlag    bool
-	uploadRebaseFlag    bool
-	uploadSetTopicFlag  bool
-	uploadMultipartFlag bool
-	uploadBranchFlag    string
+	uploadCcsFlag          string
+	uploadHostFlag         string
+	uploadPresubmitFlag    string
+	uploadReviewersFlag    string
+	uploadTopicFlag        string
+	uploadVerifyFlag       bool
+	uploadRebaseFlag       bool
+	uploadSetTopicFlag     bool
+	uploadMultipartFlag    bool
+	uploadBranchFlag       string
+	uploadRemoteBranchFlag string
 )
 
 type uploadError string
@@ -59,6 +60,8 @@ func init() {
 	cmdUpload.Flags.BoolVar(&uploadRebaseFlag, "rebase", false, `Run rebase before pushing.`)
 	cmdUpload.Flags.BoolVar(&uploadMultipartFlag, "multipart", false, `Send multipart CL.`)
 	cmdUpload.Flags.StringVar(&uploadBranchFlag, "branch", "", `Used when multipart flag is true and this command is executed from root folder`)
+	cmdUpload.Flags.StringVar(&uploadRemoteBranchFlag, "remoteBranch", "", `Remote branch to upload change to. If this is not specified and branch is untracked,
+change would be uploaded to branch in project manifest`)
 }
 
 // runUpload is a wrapper that pushes the changes to gerrit for review.
@@ -105,12 +108,12 @@ func runUpload(jirix *jiri.X, _ []string) error {
 			topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), currentBranch) // use <username>-<branchname> as the default
 		}
 	}
+	localProjects, err := project.LocalProjects(jirix, project.FastScan)
+	if err != nil {
+		return err
+	}
 	if uploadMultipartFlag {
-		projects, err := project.LocalProjects(jirix, project.FastScan)
-		if err != nil {
-			return err
-		}
-		for _, project := range projects {
+		for _, project := range localProjects {
 			scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 			if scm.IsOnBranch() {
 				branch, err := scm.CurrentBranchName()
@@ -143,6 +146,10 @@ func runUpload(jirix *jiri.X, _ []string) error {
 		return err
 	}
 	var gerritPushOptions []GerritPushOption
+	remoteProjects, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, false /*localManifest*/)
+	if err != nil {
+		return err
+	}
 	for _, project := range projectsToProcess {
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 		relativePath, err := filepath.Rel(cwd, project.Path)
@@ -157,12 +164,20 @@ func runUpload(jirix *jiri.X, _ []string) error {
 				return fmt.Errorf("Project %s(%s) has uncommited changes, please commit them or stash them. Cannot rebase before pushing.", project.Name, relativePath)
 			}
 		}
-		remoteBranch, err := scm.RemoteBranchName()
-		if err != nil {
-			return err
-		}
+		remoteBranch := uploadRemoteBranchFlag
 		if remoteBranch == "" {
-			return fmt.Errorf("For project %s(%s), branch %q is un-tracked or tracks a local un-tracked branch.", project.Name, relativePath, currentBranch)
+			remoteBranch, err = scm.RemoteBranchName()
+			if err != nil {
+				return err
+			}
+		}
+		if remoteBranch == "" { // Un-tracked branch
+			remoteBranch = "master"
+			if r, ok := remoteProjects[project.Key()]; ok {
+				remoteBranch = r.RemoteBranch
+			} else {
+				jirix.Logger.Warningf("Project %s(%s) not found in manifest, will upload change to %q", project.Name, relativePath, remoteBranch)
+			}
 		}
 
 		host := uploadHostFlag
@@ -207,15 +222,12 @@ func runUpload(jirix *jiri.X, _ []string) error {
 			if err := scm.Fetch("origin"); err != nil {
 				return err
 			}
-			trackingBranch, err := scm.TrackingBranchName()
-			if err != nil {
-				return err
-			}
-			if err = scm.Rebase(trackingBranch); err != nil {
+			remoteBranch := "remotes/origin/" + gerritPushOption.CLOpts.RemoteBranch
+			if err = scm.Rebase(remoteBranch); err != nil {
 				if err2 := scm.RebaseAbort(); err2 != nil {
 					return err2
 				}
-				return fmt.Errorf("For project %s(%s), not able to rebase the branch to %s, please rebase manually: %s", gerritPushOption.Project.Name, gerritPushOption.relativePath, trackingBranch, err)
+				return fmt.Errorf("For project %s(%s), not able to rebase the branch to %s, please rebase manually: %s", gerritPushOption.Project.Name, gerritPushOption.relativePath, remoteBranch, err)
 			}
 		}
 	}
