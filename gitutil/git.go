@@ -325,6 +325,17 @@ func (g *Git) CreateBranchWithUpstream(branch, upstream string) error {
 	return g.run("branch", branch, upstream)
 }
 
+func (g *Git) GetShortHash(hash string) (string, error) {
+	out, err := g.runOutput("rev-parse", "--short", hash)
+	if err != nil {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		return "", fmt.Errorf("unexpected length of %v: got %v, want %v", out, got, want)
+	}
+	return out[0], nil
+}
+
 // CurrentBranchName returns the name of the current branch.
 func (g *Git) CurrentBranchName() (string, error) {
 	out, err := g.runOutput("rev-parse", "--abbrev-ref", "HEAD")

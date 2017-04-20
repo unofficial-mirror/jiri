@@ -132,41 +132,41 @@ func deleteBranches(jirix *jiri.X, branchToDelete string) error {
 	}
 
 	jirix.TimerPop()
-	projectMap := make(project.Projects)
-	jirix.TimerPush("Build Map")
-	for key, state := range states {
+	jirix.TimerPush("Process")
+	errors := false
+	projectFound := false
+	for _, state := range states {
 		for _, branch := range state.Branches {
 			if branch.Name == branchToDelete {
-				projectMap[key] = state.Project
+				projectFound = true
+				localProject := state.Project
+				relativePath, err := filepath.Rel(cDir, localProject.Path)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Project %s(%s): ", localProject.Name, relativePath)
+				git := gitutil.New(jirix, gitutil.RootDirOpt(localProject.Path))
+
+				if err := git.DeleteBranch(branchToDelete, gitutil.ForceOpt(branchFlags.forceDeleteFlag)); err != nil {
+					errors = true
+					fmt.Printf(jirix.Color.Red("Error while deleting branch: %s\n", err))
+				} else {
+					shortHash, err := git.GetShortHash(branch.Revision)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("%s (was %s)\n", jirix.Color.Green("Deleted Branch %s", branchToDelete), jirix.Color.Yellow(shortHash))
+				}
 				break
 			}
 		}
 	}
 	jirix.TimerPop()
 
-	if len(projectMap) == 0 {
+	if !projectFound {
 		fmt.Printf("Cannot find any project with branch %q\n", branchToDelete)
 		return nil
 	}
-
-	jirix.TimerPush("Process")
-	errors := false
-	for _, localProject := range projectMap {
-		relativePath, err := filepath.Rel(cDir, localProject.Path)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Project %s(%s): ", localProject.Name, relativePath)
-		git := gitutil.New(jirix, gitutil.RootDirOpt(localProject.Path))
-		if err := git.DeleteBranch(branchToDelete, gitutil.ForceOpt(branchFlags.forceDeleteFlag)); err != nil {
-			errors = true
-			fmt.Printf(jirix.Color.Red("Error while deleting branch: %s\n", err))
-		} else {
-			fmt.Printf(jirix.Color.Green("Branch deleted\n"))
-		}
-	}
-	jirix.TimerPop()
-
 	if errors {
 		fmt.Println(jirix.Color.Yellow("Please check errors above"))
 	}
