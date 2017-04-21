@@ -27,7 +27,8 @@ import (
 
 const (
 	RootMetaDir        = ".jiri_root"
-	ProjectMetaDir     = ".jiri"
+	ProjectMetaDir     = ".git/jiri"
+	OldProjectMetaDir  = ".jiri"
 	ConfigFile         = "config"
 	DefaultCacheSubdir = "cache"
 	ProjectMetaFile    = "metadata.v2"

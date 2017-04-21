@@ -85,10 +85,15 @@ func runUpload(jirix *jiri.X, args []string) error {
 	// Walk up the path until we find a project at that path, or hit the jirix.Root.
 	// Note that we can't just compare path prefixes because of soft links.
 	for dir != jirix.Root && dir != string(filepath.Separator) {
-		project, err := project.ProjectAtPath(jirix, dir)
-		if err != nil {
+		if isLocal, err := project.IsLocalProject(jirix, dir); err != nil {
+			return fmt.Errorf("Error while checking for local project at path %q: %s", dir, err)
+		} else if !isLocal {
 			dir = filepath.Dir(dir)
 			continue
+		}
+		project, err := project.ProjectAtPath(jirix, dir)
+		if err != nil {
+			return fmt.Errorf("Error while getting project at path %q: %s", dir, err)
 		}
 		p = &project
 		break
@@ -138,11 +143,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 		}
 
 	} else {
-		if project, err := currentProject(jirix); err != nil {
-			return err
-		} else {
-			projectsToProcess = append(projectsToProcess, project)
-		}
+		projectsToProcess = append(projectsToProcess, *p)
 	}
 	if len(projectsToProcess) == 0 {
 		return fmt.Errorf("Did not find any project to push for branch %q", currentBranch)

@@ -947,7 +947,7 @@ func projectsExistLocally(jirix *jiri.X, projects Projects) (bool, error) {
 	jirix.TimerPush("match manifest")
 	defer jirix.TimerPop()
 	for _, p := range projects {
-		isLocal, err := isLocalProject(jirix, p.Path)
+		isLocal, err := IsLocalProject(jirix, p.Path)
 		if err != nil {
 			return false, err
 		}
@@ -1218,14 +1218,27 @@ func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches boo
 	return nil
 }
 
-// isLocalProject returns true if there is a project at the given path.
-func isLocalProject(jirix *jiri.X, path string) (bool, error) {
+// IsLocalProject returns true if there is a project at the given path.
+func IsLocalProject(jirix *jiri.X, path string) (bool, error) {
 	// Existence of a metadata directory is how we know we've found a
 	// Jiri-maintained project.
 	metadataDir := filepath.Join(path, jiri.ProjectMetaDir)
 	if _, err := os.Stat(metadataDir); err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			// Check for old meta directory
+			oldMetadataDir := filepath.Join(path, jiri.OldProjectMetaDir)
+			if _, err := os.Stat(oldMetadataDir); err != nil {
+				if os.IsNotExist(err) {
+					return false, nil
+
+				}
+				return false, fmtError(err)
+			}
+			// Old metadir found, move it
+			if err := os.Rename(oldMetadataDir, metadataDir); err != nil {
+				return false, fmtError(err)
+			}
+			return true, nil
 		}
 		return false, fmtError(err)
 	}
@@ -1275,7 +1288,7 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 		defer pwg.Done()
 		limit <- struct{}{}
 		defer func() { <-limit }()
-		isLocal, err := isLocalProject(jirix, path)
+		isLocal, err := IsLocalProject(jirix, path)
 		if err != nil {
 			errs <- fmt.Errorf("Error while processing path %q: %v", path, err)
 			return
@@ -2503,29 +2516,6 @@ fi
 			commitHook.Close()
 			if err := os.Chmod(hookPath, 0750); err != nil {
 				return err
-			}
-
-			// Apply exclusion for /.jiri/. Ideally we'd only write this file on
-			// create, but the remote manifest import is move from the temp directory
-			// into the final spot, so we need this to apply to both.
-			//
-			// TODO(toddw): Find a better way to do this.
-			excludeDir := filepath.Join(op.Project().Path, ".git", "info")
-			excludeFile := filepath.Join(excludeDir, "exclude")
-			b, err := ioutil.ReadFile(excludeFile)
-			if err != nil {
-				if !os.IsNotExist(err) {
-					return fmtError(err)
-				}
-			}
-			excludeString := "/.jiri/\n"
-			if !strings.Contains(string(b), excludeString) {
-				if err := os.MkdirAll(excludeDir, 0755); err != nil {
-					return fmtError(err)
-				}
-				if err := ioutil.WriteFile(excludeFile, []byte(excludeString), 0644); err != nil {
-					return fmtError(err)
-				}
 			}
 		}
 		if op.Project().GitHooks == "" {

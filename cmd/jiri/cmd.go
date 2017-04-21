@@ -87,16 +87,16 @@ All data managed by the jiri tool is located in the file system under a root
 directory, colloquially called the jiri root directory.  The file system layout
 looks like this:
 
- [root]                              # root directory (name picked by user)
- [root]/.jiri_root                   # root metadata directory
- [root]/.jiri_root/bin               # contains jiri tool binary
- [root]/.jiri_root/update_history    # contains history of update snapshots
- [root]/.manifest                    # contains jiri manifests
- [root]/[project1]                   # project directory (name picked by user)
- [root]/[project1]/.jiri             # project metadata directory
- [root]/[project1]/.jiri/metadata.v2 # project metadata file
- [root]/[project1]/.jiri/<<cls>>     # project per-cl metadata directories
- [root]/[project1]/<<files>>         # project files
+ [root]                                   # root directory (name picked by user)
+ [root]/.jiri_root                        # root metadata directory
+ [root]/.jiri_root/bin                    # contains jiri tool binary
+ [root]/.jiri_root/update_history         # contains history of update snapshots
+ [root]/.manifest                         # contains jiri manifests
+ [root]/[project1]                        # project directory (name picked by user)
+ [root]/[project1]/.git/jiri              # project metadata directory
+ [root]/[project1]/.git/jiri/metadata.v2  # project metadata file
+ [root]/[project1]/.git/jiri/config       # project local config file
+ [root]/[project1]/<<files>>              # project files
  [root]/[project2]...
 
 The [root] and [projectN] directory names are picked by the user.  The <<cls>>

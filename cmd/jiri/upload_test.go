@@ -206,6 +206,46 @@ func TestUploadRef(t *testing.T) {
 	assertUploadFilesNotPushedToRef(t, fake.X, gerritPath, expectedRef, files[1:])
 }
 
+func TestUploadWithOldMetadata(t *testing.T) {
+	defer resetFlags()
+	fake, localProjects, cleanup := setupUploadTest(t)
+	defer cleanup()
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	if err := os.Chdir(localProjects[1].Path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(jiri.ProjectMetaDir, jiri.OldProjectMetaDir); err != nil {
+		t.Fatal(err)
+	}
+	branch := "my-branch"
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := git.CheckoutBranch(branch); err != nil {
+		t.Fatal(err)
+	}
+	files := []string{"file1"}
+	commitFiles(t, fake.X, files)
+
+	gerritPath := fake.Projects[localProjects[1].Name]
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Fatal(err)
+	}
+
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
+	expectedRef := "refs/for/master%topic=" + topic
+	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
+}
+
 func TestUploadMultipart(t *testing.T) {
 	defer resetFlags()
 	fake, localProjects, cleanup := setupUploadTest(t)
