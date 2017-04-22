@@ -17,6 +17,12 @@ Jiri is open-source.
 We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
 rder to build jiri manually use these [instructions][build jiri].
 
+## Jiri Behaviour
+[See this][behaviour]
+
+## Jiri Tricks
+[See this][how do i]
+
 ## Jiri Basics
 Jiri organizes a set of repositories on your local filesystem according to a
 [manifest][manifests].  These repositories are referred to as "projects", and
@@ -448,7 +454,9 @@ see [Jiri local update][hacking doc]
 [jiri-wiki]: https://en.wikipedia.org/wiki/Ji%C5%99%C3%AD "Jiří"
 [manifests]: #manifests "manifests"
 [minimal manifest]: https://fuchsia.googlesource.com/manifest/+/refs/heads/master/minimal "minimal manifest"
-[manifest doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/manifest.md "Jiri manifest"
-[filesystem doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/filesystem.md "Jiri filesystem"
-[hacking doc]:https://fuchsia.googlesource.com/jiri/+/HEAD/HACKING.md "Jiri local updates"
-[build jiri]:https://fuchsia.googlesource.com/jiri/+/HEAD/BUILD.md "Build jiri"
+[manifest doc]:/manifest.md "Jiri manifest"
+[filesystem doc]:/filesystem.md "Jiri filesystem"
+[hacking doc]:/HACKING.md "Jiri local updates"
+[behaviour and tricks]:/behaviour.md
+[build jiri]:/BUILD.md "Build jiri"
+[how do i]:/howdoi.md
