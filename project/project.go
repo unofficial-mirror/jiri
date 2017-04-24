@@ -2660,17 +2660,22 @@ func computeOp(local, remote *Project, state *ProjectState, gc, rebaseUntracked,
 		remote.LocalConfig = local.LocalConfig
 		localBranchesNeedUpdating := false
 		if !snapshot {
-			for _, branch := range state.Branches {
-				if branch.Tracking != nil {
-					if branch.Revision != branch.Tracking.Revision {
+			cb := state.CurrentBranch
+			if rebaseAll {
+				for _, branch := range state.Branches {
+					if branch.Tracking != nil {
+						if branch.Revision != branch.Tracking.Revision {
+							localBranchesNeedUpdating = true
+							break
+						}
+					} else if rebaseUntracked && rebaseAll {
+						// We put checks for untracked-branch updation in syncProjectMaster funtion
 						localBranchesNeedUpdating = true
 						break
 					}
-				} else if rebaseUntracked && rebaseAll {
-					// We put checks for untracked-branch updation in syncProjectMaster funtion
-					localBranchesNeedUpdating = true
-					break
 				}
+			} else if cb.Name != "" && cb.Tracking != nil && cb.Revision != cb.Tracking.Revision {
+				localBranchesNeedUpdating = true
 			}
 		}
 		switch {
