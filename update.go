@@ -27,9 +27,9 @@ const (
 )
 
 var (
-	updateTestVersionErr = fmt.Errorf("Jiri has test version")
-	updateVersionErr     = fmt.Errorf("Jiri is already at latest version")
-	updateNotAvaiableErr = fmt.Errorf("Latest version of jiri not available")
+	updateTestVersionErr  = fmt.Errorf("jiri has test version")
+	updateVersionErr      = fmt.Errorf("jiri is already at latest version")
+	updateNotAvailableErr = fmt.Errorf("latest version of jiri not available")
 )
 
 // Update checks whether a new version of Jiri is available and if so,
@@ -46,20 +46,20 @@ func Update(force bool) error {
 		// Check if the prebuilt for new version exsits.
 		has, err := hasPrebuilt(JiriStorageBucket, commit)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot check if prebuilt is available, %s", err)
 		}
 		if !has {
-			return updateNotAvaiableErr
+			return updateNotAvailableErr
 		}
 
 		// New version is available, download and update to it.
 		b, err := downloadBinary(JiriStorageBucket, commit)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot download latest jiri binary, %s", err)
 		}
 		path, err := osutil.Executable()
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot get executable path, %s", err)
 		}
 		return updateExecutable(path, b)
 	}
@@ -67,8 +67,13 @@ func Update(force bool) error {
 }
 
 func UpdateAndExecute(force bool) error {
+	// Capture executable path before it is replaced in Update func
+	path, err := osutil.Executable()
+	if err != nil {
+		return fmt.Errorf("cannot get executable path, %s", err)
+	}
 	if err := Update(force); err != nil {
-		if err != updateNotAvaiableErr && err != updateVersionErr &&
+		if err != updateNotAvailableErr && err != updateVersionErr &&
 			err != updateTestVersionErr {
 			return err
 		} else {
@@ -78,11 +83,10 @@ func UpdateAndExecute(force bool) error {
 	// This will overwrite previous force autoupdate if present
 	os.Args = append(os.Args, "-force-autoupdate=false")
 	// Run the update version.
-	path, err := osutil.Executable()
-	if err != nil {
-		return err
+	if err = syscall.Exec(path, os.Args, os.Environ()); err != nil {
+		return fmt.Errorf("cannot execute %s: %s", path, err)
 	}
-	return syscall.Exec(path, os.Args, os.Environ())
+	return nil
 }
 
 func getCurrentCommit(repository string) (string, error) {
