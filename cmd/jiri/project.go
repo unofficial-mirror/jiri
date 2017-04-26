@@ -104,8 +104,8 @@ type infoOutput struct {
 	Path          string   `json:"path"`
 	Remote        string   `json:"remote"`
 	Revision      string   `json:"revision"`
-	CurrentBranch string   `json:"current_branch"`
-	Branches      []string `json:"branches"`
+	CurrentBranch string   `json:"current_branch,omitempty"`
+	Branches      []string `json:"branches,omitempty"`
 }
 
 // runProjectInfo provides structured info on local projects.
