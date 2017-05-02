@@ -459,6 +459,10 @@ type Project struct {
 	// update".  If Revision is set, RemoteBranch will be ignored.  If Revision
 	// is not set, "HEAD" is used as the default.
 	Revision string `xml:"revision,attr,omitempty"`
+	// HistoryDepth is the depth flag passed to git clone and git fetch
+	// commands. It is used to limit downloading large histories for large
+	// projects.
+	HistoryDepth int `xml:"historydepth,attr,omitempty"`
 	// GerritHost is the gerrit host where project CLs will be sent.
 	GerritHost string `xml:"gerrithost,attr,omitempty"`
 	// GitHooks is a directory containing git hooks that will be installed for
@@ -1765,25 +1769,25 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			processingPath[cacheDirPath] = true
 			wg.Add(1)
 			fetchLimit <- struct{}{}
-			go func(dir, remote string) {
+			go func(dir, remote string, depth int) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				if isPathDir(dir) {
 					// Cache already present, update it
 					// TODO : update this after implementing FetchAll using g
-					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.AllOpt(true), gitutil.PruneOpt(true)); err != nil {
+					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.PruneOpt(true)); err != nil {
 						errs <- err
 						return
 					}
 				} else {
 					// Create cache
-					if err := gitutil.New(jirix).CloneMirror(remote, dir); err != nil {
+					if err := gitutil.New(jirix).CloneMirror(remote, dir, depth); err != nil {
 						errs <- err
 						return
 					}
 
 				}
-			}(cacheDirPath, project.Remote)
+			}(cacheDirPath, project.Remote, project.HistoryDepth)
 		} else {
 			errs <- err
 		}
@@ -2344,13 +2348,13 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	if jirix.Shared && cache != "" {
 		if err := gitutil.New(jirix).Clone(cache, tmpDir,
 			gitutil.SharedOpt(true),
-			gitutil.NoCheckoutOpt(true)); err != nil {
+			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
 			return err
 		}
 	} else {
 		if err := gitutil.New(jirix).Clone(op.project.Remote, tmpDir,
 			gitutil.ReferenceOpt(cache),
-			gitutil.NoCheckoutOpt(true)); err != nil {
+			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
 			return err
 		}
 	}

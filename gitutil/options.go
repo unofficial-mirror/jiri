@@ -92,3 +92,7 @@ func (ReferenceOpt) cloneOpt() {}
 type NoCheckoutOpt bool
 
 func (NoCheckoutOpt) cloneOpt() {}
+
+type DepthOpt int
+
+func (DepthOpt) cloneOpt() {}

@@ -178,6 +178,10 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 			if typedOpt {
 				args = append(args, "--no-checkout")
 			}
+		case DepthOpt:
+			if typedOpt > 0 {
+				args = append(args, []string{"--depth", strconv.Itoa(int(typedOpt))}...)
+			}
 		}
 	}
 	args = append(args, repo)
@@ -186,8 +190,13 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 }
 
 // CloneMirror clones the given repository using mirror flag.
-func (g *Git) CloneMirror(repo, path string) error {
-	return g.run("clone", "--mirror", repo, path)
+func (g *Git) CloneMirror(repo, path string, depth int) error {
+	args := []string{"clone", "--mirror"}
+	if depth > 0 {
+		args = append(args, []string{"--depth", strconv.Itoa(depth)}...)
+	}
+	args = append(args, []string{repo, path}...)
+	return g.run(args...)
 }
 
 // CloneRecursive clones the given repository recursively to the given local path.

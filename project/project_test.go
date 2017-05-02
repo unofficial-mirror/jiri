@@ -236,6 +236,7 @@ func setupUniverse(t *testing.T) ([]project.Project, *jiritest.FakeJiriRoot, fun
 		}
 		localProjects = append(localProjects, p)
 	}
+	localProjects[2].HistoryDepth = 1
 	localProjects[3].Path = filepath.Join(localProjects[2].Path, fmt.Sprintf("path-%d", 3))
 	localProjects[4].Path = filepath.Join(localProjects[3].Path, fmt.Sprintf("path-%d", 4))
 	localProjects[5].Path = filepath.Join(localProjects[2].Path, fmt.Sprintf("path-%d", 5))
