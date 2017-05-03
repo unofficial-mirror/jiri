@@ -600,20 +600,28 @@ func (p *Project) CacheDirPath(jirix *jiri.X) (string, error) {
 	return "", nil
 }
 
-func (p *Project) writeJiriHeadFile(jirix *jiri.X) error {
+func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 	g := git.NewGit(p.Path)
-	fn := filepath.Join(p.Path, ".git", "JIRI_HEAD")
+	file := filepath.Join(p.Path, ".git", "JIRI_HEAD")
 	head := "ref: refs/remotes/origin/master"
 	var err error
 	if p.Revision != "" {
 		head, err = g.CurrentRevisionForRef(p.Revision)
 		if err != nil {
-			return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", p.Revision, p.Name, err)
+			return fmt.Errorf("Cannot find revision for ref %q for project %s(%s): %s", p.Revision, p.Name, p.Path, err)
 		}
 	} else if p.RemoteBranch != "" {
 		head = "ref: refs/remotes/origin/" + p.RemoteBranch
 	}
-	return safeWriteFile(jirix, fn, []byte(head))
+	if err := safeWriteFile(jirix, file, []byte(head)); err != nil {
+		return err
+	}
+	file = filepath.Join(p.Path, ".git", "JIRI_LAST_BASE")
+	if rev, err := g.CurrentRevision(); err != nil {
+		return fmt.Errorf("Cannot find current revision for for project %s(%s): %s", p.Name, p.Path, err)
+	} else {
+		return safeWriteFile(jirix, file, []byte(rev))
+	}
 }
 
 func isPathDir(dir string) bool {
@@ -2037,11 +2045,13 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	if err := runCommonOperations(jirix, nullOperations); err != nil {
 		return err
 	}
+	jirix.TimerPush("jiri revision files")
 	for _, project := range ps {
 		if !(project.LocalConfig.Ignore || project.LocalConfig.NoUpdate) {
-			project.writeJiriHeadFile(jirix)
+			project.writeJiriRevisionFiles(jirix)
 		}
 	}
+	jirix.TimerPop()
 	if err := runHooks(jirix, ops, hooks, runHookTimeout); err != nil {
 		return err
 	}

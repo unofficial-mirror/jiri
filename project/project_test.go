@@ -39,18 +39,18 @@ func checkReadme(t *testing.T, jirix *jiri.X, p project.Project, message string)
 	}
 }
 
-func checkJiriHead(t *testing.T, jirix *jiri.X, p project.Project) {
+func checkJiriRevFiles(t *testing.T, jirix *jiri.X, p project.Project) {
 	g := git.NewGit(p.Path)
 
-	headFile := filepath.Join(p.Path, ".git", "JIRI_HEAD")
-	data, err := ioutil.ReadFile(headFile)
+	file := filepath.Join(p.Path, ".git", "JIRI_HEAD")
+	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		t.Fatalf("ReadFile(%v) failed: %v", headFile, err)
+		t.Fatalf("ReadFile(%v) failed: %s", file, err)
 	}
 	headFileContents := string(data)
 	headFileCommit, err := g.CurrentRevisionForRef(headFileContents)
 	if err != nil {
-		t.Fatalf("CurrentRevisionForRef failed: %v", err)
+		t.Fatalf("CurrentRevisionForRef failed: %s", err)
 	}
 
 	projectRevision := p.Revision
@@ -63,11 +63,21 @@ func checkJiriHead(t *testing.T, jirix *jiri.X, p project.Project) {
 	}
 	revisionCommit, err := g.CurrentRevisionForRef(projectRevision)
 	if err != nil {
-		t.Fatalf("CurrentRevisionForRef failed: %v", err)
+		t.Fatalf("CurrentRevisionForRef failed: %s", err)
 	}
 
 	if revisionCommit != headFileCommit {
-		t.Fatalf("JIRI_HEAD contains %v (%s) expected %v (%s)", headFileContents, headFileCommit, projectRevision, revisionCommit)
+		t.Fatalf("JIRI_HEAD contains %s (%s) expected %s (%s)", headFileContents, headFileCommit, projectRevision, revisionCommit)
+	}
+	file = filepath.Join(p.Path, ".git", "JIRI_LAST_BASE")
+	data, err = ioutil.ReadFile(file)
+	if err != nil {
+		t.Fatalf("ReadFile(%v) failed: %s", file, err)
+	}
+	if rev, err := g.CurrentRevision(); err != nil {
+		t.Fatalf("CurrentRevision() failed: %s", err)
+	} else if rev != string(data) {
+		t.Fatalf("JIRI_LAST_BASE contains %s expected %s", string(data), rev)
 	}
 }
 
@@ -274,7 +284,7 @@ func TestUpdateUniverseSimple(t *testing.T) {
 		}
 		checkReadme(t, fake.X, p, "initial readme")
 		checkMetadataIsIgnored(t, fake.X, p)
-		checkJiriHead(t, fake.X, p)
+		checkJiriRevFiles(t, fake.X, p)
 	}
 }
 
@@ -310,7 +320,7 @@ func testWithCache(t *testing.T, shared bool) {
 			t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
 		}
 		checkReadme(t, fake.X, p, "initial readme")
-		checkJiriHead(t, fake.X, p)
+		checkJiriRevFiles(t, fake.X, p)
 	}
 
 	// Commit to master branch of a project 1.
@@ -319,7 +329,7 @@ func testWithCache(t *testing.T, shared bool) {
 		t.Fatal(err)
 	}
 	checkReadme(t, fake.X, localProjects[1], "master commit")
-	checkJiriHead(t, fake.X, localProjects[1])
+	checkJiriRevFiles(t, fake.X, localProjects[1])
 
 	// Check that cache was updated
 	cacheDirPath, err := localProjects[1].CacheDirPath(fake.X)
