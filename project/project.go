@@ -1783,18 +1783,25 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 				if isPathDir(dir) {
 					// Cache already present, update it
 					// TODO : update this after implementing FetchAll using g
+					shallowPath := filepath.Join(dir, "shallow")
+					if _, err := os.Stat(shallowPath); err == nil {
+						// shallow file exists
+						if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.PruneOpt(true), gitutil.UnshallowOpt(true)); err != nil {
+							errs <- err
+						}
+						return
+					}
 					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.PruneOpt(true)); err != nil {
 						errs <- err
-						return
 					}
-				} else {
-					// Create cache
-					if err := gitutil.New(jirix).CloneMirror(remote, dir, depth); err != nil {
-						errs <- err
-						return
-					}
-
+					return
 				}
+				// Create cache
+				if err := gitutil.New(jirix).CloneMirror(remote, dir); err != nil {
+					errs <- err
+				}
+				return
+
 			}(cacheDirPath, project.Remote, project.HistoryDepth)
 		} else {
 			errs <- err

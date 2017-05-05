@@ -77,6 +77,10 @@ type PruneOpt bool
 
 func (PruneOpt) fetchOpt() {}
 
+type UnshallowOpt bool
+
+func (UnshallowOpt) fetchOpt() {}
+
 type VerifyOpt bool
 
 func (VerifyOpt) pushOpt() {}

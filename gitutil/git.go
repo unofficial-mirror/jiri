@@ -190,13 +190,8 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 }
 
 // CloneMirror clones the given repository using mirror flag.
-func (g *Git) CloneMirror(repo, path string, depth int) error {
-	args := []string{"clone", "--mirror"}
-	if depth > 0 {
-		args = append(args, []string{"--depth", strconv.Itoa(depth)}...)
-	}
-	args = append(args, []string{repo, path}...)
-	return g.run(args...)
+func (g *Git) CloneMirror(repo, path string) error {
+	return g.run("clone", "--mirror", repo, path)
 }
 
 // CloneRecursive clones the given repository recursively to the given local path.
@@ -474,6 +469,7 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	tags := false
 	all := false
 	prune := false
+	unshallow := false
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case TagsOpt:
@@ -482,12 +478,17 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 			all = bool(typedOpt)
 		case PruneOpt:
 			prune = bool(typedOpt)
+		case UnshallowOpt:
+			unshallow = bool(typedOpt)
 		}
 	}
 	args := []string{}
 	args = append(args, "fetch")
 	if prune {
 		args = append(args, "-p")
+	}
+	if unshallow {
+		args = append(args, "--unshallow")
 	}
 	if tags {
 		args = append(args, "--tags")
