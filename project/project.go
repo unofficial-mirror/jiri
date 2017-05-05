@@ -1261,7 +1261,12 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if err := g.SetRemoteUrl("origin", project.Remote); err != nil {
 		return err
 	}
-	return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
+	if project.HistoryDepth > 0 {
+		return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true),
+			gitutil.DepthOpt(project.HistoryDepth), gitutil.UpdateShallowOpt(true))
+	} else {
+		return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
+	}
 }
 
 func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
@@ -1777,32 +1782,39 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			processingPath[cacheDirPath] = true
 			wg.Add(1)
 			fetchLimit <- struct{}{}
-			go func(dir, remote string, depth int) {
+			if err := project.fillDefaults(); err != nil {
+				errs <- err
+				continue
+			}
+			go func(dir, remote string, depth int, branch string) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				if isPathDir(dir) {
 					// Cache already present, update it
 					// TODO : update this after implementing FetchAll using g
-					shallowPath := filepath.Join(dir, "shallow")
-					if _, err := os.Stat(shallowPath); err == nil {
-						// shallow file exists
-						if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.PruneOpt(true), gitutil.UnshallowOpt(true)); err != nil {
+					if _, err := os.Stat(filepath.Join(dir, "shallow")); err == nil {
+						// Shallow cache, fetch only manifest tracked remote branch
+						refspec := fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
+						if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true)); err != nil {
 							errs <- err
 						}
 						return
 					}
-					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("", gitutil.PruneOpt(true)); err != nil {
+					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("origin", gitutil.PruneOpt(true)); err != nil {
 						errs <- err
 					}
 					return
-				}
-				// Create cache
-				if err := gitutil.New(jirix).CloneMirror(remote, dir); err != nil {
-					errs <- err
-				}
-				return
+				} else {
+					// Create cache
+					// TODO : If we in future need to support two projects with same remote url,
+					// one with shallow checkout and one with full, we should create two caches
+					if err := gitutil.New(jirix).CloneMirror(remote, dir, depth); err != nil {
+						errs <- err
+					}
+					return
 
-			}(cacheDirPath, project.Remote, project.HistoryDepth)
+				}
+			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch)
 		} else {
 			errs <- err
 		}
@@ -1826,13 +1838,14 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 	errs := make(chan error, len(localProjects))
 	var wg sync.WaitGroup
 	for key, project := range localProjects {
-		if _, ok := remoteProjects[key]; ok {
+		if r, ok := remoteProjects[key]; ok {
 			if project.LocalConfig.Ignore || project.LocalConfig.NoUpdate {
 				jirix.Logger.Warningf("Not updating remotes for project %s(%s) due to its local-config\n\n", project.Name, project.Path)
 				continue
 			}
 			wg.Add(1)
 			fetchLimit <- struct{}{}
+			project.HistoryDepth = r.HistoryDepth
 			go func(project Project) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()

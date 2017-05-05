@@ -77,9 +77,13 @@ type PruneOpt bool
 
 func (PruneOpt) fetchOpt() {}
 
-type UnshallowOpt bool
+type DepthOpt int
 
-func (UnshallowOpt) fetchOpt() {}
+func (DepthOpt) fetchOpt() {}
+
+type UpdateShallowOpt bool
+
+func (UpdateShallowOpt) fetchOpt() {}
 
 type VerifyOpt bool
 
@@ -96,7 +100,5 @@ func (ReferenceOpt) cloneOpt() {}
 type NoCheckoutOpt bool
 
 func (NoCheckoutOpt) cloneOpt() {}
-
-type DepthOpt int
 
 func (DepthOpt) cloneOpt() {}
