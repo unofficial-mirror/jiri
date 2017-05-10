@@ -316,8 +316,13 @@ func testWithCache(t *testing.T, shared bool) {
 	}
 	for _, p := range localProjects {
 		// Check that local clone was referenced from cache
-		if err := s.AssertFileExists(p.Path + "/.git/objects/info/alternates").Done(); err != nil {
-			t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
+		err := s.AssertFileExists(p.Path + "/.git/objects/info/alternates").Done()
+		if shared || p.HistoryDepth == 0 {
+			if err != nil {
+				t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
+			}
+		} else if err == nil {
+			t.Fatalf("expected %v to not exist, but found", p.Path+"/.git/objects/info/alternates")
 		}
 		checkReadme(t, fake.X, p, "initial readme")
 		checkJiriRevFiles(t, fake.X, p)

@@ -2382,8 +2382,12 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 			return err
 		}
 	} else {
+		ref := cache
+		if op.project.HistoryDepth > 0 {
+			ref = ""
+		}
 		if err := gitutil.New(jirix).Clone(op.project.Remote, tmpDir,
-			gitutil.ReferenceOpt(cache),
+			gitutil.ReferenceOpt(ref),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
 			return err
 		}
