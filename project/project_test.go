@@ -115,11 +115,15 @@ func projectName(i int) string {
 	return fmt.Sprintf("project-%d", i)
 }
 
-func writeFile(t *testing.T, jirix *jiri.X, projectDir, fileName, message string) {
+func writeUncommitedFile(t *testing.T, jirix *jiri.X, projectDir, fileName, message string) string {
 	path, perm := filepath.Join(projectDir, fileName), os.FileMode(0644)
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
 		t.Fatalf("WriteFile(%v, %v) failed: %v", path, perm, err)
 	}
+	return path
+}
+func writeFile(t *testing.T, jirix *jiri.X, projectDir, fileName, message string) {
+	path := writeUncommitedFile(t, jirix, projectDir, fileName, message)
 	commitFile(t, jirix, projectDir, path, "creating "+fileName)
 }
 
@@ -247,10 +251,10 @@ func setupUniverse(t *testing.T) ([]project.Project, *jiritest.FakeJiriRoot, fun
 		localProjects = append(localProjects, p)
 	}
 	localProjects[2].HistoryDepth = 1
-	localProjects[3].Path = filepath.Join(localProjects[2].Path, fmt.Sprintf("path-%d", 3))
-	localProjects[4].Path = filepath.Join(localProjects[3].Path, fmt.Sprintf("path-%d", 4))
-	localProjects[5].Path = filepath.Join(localProjects[2].Path, fmt.Sprintf("path-%d", 5))
-	localProjects[6].Path = filepath.Join(localProjects[0].Path, fmt.Sprintf("path-%d", 6))
+	localProjects[3].Path = filepath.Join(localProjects[2].Path, "path-3")
+	localProjects[4].Path = filepath.Join(localProjects[3].Path, "path-4")
+	localProjects[5].Path = filepath.Join(localProjects[2].Path, "path-5")
+	localProjects[6].Path = filepath.Join(localProjects[0].Path, "path-6")
 	for _, p := range localProjects {
 		if err := fake.AddProject(p); err != nil {
 			t.Fatal(err)
@@ -261,6 +265,9 @@ func setupUniverse(t *testing.T) ([]project.Project, *jiritest.FakeJiriRoot, fun
 	for _, remoteProjectDir := range fake.Projects {
 		writeReadme(t, fake.X, remoteProjectDir, "initial readme")
 	}
+	writeFile(t, fake.X, fake.Projects[localProjects[2].Name], ".gitignore", "path-3/\npath-5/\n")
+	writeFile(t, fake.X, fake.Projects[localProjects[0].Name], ".gitignore", "path-6/\n")
+	writeFile(t, fake.X, fake.Projects[localProjects[3].Name], ".gitignore", "path-4/\n")
 
 	success = true
 	return localProjects, fake, cleanup
@@ -885,9 +892,9 @@ func TestUpdateUniverseRenamedProject(t *testing.T) {
 	}
 }
 
-// TestUpdateUniverseDeletedProject checks that UpdateUniverse will delete a
-// project iff gc=true.
-func TestUpdateUniverseDeletedProject(t *testing.T) {
+// testUpdateUniverseDeletedProject checks that UpdateUniverse will delete a
+// project if gc=true.
+func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
 	s := fake.X.NewSeq()
@@ -901,8 +908,17 @@ func TestUpdateUniverseDeletedProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	projects := []project.Project{}
+	if testDirtyProjectDelete {
+		writeUncommitedFile(t, fake.X, localProjects[4].Path, "extra", "")
+	}
 	for _, p := range m.Projects {
-		if p.Name == localProjects[1].Name {
+		skip := false
+		for i := 1; i <= 5; i++ {
+			if p.Name == localProjects[i].Name {
+				skip = true
+			}
+		}
+		if skip {
 			continue
 		}
 		projects = append(projects, p)
@@ -916,18 +932,31 @@ func TestUpdateUniverseDeletedProject(t *testing.T) {
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AssertDirExists(localProjects[1].Path).Done(); err != nil {
-		t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[1].Name, localProjects[1].Path)
+	for i := 1; i <= 5; i++ {
+		if err := s.AssertDirExists(localProjects[i].Path).Done(); err != nil {
+			t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[i].Name, localProjects[i].Path)
+		}
+		checkReadme(t, fake.X, localProjects[i], "initial readme")
 	}
-	checkReadme(t, fake.X, localProjects[1], "initial readme")
 	// Check that UpdateUniverse() with gc=true does delete the local copy of
 	// the project.
 	if err := fake.UpdateUniverse(true); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AssertDirExists(localProjects[1].Path).Done(); err == nil {
-		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, localProjects[1].Path)
+	for i := 1; i <= 5; i++ {
+		err := s.AssertDirExists(localProjects[i].Path).Done()
+		if testDirtyProjectDelete && i >= 2 && i <= 4 {
+			if err != nil {
+				t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[i].Name, localProjects[i].Path)
+			}
+		} else if err == nil {
+			t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[i].Name, localProjects[i].Path)
+		}
 	}
+}
+func TestUpdateUniverseDeletedProject(t *testing.T) {
+	testUpdateUniverseDeletedProject(t, false)
+	testUpdateUniverseDeletedProject(t, true)
 }
 
 func TestIgnoredProjectsNotDeleted(t *testing.T) {

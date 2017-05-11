@@ -1922,7 +1922,7 @@ func runCreateOperations(jirix *jiri.X, ops []createOperation) MultiError {
 		for _, op := range tree.ops {
 			jirix.Logger.Debugf("%v", op)
 			if err := op.Run(jirix); err != nil {
-				errs <- fmt.Errorf("error creating project %q: %v", op.Project().Name, err)
+				errs <- fmt.Errorf("Creating project %q: %v", op.Project().Name, err)
 				return
 			}
 		}
@@ -1951,6 +1951,85 @@ func runCreateOperations(jirix *jiri.X, ops []createOperation) MultiError {
 	return multiErr
 }
 
+type PathTrie struct {
+	current  string
+	children map[string]*PathTrie
+}
+
+func NewPathTrie() *PathTrie {
+	return &PathTrie{
+		current:  "",
+		children: make(map[string]*PathTrie),
+	}
+}
+func (p *PathTrie) Contains(path string) bool {
+	parts := strings.Split(path, string(filepath.Separator))
+	node := p
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		child, ok := node.children[part]
+		if !ok {
+			return false
+		}
+		node = child
+	}
+	return true
+}
+
+func (p *PathTrie) Insert(path string) {
+	parts := strings.Split(path, string(filepath.Separator))
+	node := p
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		child, ok := node.children[part]
+		if !ok {
+			child = &PathTrie{
+				current:  part,
+				children: make(map[string]*PathTrie),
+			}
+			node.children[part] = child
+		}
+		node = child
+	}
+}
+
+func runDeleteOperations(jirix *jiri.X, ops []deleteOperation) error {
+	notDeleted := NewPathTrie()
+	for _, op := range ops {
+		if !op.gc {
+			jirix.Logger.Debugf("%s", op)
+			if err := op.Run(jirix); err != nil {
+				return fmt.Errorf("Deleting project %q: %s", op.Project().Name, err)
+			}
+			continue
+		}
+		if notDeleted.Contains(op.Project().Path) {
+			// not deleting project, add it to trie
+			notDeleted.Insert(op.source)
+			rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
+			msg := fmt.Sprintf("Project %q won't be deleted because of its sub project(s)", op.project.Name)
+			msg += fmt.Sprintf("\nIf you no longer need it, invoke '%s'\n\n", rmCommand)
+			jirix.Logger.Warningf(msg)
+			continue
+		}
+		jirix.Logger.Debugf("%s", op)
+		if err := op.Run(jirix); err != nil {
+			return fmt.Errorf("Deleting project %q: %s", op.Project().Name, err)
+		}
+		if _, err := os.Stat(op.source); err == nil {
+			// project not deleted, add it to trie
+			notDeleted.Insert(op.source)
+		} else if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("Checking if %q exists", op.source)
+		}
+	}
+	return nil
+}
+
 func runMoveOperations(jirix *jiri.X, ops []moveOperation) error {
 	parentSrcPath := ""
 	parentDestPath := ""
@@ -1963,7 +2042,7 @@ func runMoveOperations(jirix *jiri.X, ops []moveOperation) error {
 		}
 		jirix.Logger.Debugf("%s", op)
 		if err := op.Run(jirix); err != nil {
-			return fmt.Errorf("error moving and updating project %q: %s", op.Project().Name, err)
+			return fmt.Errorf("Moving and updating project %q: %s", op.Project().Name, err)
 		}
 	}
 	return nil
@@ -1973,7 +2052,7 @@ func runCommonOperations(jirix *jiri.X, ops operations) error {
 	for _, op := range ops {
 		jirix.Logger.Debugf("%s", op)
 		if err := op.Run(jirix); err != nil {
-			return fmt.Errorf("error updating project %q: %s", op.Project().Name, err)
+			return fmt.Errorf("Updating project %q: %s", op.Project().Name, err)
 		}
 	}
 	return nil
@@ -2028,7 +2107,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	}
 	ops := computeOperations(localProjects, ps, states, gc, rebaseUntracked, rebaseAll, snapshot)
 	moveOperations := []moveOperation{}
-	deleteOperations := operations{}
+	deleteOperations := []deleteOperation{}
 	updateOperations := operations{}
 	createOperations := []createOperation{}
 	nullOperations := operations{}
@@ -2050,7 +2129,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 			nullOperations = append(nullOperations, o)
 		}
 	}
-	if err := runCommonOperations(jirix, deleteOperations); err != nil {
+	if err := runDeleteOperations(jirix, deleteOperations); err != nil {
 		return err
 	}
 	if err := runMoveOperations(jirix, moveOperations); err != nil {
@@ -2640,7 +2719,12 @@ func (ops operations) Less(i, j int) bool {
 	if vals[0] != vals[1] {
 		return vals[0] < vals[1]
 	}
-	return ops[i].Project().Path+string(filepath.Separator) < ops[j].Project().Path+string(filepath.Separator)
+	if vals[0] == 0 {
+		// delete sub folder first
+		return ops[i].Project().Path+string(filepath.Separator) > ops[j].Project().Path+string(filepath.Separator)
+	} else {
+		return ops[i].Project().Path+string(filepath.Separator) < ops[j].Project().Path+string(filepath.Separator)
+	}
 }
 
 // Swap swaps two elements of the collection.
