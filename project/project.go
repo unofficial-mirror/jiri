@@ -312,24 +312,24 @@ func (m *Manifest) unfillDefaults() error {
 type MultiError []error
 
 func (m MultiError) Error() string {
-	s, n := "", 0
+	s := []string{}
+	n := 0
 	for _, e := range m {
 		if e != nil {
-			if n == 0 {
-				s = e.Error()
-			}
+			s = append(s, e.Error())
 			n++
 		}
 	}
+	sort.Strings(s)
 	switch n {
 	case 0:
 		return "(0 errors)"
 	case 1:
-		return s
+		return s[0]
 	case 2:
-		return s + " (and 1 other error)"
+		return s[0] + " (and 1 other error not shown here)"
 	}
-	return fmt.Sprintf("%s (and %d other errors)", s, n-1)
+	return fmt.Sprintf("%s (and %d other errors not shown here)", s[0], n-1)
 }
 
 // Import represents a remote manifest import.

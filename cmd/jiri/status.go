@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"fuchsia.googlesource.com/jiri"
@@ -72,7 +73,13 @@ func runStatus(jirix *jiri.X, args []string) error {
 	if err != nil {
 		return err
 	}
-	for key, localProject := range localProjects {
+	var keys project.ProjectKeys
+	for key, _ := range localProjects {
+		keys = append(keys, key)
+	}
+	sort.Sort(keys)
+	for _, key := range keys {
+		localProject := localProjects[key]
 		remoteProject, _ := remoteProjects[key]
 		state, ok := states[key]
 		if !ok {

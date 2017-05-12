@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"fuchsia.googlesource.com/jiri"
@@ -56,7 +57,13 @@ func displayProjects(jirix *jiri.X, branch string) error {
 	if err != nil {
 		return err
 	}
-	for _, state := range states {
+	var keys project.ProjectKeys
+	for key, _ := range states {
+		keys = append(keys, key)
+	}
+	sort.Sort(keys)
+	for _, key := range keys {
+		state := states[key]
 		relativePath, err := filepath.Rel(cDir, state.Project.Path)
 		if err != nil {
 			return err
@@ -135,7 +142,13 @@ func deleteBranches(jirix *jiri.X, branchToDelete string) error {
 	jirix.TimerPush("Process")
 	errors := false
 	projectFound := false
-	for _, state := range states {
+	var keys project.ProjectKeys
+	for key, _ := range states {
+		keys = append(keys, key)
+	}
+	sort.Sort(keys)
+	for _, key := range keys {
+		state := states[key]
 		for _, branch := range state.Branches {
 			if branch.Name == branchToDelete {
 				projectFound = true
