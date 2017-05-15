@@ -26,7 +26,7 @@ ZLIB_SRC="${GIT_DIR}/vendor/github.com/libgit2/git2go/vendor/zlib"
 ZLIB_BUILD="${ZLIB_SRC}/build"
 mkdir -p -- "${ZLIB_BUILD}"
 pushd "${ZLIB_BUILD}"
-[[ -f "${BORINGSSL_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
+[[ -f "${ZLIB_BUILD}/build.ninja" ]] || ${CMAKE_PROGRAM} -GNinja \
   -DCMAKE_MAKE_PROGRAM=${NINJA_PROGRAM} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS=-fPIC \
