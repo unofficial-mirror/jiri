@@ -250,6 +250,20 @@ func (projects ProjectsByPath) Less(i, j int) bool {
 	return projects[i].Path+string(filepath.Separator) < projects[j].Path+string(filepath.Separator)
 }
 
+// HooksByName implements the Sort interface. It sorts Hooks by the Name
+// field.
+type HooksByName []Hook
+
+func (hooks HooksByName) Len() int {
+	return len(hooks)
+}
+func (hooks HooksByName) Swap(i, j int) {
+	hooks[i], hooks[j] = hooks[j], hooks[i]
+}
+func (hooks HooksByName) Less(i, j int) bool {
+	return hooks[i].Name < hooks[j].Name
+}
+
 // ToFile writes the manifest m to a file with the given filename, with
 // defaults unfilled and all project paths relative to the jiri root.
 func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
@@ -262,8 +276,13 @@ func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
 		}
 		projects = append(projects, project)
 	}
+	// Sort the projects and hooks to ensure that the output of "jiri
+	// snapshot" is deterministic.  Sorting the hooks by name allows
+	// some control over the ordering of the hooks in case that is
+	// necessary.
 	sort.Sort(ProjectsByPath(projects))
 	m.Projects = projects
+	sort.Sort(HooksByName(m.Hooks))
 	data, err := m.ToBytes()
 	if err != nil {
 		return err
