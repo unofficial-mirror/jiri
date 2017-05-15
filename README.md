@@ -14,7 +14,7 @@ Jiri has an extensible plugin model, making it easy to create new sub-commands.
 Jiri is open-source.  See the contributor guidelines [here][contributing].
 
 ## Manually build jiri
-We have [prebuilts](#bootstrapping) for linux and darwin `x86_64` systems. In
+We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
 rder to build jiri manually use these [instructions][build jiri].
 
 ## Jiri Basics
