@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-set -o errexit
+set -o errexit -o nounset
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly GIT_DIR="$(dirname "${SCRIPT_DIR}")"
@@ -17,7 +17,7 @@ readonly BUILD_TIME=$(python -c "import datetime; print datetime.datetime.utcnow
 readonly CMAKE_PROGRAM=${CMAKE_PROGRAM:-cmake}
 readonly NINJA_PROGRAM=${NINJA_PROGRAM:-ninja}
 
-if [[ -n "${GO_PROGRAM}" ]]; then
+if [[ -n "${GO_PROGRAM:-}" ]]; then
   readonly CMAKE_EXTRA_ARGS="-DGO_EXECUTABLE=${GO_PROGRAM}"
   export GOROOT="$(dirname "$(dirname ${GO_PROGRAM})")"
 fi
