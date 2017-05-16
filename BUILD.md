@@ -23,6 +23,15 @@ Set GOPATH to `fuchsia/go`, cd into `fuchsia/go/src/fuchsia.googlesource.com/jir
 
 The above command should build jiri and put it into your jiri repo root.
 
+## Running the tests
+To run jiri's tests, run the following from the `fuchsia/go` directory:
+```
+export GOPATH=$(pwd)
+go test $(go list fuchsia.googlesource.com/jiri/... 2>/dev/null | grep -v /jiri/vendor/)
+```
+
+(The use of `grep` here excludes tests from packages below `src/fuchsia.googlesource.com/jiri/vendor/` which don't pass.)
+
 ## Known Issues
 
 If build complains about undefined `http_parser_*` functions, please remove `http_parser` from your library path.
