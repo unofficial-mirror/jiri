@@ -29,18 +29,37 @@ fi
 readonly TEMP_DIR="$(mktemp -d)"
 trap "rm -rf -- "${TEMP_DIR}"" EXIT
 
+failed=false
+RED='\033[0;31m'
+NC='\033[0m'
+readonly ARCHS="amd64 arm64"
 for target in ${TARGETS}; do
-  os=$(echo ${target} | sed 's/darwin/mac/')
-  mkdir -p "${TEMP_DIR}/jiri-${os}"
+  for arch in ${ARCHS}; do
+    if [[ "$target" == "darwin" && "$arch" == "arm64" ]]; then
+      continue
+    fi
+    os=$(echo ${target} | sed 's/darwin/mac/')
+    tmpdir="${TEMP_DIR}/jiri-${os}-${arch}"
+    mkdir -p ${tmpdir}
 
-  # Download the jiri binary.
-  if ! curl -sf -o "${TEMP_DIR}/jiri-${os}/jiri" "${GS_BUCKET_URL}/${target}-amd64/${VERSION}"; then
-    echo "Failed downloading prebuilt jiri binary." 1>&2
-    echo "${GS_BUCKET_URL}/${os}/${VERSION}"
-    exit 1
-  fi
-  chmod 755 "${TEMP_DIR}/jiri-${os}/jiri"
+    # Download the jiri binary.
+    if ! curl -sSf -o "${tmpdir}/jiri" "${GS_BUCKET_URL}/${target}-${arch}/${VERSION}"; then
+      echo -e "${RED}Failed downloading prebuilt jiri binary.${NC}" 1>&2
+      echo -e "${RED}${GS_BUCKET_URL}/${target}-${arch}/${VERSION}${NC}"
+      if [[ "$arch" != "arm64" ]]; then
+        failed=true
+      fi
+      continue
+    fi
+    chmod 755 "${tmpdir}/jiri"
 
-  # Upload the jiri binary to CIPD
-  cipd create -name "fuchsia/tools/jiri/${os}-amd64" -in "${TEMP_DIR}/jiri-${os}" -ref latest -tag "git_repository:https://fuchsia.googlesource.com/jiri" -tag "git_revision:${VERSION}"
+    # Upload the jiri binary to CIPD
+    cipd create -name "fuchsia/tools/jiri/${os}-${arch}" -in "${tmpdir}" -ref latest -tag "git_repository:https://fuchsia.googlesource.com/jiri" -tag "git_revision:${VERSION}"
+  done
 done
+
+# fail if any os-arch failed
+if [[ "$failed" = true ]]; then
+  echo -e "${RED}Failure${NC}"
+  exit 1
+fi

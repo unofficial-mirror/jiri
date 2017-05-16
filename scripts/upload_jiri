@@ -18,6 +18,14 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly GIT_DIR="$(dirname "${SCRIPT_DIR}")"
 
 readonly HOST_ARCH=$(uname -m)
+if [ "$HOST_ARCH" == "aarch64" ]; then
+  readonly ARCH="arm64"
+elif [ "$HOST_ARCH" == "x86_64" ]; then
+  readonly ARCH="amd64"
+else
+  echo "Arch not supported: $HOST_ARCH"
+  exit 1
+fi
 readonly HOST_OS="$(uname | tr '[:upper:]' '[:lower:]')"
 
 readonly PKG_PATH="fuchsia.googlesource.com/jiri"
@@ -27,4 +35,4 @@ readonly GS_BUCKET="gs://fuchsia-build/jiri"
 readonly VERSION="$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" log -1 --format=%H)"
 
 # Upload the binary
-gsutil cp "jiri" "${GS_BUCKET}/${HOST_OS}-amd64/${VERSION}"
+gsutil cp "jiri" "${GS_BUCKET}/${HOST_OS}-${ARCH}/${VERSION}"

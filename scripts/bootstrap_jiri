@@ -39,6 +39,16 @@ $ jiri update'
   exit 1
 }
 
+readonly HOST_ARCH=$(uname -m)
+if [ "$HOST_ARCH" == "aarch64" ]; then
+  readonly ARCH="arm64"
+elif [ "$HOST_ARCH" == "x86_64" ]; then
+  readonly ARCH="amd64"
+else
+  echo "Arch not supported: $HOST_ARCH"
+  exit 1
+fi
+
 # toabs converts the possibly relative argument into an absolute path.  Run in a
 # subshell to avoid changing the caller's working directory.
 toabs() (
@@ -70,7 +80,7 @@ mkdir -p "${BIN_DIR}"
 
 # Determine and validate the version of jiri.
 readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
-readonly TARGET="${HOST_OS}-amd64"
+readonly TARGET="${HOST_OS}-${ARCH}"
 readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/master?format=JSON"
 readonly LOG_URL="${JIRI_REPO_URL}/+log/refs/heads/master?format=JSON"
 readonly VERSION=$(curl -sSf "${COMMIT_URL}" | sed -n 's/.*"value": "\([0-9a-f]\{40\}\)"/\1/p')
@@ -95,6 +105,9 @@ if ! curl -sf -o "${BIN_DIR}/jiri" "${JIRI_URL}"; then
   exit 1
 fi
 chmod 755 "${BIN_DIR}/jiri"
+if [ "$ARCH" == "arm64" ]; then
+  echo "WARNING: Jiri doesn't support timely updates for arch '$HOST_ARCH'. This or future binaries of Jiri might be out of date."
+fi
 echo "Please add ${BIN_DIR} to your PATH"
 
 trap - EXIT
