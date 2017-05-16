@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"fuchsia.googlesource.com/jiri/osutil"
@@ -80,10 +81,16 @@ func UpdateAndExecute(force bool) error {
 			return nil
 		}
 	}
-	// This will overwrite previous force autoupdate if present
-	os.Args = append(os.Args, "-force-autoupdate=false")
+
+	args := []string{}
+	for _, a := range os.Args {
+		if !strings.HasPrefix(a, "-force-autoupdate") {
+			args = append(args, a)
+		}
+	}
+
 	// Run the update version.
-	if err = syscall.Exec(path, os.Args, os.Environ()); err != nil {
+	if err = syscall.Exec(path, args, os.Environ()); err != nil {
 		return fmt.Errorf("cannot execute %s: %s", path, err)
 	}
 	return nil
