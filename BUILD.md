@@ -1,5 +1,11 @@
 # Building  Jiri
 
+## Prerequisites
+* cmake 3.7.2
+* golang 1.7.3
+* ninja 1.7.2
+* git 2.7.4
+
 ## Get source
 
 ### Using jiri prebuilt
