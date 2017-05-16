@@ -11,7 +11,7 @@ It supports:
 
 Jiri has an extensible plugin model, making it easy to create new sub-commands.
 
-Jiri is open-source.  See the contributor guidelines [here][contributing].
+Jiri is open-source.
 
 ## Manually build jiri
 We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
@@ -442,7 +442,6 @@ see [Jiri local update][hacking doc]
 
 [android repo]: https://source.android.com/source/using-repo.html "Repo command reference"
 [bootstrap_jiri]: scripts/bootstrap_jiri "bootstrap_jiri"
-[contributing]: CONTRIBUTING.md "contributing"
 [gerrit]: https://code.google.com/p/gerrit/ "Gerrit code review"
 [gerrit web ui]: https://gerrit-review.googlesource.com/Documentation/user-review-ui.html "Gerrit review UI"
 [github resolve conflict]: https://help.github.com/articles/resolving-a-merge-conflict-from-the-command-line/ "Resolving a merge conflict"
