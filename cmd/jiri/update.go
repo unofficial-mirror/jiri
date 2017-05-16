@@ -69,17 +69,19 @@ func runUpdate(jirix *jiri.X, args []string) error {
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
-	if err := retry.Function(jirix.Context, func() error {
+	err := retry.Function(jirix.Context, func() error {
 		if len(args) > 0 {
 			return project.CheckoutSnapshot(jirix, args[0], gcFlag, hookTimeoutFlag)
 		} else {
 			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag)
 		}
-	}, retry.AttemptsOpt(attemptsFlag)); err != nil {
-		return err
-	}
-	if err := project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag); err != nil {
-		return err
+	}, retry.AttemptsOpt(attemptsFlag))
+
+	if err2 := project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag); err2 != nil {
+		if err != nil {
+			return fmt.Errorf("while updation: %s, while writing history: %s", err, err2)
+		}
+		return fmt.Errorf("while writing history: %s", err2)
 	}
 	if jirix.Failures() != 0 {
 		return fmt.Errorf("Project update completed with non-fatal errors")
