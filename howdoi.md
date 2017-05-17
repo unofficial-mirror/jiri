@@ -1,6 +1,6 @@
-#JIRI
+# JIRI
 
-[toc]
+[TOC]
 
 ## How Do I
 

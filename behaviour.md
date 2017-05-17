@@ -1,6 +1,6 @@
 # Jiri
 
-[toc]
+[TOC]
 
 ## Feedback
 If you work at Google, please file a bug at [go/file-jiri-bug][file bug], or to request new features use [go/jiri-new-feature][request new feature].

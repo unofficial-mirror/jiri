@@ -15,7 +15,7 @@ Jiri is open-source.
 
 ## Manually build jiri
 We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
-rder to build jiri manually use these [instructions][build jiri].
+order to build jiri manually use these [instructions][build jiri].
 
 ## Jiri Behaviour
 [See this][behaviour]
@@ -457,6 +457,6 @@ see [Jiri local update][hacking doc]
 [manifest doc]:/manifest.md "Jiri manifest"
 [filesystem doc]:/filesystem.md "Jiri filesystem"
 [hacking doc]:/HACKING.md "Jiri local updates"
-[behaviour and tricks]:/behaviour.md
+[behaviour]:/behaviour.md
 [build jiri]:/BUILD.md "Build jiri"
 [how do i]:/howdoi.md
