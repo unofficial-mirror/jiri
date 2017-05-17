@@ -289,6 +289,11 @@ func TestUpdateUniverseSimple(t *testing.T) {
 		if err := s.AssertDirExists(p.Path).Done(); err != nil {
 			t.Fatalf("expected project to exist at path %q but none found", p.Path)
 		}
+		if branches, _, err := git.NewGit(p.Path).GetBranches(); err != nil {
+			t.Fatal(err)
+		} else if len(branches) != 0 {
+			t.Fatalf("expected project %s(%s) to contain no branches but it contains %s", p.Name, p.Path, branches)
+		}
 		checkReadme(t, fake.X, p, "initial readme")
 		checkMetadataIsIgnored(t, fake.X, p)
 		checkJiriRevFiles(t, fake.X, p)

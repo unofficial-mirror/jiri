@@ -2497,7 +2497,21 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 		Rename(tmpDir, op.destination).Done(); err != nil {
 		return err
 	}
-	return checkoutHeadRevision(jirix, op.project, false)
+	if err := checkoutHeadRevision(jirix, op.project, false); err != nil {
+		return err
+	}
+	// Delete inital branch(es)
+	if branches, _, err := git.NewGit(op.project.Path).GetBranches(); err != nil {
+		jirix.Logger.Warningf("not able to get branches for newly created project %s(%s)\n\n", op.project.Name, op.project.Path)
+	} else {
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
+		for _, b := range branches {
+			if err := scm.DeleteBranch(b); err != nil {
+				jirix.Logger.Warningf("not able to delete branch %s for project %s(%s)\n\n", b, op.project.Name, op.project.Path)
+			}
+		}
+	}
+	return nil
 }
 
 func (op createOperation) String() string {
