@@ -154,7 +154,7 @@ func getDiff(jirix *jiri.X, snapshot1, snapshot2 string) (*Diff, error) {
 	defer func() {
 		jirix.Logger = oldLogger
 	}()
-	jirix.Logger = log.NewLogger(log.NoLogLevel, jirix.Color)
+	jirix.Logger = log.NewLogger(log.NoLogLevel, jirix.Color, false, 0)
 	projects1, _, err := project.LoadSnapshotFile(jirix, snapshot1)
 	if err != nil {
 		return nil, err

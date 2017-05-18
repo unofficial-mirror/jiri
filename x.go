@@ -101,18 +101,22 @@ func (jirix *X) Failures() uint32 {
 }
 
 var (
-	rootFlag         string
-	jobsFlag         uint
-	colorFlag        bool
-	quietVerboseFlag bool
-	debugVerboseFlag bool
-	traceVerboseFlag bool
+	rootFlag              string
+	jobsFlag              uint
+	colorFlag             bool
+	quietVerboseFlag      bool
+	debugVerboseFlag      bool
+	traceVerboseFlag      bool
+	showProgressFlag      bool
+	progessWindowSizeFlag uint
 )
 
 func init() {
 	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
 	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
 	flag.BoolVar(&colorFlag, "color", true, "Use color to format output.")
+	flag.BoolVar(&showProgressFlag, "show-progress", true, "Show progress.")
+	flag.UintVar(&progessWindowSizeFlag, "progress-window", 5, "Number of progress messages to show simultaneously. Should be between 1 and 10")
 	flag.BoolVar(&quietVerboseFlag, "quiet", false, "Only print user actionable messages.")
 	flag.BoolVar(&quietVerboseFlag, "q", false, "Same as -quiet")
 	flag.BoolVar(&debugVerboseFlag, "v", false, "Print debug level output.")
@@ -132,7 +136,12 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if debugVerboseFlag {
 		loggerLevel = log.DebugLevel
 	}
-	logger := log.NewLogger(loggerLevel, color)
+	if progessWindowSizeFlag < 1 {
+		progessWindowSizeFlag = 1
+	} else if progessWindowSizeFlag > 10 {
+		progessWindowSizeFlag = 10
+	}
+	logger := log.NewLogger(loggerLevel, color, showProgressFlag, progessWindowSizeFlag)
 
 	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())
@@ -359,5 +368,7 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	return r(x, args)
+	err = r(x, args)
+	x.Logger.DisableProgress()
+	return err
 }
