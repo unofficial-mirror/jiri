@@ -65,6 +65,10 @@ type StrategyOpt string
 
 func (StrategyOpt) mergeOpt() {}
 
+type FfOnlyOpt bool
+
+func (FfOnlyOpt) mergeOpt() {}
+
 type TagsOpt bool
 
 func (TagsOpt) fetchOpt() {}

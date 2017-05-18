@@ -1072,10 +1072,7 @@ func TestUpdateUniverseRemoteBranch(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "non-master commit")
 }
 
-// TestUpdateWhenRemoteChangesRebased checks that UpdateUniverse can pull from a
-// non-master remote branch if the local changes were rebased somewhere else(gerrit)
-// before being pushed to remote
-func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
+func TestUpdateWhenConflictMerge(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
 	if err := fake.UpdateUniverse(false); err != nil {
@@ -1104,17 +1101,17 @@ func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
 	file1CommitRev, _ := gr.CurrentRevision()
 	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file2", "file2")
-	file2CommitRev, _ := gr.CurrentRevision()
 
 	if err := gl.Fetch("origin", git.PruneOpt(true)); err != nil {
 		t.Fatal(err)
 	}
 
 	// Cherry pick creation of file1, so that it acts like been rebased on remote repo
-	// As there is a commit creating README on remote not in local repo
+	// This would act like conflicting merge
 	if err := gitLocal.CherryPick(file1CommitRev); err != nil {
 		t.Fatal(err)
 	}
+	rev, _ := gl.CurrentRevision()
 
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
@@ -1122,8 +1119,8 @@ func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 
 	// It rebased properly and pulled latest changes
 	localRev, _ := gl.CurrentRevision()
-	if file2CommitRev != localRev {
-		t.Fatalf("Current commit is %v, it should be %v\n", localRev, file2CommitRev)
+	if rev != localRev {
+		t.Fatalf("Current commit is %v, it should be %v\n", localRev, rev)
 	}
 }
 

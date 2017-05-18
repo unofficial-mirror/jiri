@@ -651,6 +651,8 @@ func (g *Git) Merge(branch string, opts ...MergeOpt) error {
 			strategy = string(typedOpt)
 		case ResetOnFailureOpt:
 			resetOnFailure = bool(typedOpt)
+		case FfOnlyOpt:
+			args = append(args, "--ff-only")
 		}
 	}
 	if squash {

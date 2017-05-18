@@ -1379,6 +1379,24 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 		}()
 	}
 
+	// if rebase flag is false, merge fast forward current branch
+	if !rebaseAll && state.CurrentBranch.Tracking != nil {
+		tracking := state.CurrentBranch.Tracking
+		if tracking.Revision == state.CurrentBranch.Revision {
+			return nil
+		}
+		if project.LocalConfig.NoRebase {
+			jirix.Logger.Warningf("For project %s(%s), not merging your local branches due to it's local-config\n\n", project.Name, relativePath)
+			return nil
+		}
+		if err := scm.Merge(tracking.Name, gitutil.FfOnlyOpt(true)); err != nil {
+			msg := fmt.Sprintf("For project %s(%s), not able to fast forward your local branch %q to %q\n\n", project.Name, relativePath, state.CurrentBranch.Name, tracking.Name)
+			jirix.Logger.Errorf(msg)
+			jirix.IncrementFailures()
+		}
+		return nil
+	}
+
 	branches := state.Branches
 	if !rebaseAll {
 		branches = []BranchState{state.CurrentBranch}

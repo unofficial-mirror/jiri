@@ -31,7 +31,7 @@ var (
 func init() {
 	cmdProjectConfig.Flags.StringVar(&configIgnoreFlag, "ignore", "", `This can be true or false. If set to true project would be completely ignored while updating`)
 	cmdProjectConfig.Flags.StringVar(&configNoUpdateFlag, "no-update", "", `This can be true or false. If set to true project won't be updated`)
-	cmdProjectConfig.Flags.StringVar(&configNoRebaseFlag, "no-rebase", "", `This can be true or false. If set to true local branch won't be rebased`)
+	cmdProjectConfig.Flags.StringVar(&configNoRebaseFlag, "no-rebase", "", `This can be true or false. If set to true local branch won't be rebased or merged.`)
 }
 
 func runProjectConfig(jirix *jiri.X, args []string) error {

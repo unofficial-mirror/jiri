@@ -15,11 +15,11 @@ If filing a bug please include output from `jiri [command]`. If you think that j
 * Point the tree name JIRI_HEAD to the manifest selected revision.
 * Checkout new repositories at JIRI_HEAD (detached).
 * Fast-forward existing repositories to JIRI_HEAD unless further conditions apply (see below).
-* If local repo is on a tracked branch, it will rebase onto upstream changes. If rebase fails, it would be aborted and left in previous state.
+* If local repo is on a tracked branch, it will fast forward merge to upstream changes. If merge fails, user would be shown a error.
 * If project is on un-tracked branch it would be left alone and jiri will show warning.
 * It will leave all other local branches as it is.
 * If a project is deleted from manifest it  won't be deleted unless command is run with `-gc` flag.
-* If a project contains uncommitted changes, jiri will leave it alone and will not fast-forward or rebase the branches.
+* If a project contains uncommitted changes, jiri will leave it alone and will not fast-forward or merge/rebase the branches.
 * Sometimes projects are pinned to particular revision in manifest, in that case if local project is on a local branch, jiri will update them according to above rules and will not throw warnings about those projects.
     * Please note that this can leave projects on revisions other than `JIRI_HEAD` which can cause build failures. In that case user can run [`jiri status`](/howdoi.md#use-jiri-status) which will output all the projects which have changes and/or are not on `JIRI_HEAD`. User can manually checkout `JIRI_HEAD` by running `git checkout JIRI_HEAD` from inside the project.
 * If user doesn't want jiri to update a project, he/she can use `jiri project-config`.
