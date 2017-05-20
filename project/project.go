@@ -2508,9 +2508,6 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 			return err
 		}
 	}
-	if err := writeMetadata(jirix, op.project, tmpDir); err != nil {
-		return err
-	}
 	if err := s.Chmod(tmpDir, os.FileMode(0755)).
 		Rename(tmpDir, op.destination).Done(); err != nil {
 		return err
@@ -2518,6 +2515,11 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	if err := checkoutHeadRevision(jirix, op.project, false); err != nil {
 		return err
 	}
+
+	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
+		return err
+	}
+
 	// Delete inital branch(es)
 	if branches, _, err := git.NewGit(op.project.Path).GetBranches(); err != nil {
 		jirix.Logger.Warningf("not able to get branches for newly created project %s(%s)\n\n", op.project.Name, op.project.Path)
