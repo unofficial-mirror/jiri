@@ -164,18 +164,11 @@ func TestStatus(t *testing.T) {
 	if !equal(got, want) {
 		t.Errorf("got %s, want %s", got, want)
 	}
-	newfile := func(dir, file string) {
-		testfile := filepath.Join(dir, file)
-		_, err := os.Create(testfile)
-		if err != nil {
-			t.Errorf("failed to create %s: %s", testfile, err)
-		}
-	}
 
 	// Test combinations of tracked and untracked changes
-	newfile(localProjects[0].Path, "untracked1")
-	newfile(localProjects[0].Path, "untracked2")
-	newfile(localProjects[2].Path, "uncommitted.go")
+	newfile(t, localProjects[0].Path, "untracked1")
+	newfile(t, localProjects[0].Path, "untracked2")
+	newfile(t, localProjects[2].Path, "uncommitted.go")
 	if err := gitLocal.Add("uncommitted.go"); err != nil {
 		t.Error(err)
 	}
@@ -206,30 +199,22 @@ func statusFlagsTest(t *testing.T) {
 		gitLocals[i] = gitLocal
 	}
 
-	newfile := func(dir, file string) {
-		testfile := filepath.Join(dir, file)
-		_, err := os.Create(testfile)
-		if err != nil {
-			t.Errorf("failed to create %s: %s", testfile, err)
-		}
-	}
-
 	gitLocals[0].CheckoutBranch("HEAD~1")
 	gitLocals[1].CheckoutBranch("file-2")
 	gitLocals[3].CheckoutBranch("HEAD~2")
 	gitLocals[4].CheckoutBranch("master")
 	gitLocals[5].CheckoutBranch("master")
 
-	newfile(localProjects[0].Path, "untracked1")
-	newfile(localProjects[0].Path, "untracked2")
+	newfile(t, localProjects[0].Path, "untracked1")
+	newfile(t, localProjects[0].Path, "untracked2")
 
-	newfile(localProjects[1].Path, "uncommitted.go")
+	newfile(t, localProjects[1].Path, "uncommitted.go")
 	if err := gitLocals[1].Add("uncommitted.go"); err != nil {
 		t.Error(err)
 	}
 
-	newfile(localProjects[2].Path, "untracked1")
-	newfile(localProjects[2].Path, "uncommitted.go")
+	newfile(t, localProjects[2].Path, "untracked1")
+	newfile(t, localProjects[2].Path, "uncommitted.go")
 	if err := gitLocals[2].Add("uncommitted.go"); err != nil {
 		t.Error(err)
 	}
@@ -366,5 +351,13 @@ func setDummyUser(t *testing.T, jirix *jiri.X, projectDir string) {
 	}
 	if err := git.Config("user.name", "John Doe"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func newfile(t *testing.T, dir, file string) {
+	testfile := filepath.Join(dir, file)
+	_, err := os.Create(testfile)
+	if err != nil {
+		t.Errorf("failed to create %s: %s", testfile, err)
 	}
 }

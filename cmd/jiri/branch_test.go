@@ -21,6 +21,7 @@ import (
 func setDefaultBranchFlags() {
 	branchFlags.forceDeleteFlag = false
 	branchFlags.deleteFlag = false
+	branchFlags.deleteMergedFlag = false
 	branchFlags.listFlag = false
 	branchFlags.overrideProjectConfigFlag = false
 }
@@ -369,6 +370,176 @@ func TestDeleteBranch(t *testing.T) {
 
 		}
 	}
+}
+
+func TestDeleteMergedBranch(t *testing.T) {
+	testDeleteMergedBranch(t, false)
+	testDeleteMergedBranch(t, true)
+}
+
+func testDeleteMergedBranch(t *testing.T, override_pc bool) {
+	setDefaultBranchFlags()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Add projects
+	numProjects := 7
+	localProjects := createBranchProjects(t, fake, numProjects)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocals := make([]*gitutil.Git, numProjects)
+	for i, localProject := range localProjects {
+		gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		gitLocals[i] = gitLocal
+	}
+
+	branchToDelete1 := "branchToDelete1"
+	branchToDelete2 := "branchToDelete2"
+	branchNotToDelete := "branchNotToDelete"
+
+	i := 0
+	gitLocals[i].CreateBranch(branchToDelete1)
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete2, "origin/master")
+
+	i = 1
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile")
+
+	i = 2
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile")
+
+	// project-3 has no branch
+
+	i = 4
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CreateBranch(branchToDelete2)
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile")
+	lc := project.LocalConfig{NoUpdate: true}
+	project.WriteLocalConfig(fake.X, localProjects[i], lc)
+	localProjects[i].LocalConfig = lc
+
+	// Don't delete current branch with changes
+	i = 5
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	newfile(t, localProjects[i].Path, "uncommitted.go")
+
+	// Don't delete current branch with changes
+	i = 6
+	gitLocals[i].CreateBranch(branchToDelete1)
+	gitLocals[i].CreateBranch(branchNotToDelete)
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	newfile(t, localProjects[i].Path, "uncommitted.go")
+
+	projects := make(project.Projects)
+	for _, localProject := range localProjects {
+		projects[localProject.Key()] = localProject
+	}
+
+	oldstates, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	setDefaultBranchFlags()
+	branchFlags.deleteMergedFlag = true
+	branchFlags.overrideProjectConfigFlag = override_pc
+	executeBranch(t, fake)
+
+	newstates, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// test project states
+	for i = 0; i < numProjects; i++ {
+		localProject := localProjects[i]
+		dontdelete := localProject.LocalConfig.NoUpdate && !override_pc
+		oldstate, _ := oldstates[localProject.Key()]
+		newstate, _ := newstates[localProject.Key()]
+		newBranchMap := make(map[string]bool)
+		for _, newb := range newstate.Branches {
+			newBranchMap[newb.Name] = true
+		}
+		for _, oldb := range oldstate.Branches {
+			if (dontdelete || oldb.Name == branchNotToDelete) && !newBranchMap[oldb.Name] {
+				t.Errorf("project %q should contain branch %q", localProject.Name, oldb.Name)
+			} else if !dontdelete && strings.HasPrefix(oldb.Name, "branchToDelete") && newBranchMap[oldb.Name] {
+				t.Errorf("project %q should not contain branch %q", localProject.Name, oldb.Name)
+			}
+		}
+	}
+
+	// Test that if <branch> is passed only that branch is deleted
+	i = 0
+	gitLocals[i].CreateBranch(branchToDelete1)
+	gitLocals[i].DeleteBranch(branchNotToDelete, gitutil.ForceOpt(true))
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+
+	i = 1
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].DeleteBranch(branchNotToDelete, gitutil.ForceOpt(true))
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+
+	i = 2
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].DeleteBranch(branchNotToDelete, gitutil.ForceOpt(true))
+	gitLocals[i].CreateBranch(branchNotToDelete)
+
+	i = 3
+	gitLocals[i].CreateBranch(branchToDelete1)
+	gitLocals[i].DeleteBranch(branchNotToDelete, gitutil.ForceOpt(true))
+	gitLocals[i].CreateBranch(branchNotToDelete)
+
+	i = 4
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].DeleteBranch(branchNotToDelete, gitutil.ForceOpt(true))
+	gitLocals[i].CreateBranch(branchNotToDelete)
+	lc = project.LocalConfig{NoUpdate: true}
+	project.WriteLocalConfig(fake.X, localProjects[i], lc)
+	localProjects[i].LocalConfig = lc
+
+	setDefaultBranchFlags()
+	branchFlags.deleteMergedFlag = true
+	branchFlags.overrideProjectConfigFlag = override_pc
+	executeBranch(t, fake, branchToDelete1)
+
+	newstates, err = project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// test project states
+	for i = 0; i <= 4; i++ {
+		localProject := localProjects[i]
+		dontdelete := localProject.LocalConfig.NoUpdate && !override_pc
+		newstate, _ := newstates[localProject.Key()]
+		newBranchMap := make(map[string]bool)
+		for _, newb := range newstate.Branches {
+			newBranchMap[newb.Name] = true
+		}
+
+		if !newBranchMap[branchNotToDelete] {
+			t.Errorf("project %q should contain branch %q", localProject.Name, branchNotToDelete)
+		}
+
+		if dontdelete && !newBranchMap[branchToDelete1] {
+			t.Errorf("project %q should contain branch %q", localProject.Name, branchToDelete1)
+		}
+
+		if !dontdelete && newBranchMap[branchToDelete1] {
+			t.Errorf("project %q should not contain branch %q", localProject.Name, branchToDelete1)
+		}
+	}
+
 }
 
 func equalBranchOut(first, second string) bool {

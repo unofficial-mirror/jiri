@@ -111,6 +111,24 @@ type Branch struct {
 	Tracking *Reference
 }
 
+func (g *Git) ShortHash(ref string) (string, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return "", err
+	}
+	defer repo.Free()
+	if obj, err := repo.RevparseSingle(ref); err != nil {
+		return "", err
+	} else {
+		defer obj.Free()
+		commit, err := obj.Peel(git2go.ObjectCommit)
+		if err != nil {
+			return "", err
+		}
+		return commit.ShortId()
+	}
+}
+
 // CurrentRevisionForRef gets current rev for ref/branch/tags
 func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
 	repo, err := git2go.OpenRepository(g.rootDir)
@@ -132,6 +150,46 @@ func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
 		}
 		return obj.Id().String(), nil
 	}
+}
+
+func (g *Git) MergedBranches(ref string) ([]string, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return nil, err
+	}
+	defer repo.Free()
+	obj, err := repo.RevparseSingle(ref)
+	if err != nil {
+		return nil, err
+	}
+	defer obj.Free()
+	baseCommit, err := obj.Peel(git2go.ObjectCommit)
+	if err != nil {
+		return nil, err
+	}
+	bi, err := repo.NewBranchIterator(git2go.BranchLocal)
+	if err != nil {
+		return nil, err
+	}
+	mergedBranches := []string{}
+	err = bi.ForEach(func(b *git2go.Branch, bt git2go.BranchType) error {
+		c := b.Target()
+		if c == nil {
+			// Ignore this branch
+			return nil
+		}
+		if base, err := repo.MergeBase(c, baseCommit.Id()); err != nil {
+			return err
+		} else if base.String() == c.String() {
+			name, err := b.Name()
+			if err != nil {
+				return err
+			}
+			mergedBranches = append(mergedBranches, name)
+		}
+		return nil
+	})
+	return mergedBranches, err
 }
 
 func (g *Git) SetUpstream(branch, upstream string) error {
