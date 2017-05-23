@@ -75,6 +75,25 @@ func (g *Git) Fetch(remote string, opts ...FetchOpt) error {
 	return g.FetchRefspec(remote, "", opts...)
 }
 
+func (g *Git) CreateLightweightTag(name string) error {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return err
+	}
+	defer repo.Free()
+	head, err := repo.Head()
+	if err != nil {
+		return err
+	}
+	defer head.Free()
+	c, err := repo.LookupCommit(head.Target())
+	if err != nil {
+		return err
+	}
+	_, err = repo.Tags.CreateLightweight(name, c, false)
+	return err
+}
+
 // FetchRefspec fetches refs and tags from the given remote for a particular refspec.
 func (g *Git) FetchRefspec(remoteName, refspec string, opts ...FetchOpt) error {
 	repo, err := git2go.OpenRepository(g.rootDir)
