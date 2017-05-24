@@ -2428,7 +2428,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 	defer jirix.TimerPop()
 	commitHookMap := make(map[string][]byte)
 	for _, op := range ops {
-		if op.Kind() != "delete" {
+		if op.Kind() != "delete" && !op.Project().LocalConfig.Ignore && !op.Project().LocalConfig.NoUpdate {
 			if op.Project().GerritHost != "" {
 				hookPath := filepath.Join(op.Project().Path, ".git", "hooks", "commit-msg")
 				commitHook, err := os.Create(hookPath)
@@ -2460,6 +2460,24 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 				if err := os.Chmod(hookPath, 0750); err != nil {
 					return fmtError(err)
 				}
+			}
+			hookPath := filepath.Join(op.Project().Path, ".git", "hooks", "post-commit")
+			commitHook, err := os.Create(hookPath)
+			if err != nil {
+				return err
+			}
+			bytes := []byte(`#!/bin/sh
+
+if ! git symbolic-ref HEAD &> /dev/null; then
+  echo -e "WARNING: You are in a detached head state! You might loose this commit.\nUse 'git checkout -b <branch> to put it on a branch.\n"
+fi
+`)
+			if _, err := commitHook.Write(bytes); err != nil {
+				return err
+			}
+			commitHook.Close()
+			if err := os.Chmod(hookPath, 0750); err != nil {
+				return err
 			}
 
 			// Apply exclusion for /.jiri/. Ideally we'd only write this file on
