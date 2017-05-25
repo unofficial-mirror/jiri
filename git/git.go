@@ -47,6 +47,29 @@ func (g *Git) BranchExists(branch string) (bool, error) {
 	return true, nil
 }
 
+func (g *Git) CommitMsg(ref string) (string, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return "", err
+	}
+	defer repo.Free()
+	obj, err := repo.RevparseSingle(ref)
+	if err != nil {
+		return "", err
+	}
+	defer obj.Free()
+	c, err := obj.Peel(git2go.ObjectCommit)
+	if err != nil {
+		return "", err
+	}
+	defer c.Free()
+	commit, err := c.AsCommit()
+	if err != nil {
+		return "", err
+	}
+	return commit.Message(), nil
+}
+
 // Fetch fetches refs and tags from the given remote.
 func (g *Git) Fetch(remote string, opts ...FetchOpt) error {
 	return g.FetchRefspec(remote, "", opts...)

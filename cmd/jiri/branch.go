@@ -6,13 +6,17 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
+	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
@@ -20,10 +24,11 @@ import (
 
 var branchFlags struct {
 	deleteFlag                bool
+	deleteMergedClsFlag       bool
+	deleteMergedFlag          bool
 	forceDeleteFlag           bool
 	listFlag                  bool
 	overrideProjectConfigFlag bool
-	deleteMergedFlag          bool
 }
 
 type MultiError []error
@@ -60,6 +65,7 @@ func init() {
 	flags.BoolVar(&branchFlags.listFlag, "list", false, "Show only projects with current branch <branch>")
 	flags.BoolVar(&branchFlags.overrideProjectConfigFlag, "override-pc", false, "Overrrides project config's ignore and noupdate flag and deletes the branch.")
 	flags.BoolVar(&branchFlags.deleteMergedFlag, "delete-merged", false, "Delete merged branches. Merged branches are the tracked branches merged with their tracking remote or un-tracked branches merged with the branch specified in manifest(default master). If <branch> is provided, it will only delete branch <branch> if merged.")
+	flags.BoolVar(&branchFlags.deleteMergedClsFlag, "delete-merged-cl", false, "Implies -delete-merged. It also parses commit messages for ChangeID and checks with gerrit if those changes have been merged and deletes those branches. It will ignore a branch if it differs with remote by more than 10 commits.")
 }
 
 func displayProjects(jirix *jiri.X, branch string) error {
@@ -141,33 +147,45 @@ func runBranch(jirix *jiri.X, args []string) error {
 		}
 		return deleteBranches(jirix, branch)
 	}
+	if branchFlags.deleteMergedClsFlag {
+		return deleteMergedBranches(jirix, branch, true)
+	}
 	if branchFlags.deleteMergedFlag {
-		return deleteMergedBranches(jirix, branch)
+		return deleteMergedBranches(jirix, branch, false)
 	}
 	return displayProjects(jirix, branch)
 }
 
-func deleteMergedBranches(jirix *jiri.X, branchToDelete string) error {
+var (
+	changeIDRE = regexp.MustCompile("Change-Id: (I[0123456789abcdefABCDEF]{40})")
+)
+
+func deleteMergedBranches(jirix *jiri.X, branchToDelete string, deleteMergedCls bool) error {
 	localProjects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return err
 	}
+
 	cDir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
+
 	jirix.TimerPush("Get states")
 	states, err := project.GetProjectStates(jirix, localProjects, false)
 	if err != nil {
 		return err
 	}
 	jirix.TimerPop()
+
 	remoteProjects, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, false /*localManifest*/)
 	if err != nil {
 		return err
 	}
+
 	jirix.TimerPush("Process")
-	for key, state := range states {
+	processProject := func(key project.ProjectKey) {
+		state, _ := states[key]
 		remote, ok := remoteProjects[key]
 		relativePath, err := filepath.Rel(cDir, state.Project.Path)
 		if err != nil {
@@ -175,13 +193,23 @@ func deleteMergedBranches(jirix *jiri.X, branchToDelete string) error {
 		}
 		if !branchFlags.overrideProjectConfigFlag && (state.Project.LocalConfig.Ignore || state.Project.LocalConfig.NoUpdate) {
 			jirix.Logger.Warningf(" Not processing project %s(%s) due to it's local-config. Use '-overrride-pc' flag\n\n", state.Project.Name, state.Project.Path)
-			continue
+			return
 		}
 		if !ok {
 			jirix.Logger.Debugf("Not processing project %s(%s) as it was not found in manifest\n\n", state.Project.Name, relativePath)
-			continue
+			return
 		}
-		if deletedBranches, err := deleteProjectMergedBranches(jirix, state.Project, remote, relativePath, branchToDelete); len(deletedBranches) != 0 || err != nil {
+
+		deletedBranches, mErr := deleteProjectMergedBranches(jirix, state.Project, remote, relativePath, branchToDelete)
+		if deleteMergedCls {
+			deletedBranches2, err2 := deleteProjectMergedClsBranches(jirix, state.Project, remote, relativePath, branchToDelete)
+			for b, h := range deletedBranches2 {
+				deletedBranches[b] = h
+			}
+			mErr = append(mErr, err2...)
+		}
+
+		if len(deletedBranches) != 0 || mErr != nil {
 			buf := fmt.Sprintf("Project: %s(%s)\n", state.Project.Name, relativePath)
 			if len(deletedBranches) != 0 {
 				dbs := []string{}
@@ -194,9 +222,9 @@ func deleteMergedBranches(jirix *jiri.X, branchToDelete string) error {
 					buf = buf + fmt.Sprintf("Current branch \"%s\" was deleted and project was put on JIRI_HEAD\n", jirix.Color.Yellow(state.CurrentBranch.Name))
 				}
 			}
-			if err != nil {
+			if mErr != nil {
 				jirix.IncrementFailures()
-				buf = buf + fmt.Sprintf("%s\n", err)
+				buf = buf + fmt.Sprintf("%s\n", mErr)
 				jirix.Logger.Errorf("%s\n", buf)
 			} else {
 				jirix.Logger.Infof("%s\n", buf)
@@ -204,10 +232,151 @@ func deleteMergedBranches(jirix *jiri.X, branchToDelete string) error {
 		}
 	}
 
+	workQueue := make(chan project.ProjectKey, len(states))
+	for key, _ := range states {
+		workQueue <- key
+	}
+	close(workQueue)
+
+	var wg sync.WaitGroup
+	for i := uint(0); i < jirix.Jobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for key := range workQueue {
+				processProject(key)
+			}
+		}()
+	}
+
+	wg.Wait()
+	jirix.TimerPop()
+
 	if jirix.Failures() != 0 {
 		return fmt.Errorf("Branch deletion completed with non-fatal errors.")
 	}
 	return nil
+}
+
+func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote project.Project, relativePath, branchToDelete string) (map[string]string, MultiError) {
+	deletedBranches := make(map[string]string)
+	var retErr MultiError
+	if remote.GerritHost == "" {
+		return nil, nil
+	}
+	hostUrl, err := url.Parse(remote.GerritHost)
+	if err != nil {
+		retErr = append(retErr, err)
+		return nil, retErr
+	}
+	gerrit := gerrit.New(jirix, hostUrl)
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
+	g := git.NewGit(local.Path)
+	branches, err := g.GetAllBranchesInfo()
+	if err != nil {
+		retErr = append(retErr, err)
+		return nil, retErr
+	}
+	for _, b := range branches {
+		if branchToDelete != "" && b.Name != branchToDelete {
+			continue
+		}
+		if b.IsHead {
+			untracked, err := g.HasUntrackedFiles()
+			if err != nil {
+				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get changes: %s\n", b.Name, err))
+				continue
+			}
+			uncommited, err := g.HasUncommittedChanges()
+			if err != nil {
+				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get changes: %s\n", b.Name, err))
+				continue
+			}
+			if untracked || uncommited {
+				jirix.Logger.Debugf("Not deleting current branch %q for project %s(%s) as it has changes\n\n", b.Name, local.Name, relativePath)
+				continue
+			}
+		}
+
+		trackingBranch := ""
+		if b.Tracking == nil {
+			rb := remote.RemoteBranch
+			if rb == "" {
+				rb = "master"
+			}
+			trackingBranch = fmt.Sprintf("remotes/origin/%s", rb)
+		} else {
+			trackingBranch = b.Tracking.Name
+		}
+
+		extraCommits, err := scm.ExtraCommits(b.Name, trackingBranch)
+		if err != nil {
+			retErr = append(retErr, fmt.Errorf("Not deleting branch %q as can't get extra commits: %s\n", b.Name, err))
+			continue
+		}
+
+		if len(extraCommits) > 10 {
+			jirix.Logger.Debugf("Not deleting branch %q for project %s(%s) as it has more than 10 extra commits\n\n", b.Name, local.Name, relativePath)
+			continue
+		}
+
+		deleteBranch := true
+		for _, c := range extraCommits {
+			deleteBranch = false
+			log, err := g.CommitMsg(c)
+			if err != nil {
+				retErr = append(retErr, fmt.Errorf("Not deleting branch %q as can't get log for rev %q: %s\n", b.Name, c, err))
+				break
+			}
+			changeID := changeIDRE.FindStringSubmatch(log)
+			if len(changeID) != 2 {
+				// Invalid/No Changeid
+				break
+			}
+			c, err := gerrit.GetChangeByID(changeID[1])
+			if err != nil {
+				retErr = append(retErr, fmt.Errorf("Not deleting branch %q as can't get change %q: %s\n", b.Name, changeID[1], err))
+				break
+			}
+			if c == nil || c.Submitted == "" {
+				// Not merged
+				break
+			}
+			deleteBranch = true
+		}
+		if !deleteBranch {
+			continue
+		}
+
+		if b.IsHead {
+			revision, err := project.GetHeadRevision(jirix, remote)
+			if err != nil {
+				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get head revision: %s\n", b.Name, err))
+				continue
+			}
+			if err := scm.CheckoutBranch(revision, gitutil.DetachOpt(true)); err != nil {
+				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't checkout JIRI_HEAD: %s\n", b.Name, err))
+				continue
+			}
+		}
+
+		shortHash, err := g.ShortHash(b.Revision)
+		if err != nil {
+			retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't short hash: %s\n", b.Name, err))
+			continue
+		}
+		if err := scm.DeleteBranch(b.Name, gitutil.ForceOpt(true)); err != nil {
+			retErr = append(retErr, fmt.Errorf("Cannot delete branch %q: %s\n", b.Name, err))
+			if b.IsHead {
+				if err := scm.CheckoutBranch(b.Name); err != nil {
+					retErr = append(retErr, fmt.Errorf("Not able to put project back on branch %q: %s\n", b.Name, err))
+				}
+			}
+			continue
+		}
+		deletedBranches[b.Name] = shortHash
+	}
+	return deletedBranches, retErr
 }
 
 func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote project.Project, relativePath, branchToDelete string) (map[string]string, MultiError) {

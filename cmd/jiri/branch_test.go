@@ -6,12 +6,16 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
@@ -19,9 +23,10 @@ import (
 )
 
 func setDefaultBranchFlags() {
-	branchFlags.forceDeleteFlag = false
 	branchFlags.deleteFlag = false
+	branchFlags.deleteMergedClsFlag = false
 	branchFlags.deleteMergedFlag = false
+	branchFlags.forceDeleteFlag = false
 	branchFlags.listFlag = false
 	branchFlags.overrideProjectConfigFlag = false
 }
@@ -368,6 +373,174 @@ func TestDeleteBranch(t *testing.T) {
 				t.Errorf("project %q should not contain branch %q", localProject.Name, testBranch)
 			}
 
+		}
+	}
+}
+
+var r *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func randomString(strlen int) string {
+	const chars = "abcde0123456789ABCDE"
+	result := make([]byte, strlen)
+	for i := range result {
+		result[i] = chars[r.Intn(len(chars))]
+	}
+	return string(result)
+}
+
+func generateChangeIds(n int) []string {
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = "I" + randomString(40)
+	}
+	return ids
+}
+
+func TestDeleteMergedClsBranch(t *testing.T) {
+	mergedIds := generateChangeIds(2)
+	unmergedIds := generateChangeIds(1)
+	localIds := generateChangeIds(1)
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/changes/", func(rw http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if id, ok := r.Form["q"]; ok {
+			for _, m := range mergedIds {
+				if m == id[0] {
+					rw.Write([]byte(")]}'\n[{\"submitted\":\"time\"}]"))
+					return
+				}
+			}
+			for _, u := range unmergedIds {
+				if u == id[0] {
+					rw.Write([]byte(fmt.Sprintf(")]}'\n[{\"change-id\":\"%s\"}]", id[0])))
+					return
+				}
+			}
+		}
+		rw.Write([]byte(")]}'\n[]"))
+	})
+	serverMux.HandleFunc("/tools/hooks/commit-msg", func(rw http.ResponseWriter, r *http.Request) {
+		rw.Write([]byte("#!/bin/sh"))
+	})
+	server := httptest.NewServer(serverMux)
+	defer server.Close()
+
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Add projects
+	numProjects := 6
+	localProjects := createBranchProjects(t, fake, numProjects)
+
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps := []project.Project{}
+	for _, p := range m.Projects {
+		p.GerritHost = server.URL
+		ps = append(ps, p)
+	}
+	m.Projects = ps
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocals := make([]*gitutil.Git, numProjects)
+	for i, localProject := range localProjects {
+		gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		gitLocals[i] = gitLocal
+	}
+
+	branchToDelete1 := "branchToDelete1"
+	branchToDelete2 := "branchToDelete2"
+	branchNotToDelete := "branchNotToDelete"
+
+	changeIdPrefix := "Change-Id: "
+
+	i := 0
+	gitLocals[i].CreateBranch(branchToDelete1)
+	gitLocals[i].CheckoutBranch(branchToDelete1)
+	for j := 0; j < 2; j++ {
+		writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+mergedIds[j])
+	}
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete2, "origin/master")
+	gitLocals[i].CheckoutBranch(branchToDelete2)
+	for j := 0; j < 2; j++ {
+		writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+mergedIds[j])
+	}
+
+	i = 1
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CheckoutBranch(branchToDelete1)
+	for j := 0; j < 2; j++ {
+		writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+mergedIds[j])
+	}
+	gitLocals[i].CreateAndCheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile"+changeIdPrefix+localIds[0])
+
+	i = 2
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+unmergedIds[0])
+
+	// project-3 has no branch
+
+	// Don't delete current branch with changes
+	i = 4
+	gitLocals[i].CreateBranchWithUpstream(branchToDelete1, "origin/master")
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+mergedIds[0])
+	newfile(t, localProjects[i].Path, "uncommitted.go")
+
+	// Don't delete branch when it has local commits
+	i = 5
+	gitLocals[i].CreateBranchWithUpstream(branchNotToDelete, "origin/master")
+	gitLocals[i].CheckoutBranch(branchNotToDelete)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+localIds[0])
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile\n"+changeIdPrefix+mergedIds[0])
+
+	projects := make(project.Projects)
+	for _, localProject := range localProjects {
+		projects[localProject.Key()] = localProject
+	}
+
+	oldstates, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	setDefaultBranchFlags()
+	branchFlags.deleteMergedClsFlag = true
+	got := executeBranch(t, fake)
+	fmt.Println(got)
+
+	newstates, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// test project states
+	for i = 0; i < numProjects; i++ {
+		localProject := localProjects[i]
+		oldstate, _ := oldstates[localProject.Key()]
+		newstate, _ := newstates[localProject.Key()]
+		newBranchMap := make(map[string]bool)
+		for _, newb := range newstate.Branches {
+			newBranchMap[newb.Name] = true
+		}
+		for _, oldb := range oldstate.Branches {
+			if oldb.Name == branchNotToDelete && !newBranchMap[oldb.Name] {
+				t.Errorf("project %q should contain branch %q", localProject.Name, oldb.Name)
+			} else if strings.HasPrefix(oldb.Name, "branchToDelete") && newBranchMap[oldb.Name] {
+				t.Errorf("project %q should not contain branch %q", localProject.Name, oldb.Name)
+			}
 		}
 	}
 }
