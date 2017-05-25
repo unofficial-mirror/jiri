@@ -298,7 +298,7 @@ branches with `jiri update -rebase-all`.
   ```
 2. Create a new feature branch for the CL.
   ```
-  jiri checkout -b <branch-name> --track origin/master
+  git checkout -b <branch-name> --track origin/master
   ```
 3. Make modifications to the project source code.
 4. Stage any changed files for commit.
@@ -322,7 +322,7 @@ branches with `jiri update -rebase-all`.
   ```
 3. Sync the feature branch with the master branch.
   ```
-  jiri rebase origin/master
+  git rebase origin/master
   ```
 4. If there are no conflicts between the master and the feature branch, the CL
    has been successfully synced with the remote.
@@ -410,7 +410,7 @@ for review according to the instructions above.
 
 Then, while still on the feature branch for A, create your feature branch for B.
 ```
-jiri checkout -b feature-B --track origin/master
+git checkout -b feature-B --track origin/master
 ```
 Then make your change and upload the CL for review according to the
 instructions above.
