@@ -2300,6 +2300,9 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 					if err != nil {
 						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
 					}
+					if response.StatusCode != http.StatusOK {
+						return fmt.Errorf("Error while downloading %q, status code: %d", downloadPath, response.StatusCode)
+					}
 					defer response.Body.Close()
 					if b, err := ioutil.ReadAll(response.Body); err != nil {
 						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
