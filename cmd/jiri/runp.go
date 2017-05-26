@@ -256,7 +256,7 @@ func (r *runner) Reduce(mr *simplemr.MR, key string, values []interface{}) error
 		mo := v.(*mapOutput)
 		if mo.err != nil {
 			fmt.Fprintf(os.Stdout, "FAILED: %v: %s %v\n", mo.key, strings.Join(r.args, " "), mo.err)
-			return mo.err
+			return nil
 		} else {
 			if runpFlags.collateOutput {
 				r.collatedOutputLock.Lock()
