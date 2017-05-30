@@ -1452,6 +1452,10 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 	if !rebaseAll {
 		branches = []BranchState{state.CurrentBranch}
 	}
+	branchMap := make(map[string]BranchState)
+	for _, branch := range branches {
+		branchMap[branch.Name] = branch
+	}
 	rebaseUntrackedMessage := false
 	headRevision, err := GetHeadRevision(jirix, project)
 	if err != nil {
@@ -1462,8 +1466,35 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 		return err
 	}
 	for _, branch := range branches {
-		if branch.Tracking != nil { // tracked branch
-			if branch.Revision == branch.Tracking.Revision {
+		tracking := branch.Tracking
+		circularDependencyMap := make(map[string]bool)
+		circularDependencyMap[branch.Name] = true
+		rebase := true
+		if tracking != nil {
+			circularDependencyMap[tracking.Name] = true
+			_, ok := branchMap[tracking.Name]
+			for ok {
+				t := branchMap[tracking.Name].Tracking
+				if t == nil {
+					break
+				}
+				if circularDependencyMap[t.Name] {
+					rebase = false
+					msg := fmt.Sprintf("For project %s(%s), branch %q has circular dependency, not rebasing it.\n\n", project.Name, relativePath, branch.Name)
+					jirix.Logger.Errorf(msg)
+					jirix.IncrementFailures()
+					break
+				}
+				circularDependencyMap[t.Name] = true
+				tracking = t
+				_, ok = branchMap[tracking.Name]
+			}
+		}
+		if !rebase {
+			continue
+		}
+		if tracking != nil { // tracked branch
+			if branch.Revision == tracking.Revision {
 				continue
 			}
 			if project.LocalConfig.NoRebase {
@@ -1472,20 +1503,20 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 			}
 
 			if err := scm.CheckoutBranch(branch.Name); err != nil {
-				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, branch.Tracking.Name)
+				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, tracking.Name)
 				msg += "\nPlease do it manually\n\n"
 				jirix.Logger.Errorf(msg)
 				jirix.IncrementFailures()
 				continue
 			}
-			rebaseSuccess, err := tryRebase(jirix, project, branch.Tracking.Name)
+			rebaseSuccess, err := tryRebase(jirix, project, tracking.Name)
 			if err != nil {
 				return err
 			}
 			if rebaseSuccess {
-				jirix.Logger.Debugf("For project %q, rebased your local branch %q on %q", project.Name, branch.Name, branch.Tracking.Name)
+				jirix.Logger.Debugf("For project %q, rebased your local branch %q on %q", project.Name, branch.Name, tracking.Name)
 			} else {
-				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, branch.Tracking.Name)
+				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, tracking.Name)
 				msg += "\nPlease do it manually\n\n"
 				jirix.Logger.Errorf(msg)
 				jirix.IncrementFailures()

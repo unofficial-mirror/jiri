@@ -322,6 +322,10 @@ func (g *Git) CreateAndCheckoutBranch(branch string) error {
 	return g.run("checkout", "-b", branch)
 }
 
+func (g *Git) SetUpstream(branch, upstream string) error {
+	return g.run("branch", "-u", upstream, branch)
+}
+
 // CreateBranchWithUpstream creates a new branch and sets the upstream
 // repository to the given upstream.
 func (g *Git) CreateBranchWithUpstream(branch, upstream string) error {

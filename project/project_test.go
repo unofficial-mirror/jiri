@@ -320,6 +320,86 @@ func TestUpdateUniverseSimple(t *testing.T) {
 	}
 }
 
+func TestUpdateUniverseWhenLocalTracksLocal(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	// Check that calling UpdateUniverse() creates local copies of the remote
+	// repositories, and that jiri metadata is ignored by git.
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
+	gitLocal.CreateBranchWithUpstream("A", "origin/master")
+	gitLocal.CreateBranch("B")
+	gitLocal.SetUpstream("B", "A")
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
+	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
+	remoteRev, _ := gitRemote.CurrentRevision()
+	if err := project.UpdateUniverse(fake.X, false, false, false, false, true /*rebase-all*/, project.DefaultHookTimeout); err != nil {
+		t.Fatal(err)
+	}
+	projects, err := project.LocalProjects(fake.X, project.FastScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	states, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := states[localProjects[1].Key()]
+	for _, b := range state.Branches {
+		if b.Revision != remoteRev {
+			t.Fatalf("Branch %q should have rev %q, instead it has %q", b.Name, remoteRev, b.Revision)
+		}
+	}
+}
+
+func TestUpdateUniverseWhenLocalTracksEachOther(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	// Check that calling UpdateUniverse() creates local copies of the remote
+	// repositories, and that jiri metadata is ignored by git.
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
+	gitLocal.CreateBranch("A")
+	gitLocal.CreateBranch("B")
+	gitLocal.SetUpstream("B", "A")
+	gitLocal.SetUpstream("A", "B")
+
+	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
+	oldRemoteRev, _ := gitRemote.CurrentRevision()
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
+	remoteRev, _ := gitRemote.CurrentRevision()
+
+	if err := project.UpdateUniverse(fake.X, false, false, false, false, true /*rebase-all*/, project.DefaultHookTimeout); err != nil {
+		t.Fatal(err)
+	}
+	projects, err := project.LocalProjects(fake.X, project.FastScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	states, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := states[localProjects[1].Key()]
+	for _, b := range state.Branches {
+		expectedRev := oldRemoteRev
+		if b.Name == "" {
+			expectedRev = remoteRev
+		}
+		if b.Revision != expectedRev {
+			t.Fatalf("Branch %q should have rev %q, instead it has %q", b.Name, expectedRev, b.Revision)
+		}
+	}
+}
+
 // TestUpdateUniverseWithCache checks that UpdateUniverse can clone and pull
 // from a cache.
 func testWithCache(t *testing.T, shared bool) {
