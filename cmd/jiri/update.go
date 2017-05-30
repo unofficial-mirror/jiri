@@ -83,6 +83,9 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		}
 		return fmt.Errorf("while writing history: %s", err2)
 	}
+	if err != nil {
+		return err
+	}
 	if jirix.Failures() != 0 {
 		return fmt.Errorf("Project update completed with non-fatal errors")
 	}
