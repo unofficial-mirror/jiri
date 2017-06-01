@@ -25,8 +25,30 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
+func dirExists(dirname string) error {
+	fileInfo, err := os.Stat(dirname)
+	if err != nil {
+		return err
+	}
+	if !fileInfo.IsDir() {
+		return os.ErrNotExist
+	}
+	return nil
+}
+
+func fileExists(dirname string) error {
+	fileInfo, err := os.Stat(dirname)
+	if err != nil {
+		return err
+	}
+	if fileInfo.IsDir() {
+		return os.ErrNotExist
+	}
+	return nil
+}
+
 func checkReadme(t *testing.T, jirix *jiri.X, p project.Project, message string) {
-	if _, err := jirix.NewSeq().Stat(p.Path); err != nil {
+	if _, err := os.Stat(p.Path); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(p.Path, "README")
@@ -83,7 +105,7 @@ func checkJiriRevFiles(t *testing.T, jirix *jiri.X, p project.Project) {
 
 // Checks that /.jiri/ is ignored in a local project checkout
 func checkMetadataIsIgnored(t *testing.T, jirix *jiri.X, p project.Project) {
-	if _, err := jirix.NewSeq().Stat(p.Path); err != nil {
+	if _, err := os.Stat(p.Path); err != nil {
 		t.Fatalf("%v", err)
 	}
 	gitInfoExcludeFile := filepath.Join(p.Path, ".git", "info", "exclude")
@@ -102,8 +124,8 @@ func commitFile(t *testing.T, jirix *jiri.X, dir, file, msg string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer jirix.NewSeq().Chdir(cwd)
-	if err := jirix.NewSeq().Chdir(dir).Done(); err != nil {
+	defer os.Chdir(cwd)
+	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
 	if err := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(file, msg); err != nil {
@@ -152,10 +174,9 @@ func TestLocalProjects(t *testing.T) {
 	// Create some projects.
 	numProjects, projectPaths := 3, []string{}
 	for i := 0; i < numProjects; i++ {
-		s := jirix.NewSeq()
 		name := projectName(i)
 		path := filepath.Join(jirix.Root, name)
-		if err := s.MkdirAll(path, 0755).Done(); err != nil {
+		if err := os.MkdirAll(path, 0755); err != nil {
 			t.Fatal(err)
 		}
 
@@ -189,7 +210,7 @@ func TestLocalProjects(t *testing.T) {
 			},
 		},
 	}
-	if err := jirix.NewSeq().MkdirAll(jirix.UpdateHistoryDir(), 0755).Done(); err != nil {
+	if err := os.MkdirAll(jirix.UpdateHistoryDir(), 0755); err != nil {
 		t.Fatalf("MkdirAll(%v) failed: %v", jirix.UpdateHistoryDir(), err)
 	}
 	if err := manifest.ToFile(jirix, jirix.UpdateHistoryLatestLink()); err != nil {
@@ -213,7 +234,7 @@ func TestLocalProjects(t *testing.T) {
 
 	// Check that deleting a project forces LocalProjects to run a full scan,
 	// even if FastScan is specified.
-	if err := jirix.NewSeq().RemoveAll(projectPaths[0]).Done(); err != nil {
+	if err := os.RemoveAll(projectPaths[0]); err != nil {
 		t.Fatalf("RemoveAll(%v) failed: %v", projectPaths[0])
 	}
 	foundProjects, err = project.LocalProjects(jirix, project.FastScan)
@@ -278,7 +299,6 @@ func setupUniverse(t *testing.T) ([]project.Project, *jiritest.FakeJiriRoot, fun
 func TestUpdateUniverseSimple(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 
 	// Check that calling UpdateUniverse() creates local copies of the remote
 	// repositories, and that jiri metadata is ignored by git.
@@ -286,7 +306,7 @@ func TestUpdateUniverseSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range localProjects {
-		if err := s.AssertDirExists(p.Path).Done(); err != nil {
+		if err := dirExists(p.Path); err != nil {
 			t.Fatalf("expected project to exist at path %q but none found", p.Path)
 		}
 		if branches, _, err := git.NewGit(p.Path).GetBranches(); err != nil {
@@ -305,18 +325,17 @@ func TestUpdateUniverseSimple(t *testing.T) {
 func testWithCache(t *testing.T, shared bool) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 
 	// Create cache directory
-	cacheDir, err := s.TempDir("", "cache")
+	cacheDir, err := ioutil.TempDir("", "cache")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
-	if err := fake.X.NewSeq().MkdirAll(cacheDir, os.FileMode(0700)).Done(); err != nil {
+	if err := os.MkdirAll(cacheDir, os.FileMode(0700)); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := fake.X.NewSeq().RemoveAll(cacheDir).Done(); err != nil {
+		if err := os.RemoveAll(cacheDir); err != nil {
 			t.Fatalf("RemoveAll(%q) failed: %v", cacheDir, err)
 		}
 	}()
@@ -328,7 +347,7 @@ func testWithCache(t *testing.T, shared bool) {
 	}
 	for _, p := range localProjects {
 		// Check that local clone was referenced from cache
-		err := s.AssertFileExists(p.Path + "/.git/objects/info/alternates").Done()
+		err := fileExists(p.Path + "/.git/objects/info/alternates")
 		if shared || p.HistoryDepth == 0 {
 			if err != nil {
 				t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
@@ -564,13 +583,12 @@ func TestHookLoadError(t *testing.T) {
 func TestJiriExcludeForRepoUpdate(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
 	p := localProjects[0]
-	if _, err := s.Stat(p.Path); err != nil {
+	if _, err := os.Stat(p.Path); err != nil {
 		t.Fatalf("%v", err)
 	}
 	gitInfoExcludeFile := filepath.Join(p.Path, ".git", "info", "exclude")
@@ -737,7 +755,7 @@ func TestMoveNestedProjects(t *testing.T) {
 	}
 	checkReadme(t, fake.X, localProjects[1], "initial readme")
 	checkReadme(t, fake.X, p, "nested folder")
-	if err := fake.X.NewSeq().AssertDirExists(oldProjectPath).Done(); err == nil {
+	if err := dirExists(oldProjectPath); err == nil {
 		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, oldProjectPath)
 	}
 }
@@ -775,7 +793,6 @@ func TestUpdateUniverseWithUncommitted(t *testing.T) {
 func TestUpdateUniverseMovedProject(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
@@ -802,10 +819,10 @@ func TestUpdateUniverseMovedProject(t *testing.T) {
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AssertDirExists(oldProjectPath).Done(); err == nil {
+	if err := dirExists(oldProjectPath); err == nil {
 		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, oldProjectPath)
 	}
-	if err := s.AssertDirExists(localProjects[2].Path).Done(); err != nil {
+	if err := dirExists(localProjects[2].Path); err != nil {
 		t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[1].Name, localProjects[1].Path)
 	}
 	checkReadme(t, fake.X, localProjects[1], "initial readme")
@@ -814,7 +831,6 @@ func TestUpdateUniverseMovedProject(t *testing.T) {
 func TestIgnoredProjectsNotMoved(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
@@ -844,10 +860,10 @@ func TestIgnoredProjectsNotMoved(t *testing.T) {
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AssertDirExists(oldProjectPath).Done(); err != nil {
+	if err := dirExists(oldProjectPath); err != nil {
 		t.Fatalf("expected project %q at path %q to exist but it did not: %s", localProjects[1].Name, oldProjectPath, err)
 	}
-	if err := s.AssertDirExists(localProjects[2].Path).Done(); err != nil {
+	if err := dirExists(localProjects[2].Path); err != nil {
 		t.Fatalf("expected project %q at path %q to not exist but it did", localProjects[1].Name, localProjects[1].Path)
 	}
 }
@@ -902,7 +918,6 @@ func TestUpdateUniverseRenamedProject(t *testing.T) {
 func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
@@ -938,7 +953,7 @@ func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool)
 		t.Fatal(err)
 	}
 	for i := 1; i <= 5; i++ {
-		if err := s.AssertDirExists(localProjects[i].Path).Done(); err != nil {
+		if err := dirExists(localProjects[i].Path); err != nil {
 			t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[i].Name, localProjects[i].Path)
 		}
 		checkReadme(t, fake.X, localProjects[i], "initial readme")
@@ -949,7 +964,7 @@ func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool)
 		t.Fatal(err)
 	}
 	for i := 1; i <= 5; i++ {
-		err := s.AssertDirExists(localProjects[i].Path).Done()
+		err := dirExists(localProjects[i].Path)
 		if testDirtyProjectDelete && i >= 2 && i <= 4 {
 			if err != nil {
 				t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[i].Name, localProjects[i].Path)
@@ -967,7 +982,6 @@ func TestUpdateUniverseDeletedProject(t *testing.T) {
 func TestIgnoredProjectsNotDeleted(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
@@ -993,7 +1007,7 @@ func TestIgnoredProjectsNotDeleted(t *testing.T) {
 	if err := fake.UpdateUniverse(true); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AssertDirExists(localProjects[1].Path).Done(); err != nil {
+	if err := dirExists(localProjects[1].Path); err != nil {
 		t.Fatalf("expected project %q at path %q to exist but it did not: %s", localProjects[1].Name, localProjects[1].Path, err)
 	}
 }
@@ -1735,7 +1749,7 @@ func TestProjectToFromFile(t *testing.T) {
 		if err := test.Project.ToFile(jirix, filename); err != nil {
 			t.Errorf("%+v ToFile failed: %v", test.Project, err)
 		}
-		gotBytes, err := jirix.NewSeq().ReadFile(filename)
+		gotBytes, err := ioutil.ReadFile(filename)
 		if err != nil {
 			t.Errorf("%+v ReadFile failed: %v", test.Project, err)
 		}

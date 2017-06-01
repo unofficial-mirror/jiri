@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -72,6 +73,25 @@ func ManifestFromBytes(data []byte) (*Manifest, error) {
 	return m, nil
 }
 
+func isFile(file string) (bool, error) {
+	fileInfo, err := os.Stat(file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmtError(err)
+	}
+	return !fileInfo.IsDir(), nil
+}
+
+func fmtError(err error) error {
+	if err == nil {
+		return nil
+	}
+	_, file, line, _ := runtime.Caller(1)
+	return fmt.Errorf("%s:%d: %s", filepath.Base(file), line, err)
+}
+
 // ManifestFromFile returns a manifest parsed from the contents of filename,
 // with defaults filled in.
 //
@@ -81,9 +101,9 @@ func ManifestFromBytes(data []byte) (*Manifest, error) {
 // manifest is through LoadManifest, which does absolutize the paths, and uses
 // the correct root directory.
 func ManifestFromFile(jirix *jiri.X, filename string) (*Manifest, error) {
-	data, err := jirix.NewSeq().ReadFile(filename)
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmtError(err)
 	}
 	m, err := ManifestFromBytes(data)
 	if err != nil {
@@ -146,11 +166,13 @@ func (m *Manifest) ToBytes() ([]byte, error) {
 
 func safeWriteFile(jirix *jiri.X, filename string, data []byte) error {
 	tmp := filename + ".tmp"
-	return jirix.NewSeq().
-		MkdirAll(filepath.Dir(filename), 0755).
-		WriteFile(tmp, data, 0644).
-		Rename(tmp, filename).
-		Done()
+	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+		return fmtError(err)
+	}
+	if err := ioutil.WriteFile(tmp, data, 0644); err != nil {
+		return fmtError(err)
+	}
+	return fmtError(os.Rename(tmp, filename))
 }
 
 type LocalConfig struct {
@@ -171,7 +193,7 @@ func LocalConfigFromFile(jirix *jiri.X, filename string) (LocalConfig, error) {
 	if os.IsNotExist(err) {
 		return lc, nil
 	} else if err != nil {
-		return lc, err
+		return lc, fmtError(err)
 	}
 	_, err = lc.ReadFrom(f)
 	return lc, err
@@ -186,11 +208,11 @@ func (lc *LocalConfig) WriteTo(writer io.Writer) (int64, error) {
 
 func (lc *LocalConfig) ToFile(jirix *jiri.X, filename string) error {
 	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
-		return err
+		return fmtError(err)
 	}
 	writer, err := os.Create(filename)
 	if err != nil {
-		return err
+		return fmtError(err)
 	}
 	defer writer.Close()
 	_, err = lc.WriteTo(writer)
@@ -501,9 +523,9 @@ type Project struct {
 // ProjectFromFile returns a project parsed from the contents of filename,
 // with defaults filled in and all paths absolute.
 func ProjectFromFile(jirix *jiri.X, filename string) (*Project, error) {
-	data, err := jirix.NewSeq().ReadFile(filename)
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmtError(err)
 	}
 
 	p := new(Project)
@@ -775,7 +797,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool, runHookTimeout ui
 func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, error) {
 	if _, err := os.Stat(snapshot); err != nil {
 		if !os.IsNotExist(err) {
-			return nil, nil, err
+			return nil, nil, fmtError(err)
 		}
 		u, err := url.ParseRequestURI(snapshot)
 		if err != nil {
@@ -810,7 +832,7 @@ func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
 		return "", nil
 	}
 	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
-	if _, err := jirix.NewSeq().Stat(metadataDir); err == nil {
+	if _, err := os.Stat(metadataDir); err == nil {
 		project, err := ProjectFromFile(jirix, filepath.Join(metadataDir, jiri.ProjectMetaFile))
 		if err != nil {
 			return "", err
@@ -847,7 +869,7 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 	defer jirix.TimerPop()
 
 	latestSnapshot := jirix.UpdateHistoryLatestLink()
-	latestSnapshotExists, err := jirix.NewSeq().IsFile(latestSnapshot)
+	latestSnapshotExists, err := isFile(latestSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -1013,8 +1035,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseCurrent bo
 
 		// Make sure we clean up the tmp dir used to load remote manifest projects.
 		if tmpLoadDir != "" {
-			s := jirix.NewSeq()
-			defer collect.Error(func() error { return s.RemoveAll(tmpLoadDir).Done() }, &e)
+			defer collect.Error(func() error { return fmtError(os.RemoveAll(tmpLoadDir)) }, &e)
 		}
 
 		if err != nil {
@@ -1046,7 +1067,6 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseCurrent bo
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
 // projects and writes it to the update history directory.
 func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifest bool) error {
-	seq := jirix.NewSeq()
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
 	if err := CreateSnapshot(jirix, snapshotFile, localManifest); err != nil {
 		return err
@@ -1055,17 +1075,20 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifes
 	latestLink, secondLatestLink := jirix.UpdateHistoryLatestLink(), jirix.UpdateHistorySecondLatestLink()
 
 	// If the "latest" symlink exists, point the "second-latest" symlink to its value.
-	latestLinkExists, err := seq.IsFile(latestLink)
+	latestLinkExists, err := isFile(latestLink)
 	if err != nil {
 		return err
 	}
 	if latestLinkExists {
 		latestFile, err := os.Readlink(latestLink)
 		if err != nil {
-			return err
+			return fmtError(err)
 		}
-		if err := seq.RemoveAll(secondLatestLink).Symlink(latestFile, secondLatestLink).Done(); err != nil {
-			return err
+		if err := os.RemoveAll(secondLatestLink); err != nil {
+			return fmtError(err)
+		}
+		if err := os.Symlink(latestFile, secondLatestLink); err != nil {
+			return fmtError(err)
 		}
 	}
 
@@ -1075,7 +1098,10 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifes
 	if rel, err := filepath.Rel(filepath.Dir(latestLink), snapshotFile); err == nil {
 		snapshotFile = rel
 	}
-	return seq.RemoveAll(latestLink).Symlink(snapshotFile, latestLink).Done()
+	if err := os.RemoveAll(latestLink); err != nil {
+		return fmtError(err)
+	}
+	return fmtError(os.Symlink(snapshotFile, latestLink))
 }
 
 // CleanupProjects restores the given jiri projects back to their detached
@@ -1169,11 +1195,11 @@ func isLocalProject(jirix *jiri.X, path string) (bool, error) {
 	// Existence of a metadata directory is how we know we've found a
 	// Jiri-maintained project.
 	metadataDir := filepath.Join(path, jiri.ProjectMetaDir)
-	if _, err := jirix.NewSeq().Stat(metadataDir); err != nil {
-		if runutil.IsNotExist(err) {
+	if _, err := os.Stat(metadataDir); err != nil {
+		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, err
+		return false, fmtError(err)
 	}
 	return true, nil
 }
@@ -1323,7 +1349,7 @@ func tryRebase(jirix *jiri.X, project Project, branch string) (bool, error) {
 func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebaseCurrent, rebaseUntracked, rebaseAll, snapshot bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return fmtError(err)
 	}
 	relativePath, err := filepath.Rel(cwd, project.Path)
 	if err != nil {
@@ -1610,8 +1636,8 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 			if p, err = remote.toProject(path); err != nil {
 				return err
 			}
-			if err := jirix.NewSeq().MkdirAll(path, 0755).Done(); err != nil {
-				return err
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return fmtError(err)
 			}
 			if err := gitutil.New(jirix).Clone(p.Remote, path, gitutil.NoCheckoutOpt(true)); err != nil {
 				return err
@@ -2217,17 +2243,17 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 		go func(hook Hook) {
 			outFile, err := ioutil.TempFile(tmpDir, hook.Name+"-out")
 			if err != nil {
-				ch <- result{nil, nil, err}
+				ch <- result{nil, nil, fmtError(err)}
 				return
 			}
 			errFile, err := ioutil.TempFile(tmpDir, hook.Name+"-err")
 			if err != nil {
-				ch <- result{nil, nil, err}
+				ch <- result{nil, nil, fmtError(err)}
 				return
 			}
 
-			jirix.Logger.Capture(outFile, errFile).Debugf("output for hook(%v) for project %q", hook.Name, hook.ProjectName)
-			jirix.Logger.Capture(outFile, errFile).Errorf("Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
+			fmt.Fprintf(outFile, "output for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
+			fmt.Fprintf(errFile, "Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
 			// Hack until sequence is changesd to use logger or is removed
 			s := jirix.NewSeq().Verbose(showHookOutput).CaptureAll(outFile, errFile)
 			if err := s.Dir(hook.ActionPath).Timeout(time.Duration(runHookTimeout) * time.Minute).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
@@ -2260,16 +2286,24 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 			multiErr = append(multiErr, out.err)
 			continue
 		}
-		if out.outFile != nil && showHookOutput {
+		if out.outFile != nil {
 			out.outFile.Sync()
 			out.outFile.Seek(0, 0)
-			io.Copy(os.Stdout, out.outFile)
+			var byteBuffer bytes.Buffer
+			io.Copy(&byteBuffer, out.outFile)
+			if byteBuffer.String() != "" {
+				jirix.Logger.Debugf("%s\n", byteBuffer.String())
+			}
 		}
 		if out.err != nil {
 			if out.errFile != nil {
 				out.errFile.Sync()
 				out.errFile.Seek(0, 0)
-				io.Copy(os.Stderr, out.errFile)
+				var byteBuffer bytes.Buffer
+				io.Copy(&byteBuffer, out.errFile)
+				if byteBuffer.String() != "" {
+					jirix.Logger.Errorf("%s\n", byteBuffer.String())
+				}
 			}
 			multiErr = append(multiErr, out.err)
 		}
@@ -2284,7 +2318,6 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 func applyGitHooks(jirix *jiri.X, ops []operation) error {
 	jirix.TimerPush("apply githooks")
 	defer jirix.TimerPop()
-	s := jirix.NewSeq()
 	commitHookMap := make(map[string][]byte)
 	for _, op := range ops {
 		if op.Kind() != "delete" {
@@ -2292,7 +2325,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 				hookPath := filepath.Join(op.Project().Path, ".git", "hooks", "commit-msg")
 				commitHook, err := os.Create(hookPath)
 				if err != nil {
-					return err
+					return fmtError(err)
 				}
 				bytes, ok := commitHookMap[op.Project().GerritHost]
 				if !ok {
@@ -2317,7 +2350,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 				}
 				commitHook.Close()
 				if err := os.Chmod(hookPath, 0750); err != nil {
-					return err
+					return fmtError(err)
 				}
 			}
 
@@ -2331,13 +2364,16 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 			b, err := ioutil.ReadFile(excludeFile)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					return err
+					return fmtError(err)
 				}
 			}
 			excludeString := "/.jiri/\n"
 			if !strings.Contains(string(b), excludeString) {
-				if err := s.MkdirAll(excludeDir, 0755).WriteFile(excludeFile, []byte(excludeString), 0644).Done(); err != nil {
-					return err
+				if err := os.MkdirAll(excludeDir, 0755); err != nil {
+					return fmtError(err)
+				}
+				if err := ioutil.WriteFile(excludeFile, []byte(excludeString), 0644); err != nil {
+					return fmtError(err)
 				}
 			}
 		}
@@ -2364,14 +2400,14 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 			}
 			dst := filepath.Join(gitHooksDstDir, relPath)
 			if info.IsDir() {
-				return s.MkdirAll(dst, 0755).Done()
+				return fmtError(os.MkdirAll(dst, 0755))
 			}
-			src, err := s.ReadFile(path)
+			src, err := ioutil.ReadFile(path)
 			if err != nil {
-				return err
+				return fmtError(err)
 			}
 			// The file *must* be executable to be picked up by git.
-			return s.WriteFile(dst, src, 0755).Done()
+			return fmtError(ioutil.WriteFile(dst, src, 0755))
 		}
 		if err := filepath.Walk(op.Project().GitHooks, copyFn); err != nil {
 			return err
@@ -2385,7 +2421,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	metadataDir := filepath.Join(dir, jiri.ProjectMetaDir)
 	if err := os.MkdirAll(metadataDir, os.FileMode(0755)); err != nil {
-		return err
+		return fmtError(err)
 	}
 	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
 	return project.ToFile(jirix, metadataFile)
@@ -2457,15 +2493,13 @@ func (op createOperation) Kind() string {
 }
 
 func (op createOperation) Run(jirix *jiri.X) (e error) {
-	s := jirix.NewSeq()
-
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 	tmpDirPrefix := strings.Replace(op.Project().Name, "/", ".", -1) + "-"
 
 	// Check the local file system.
 	if _, err := os.Stat(op.destination); err != nil {
-		if !runutil.IsNotExist(err) {
-			return err
+		if !os.IsNotExist(err) {
+			return fmtError(err)
 		}
 	} else {
 		if isEmpty, err := isEmpty(op.destination); err != nil {
@@ -2481,11 +2515,15 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	// Create a temporary directory for the initial setup of the
 	// project to prevent an untimely termination from leaving the
 	// root directory in an inconsistent state.
-	tmpDir, err := s.MkdirAll(path, perm).TempDir(path, tmpDirPrefix)
-	if err != nil {
-		return err
+	if err := os.MkdirAll(path, perm); err != nil {
+		return fmtError(err)
 	}
-	defer collect.Error(func() error { return jirix.NewSeq().RemoveAll(tmpDir).Done() }, &e)
+	tmpDir, err := ioutil.TempDir(path, tmpDirPrefix)
+	if err != nil {
+		return fmtError(err)
+	}
+
+	defer collect.Error(func() error { return fmtError(os.RemoveAll(tmpDir)) }, &e)
 
 	cache, err := op.project.CacheDirPath(jirix)
 	if err != nil {
@@ -2512,9 +2550,11 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 			return err
 		}
 	}
-	if err := s.Chmod(tmpDir, os.FileMode(0755)).
-		Rename(tmpDir, op.destination).Done(); err != nil {
-		return err
+	if err := os.Chmod(tmpDir, os.FileMode(0755)); err != nil {
+		return fmtError(err)
+	}
+	if err := os.Rename(tmpDir, op.destination); err != nil {
+		return fmtError(err)
 	}
 	if err := checkoutHeadRevision(jirix, op.project, false); err != nil {
 		return err
@@ -2545,14 +2585,14 @@ func (op createOperation) String() string {
 func isEmpty(path string) (bool, error) {
 	dir, err := os.Open(path)
 	if err != nil {
-		return false, err
+		return false, fmtError(err)
 	}
 	defer dir.Close()
 
 	if _, err = dir.Readdirnames(1); err != nil && err == io.EOF {
 		return true, nil
 	} else {
-		return false, err
+		return false, fmtError(err)
 	}
 }
 
@@ -2573,7 +2613,6 @@ func (op deleteOperation) Kind() string {
 }
 
 func (op deleteOperation) Run(jirix *jiri.X) error {
-	s := jirix.NewSeq()
 	if op.project.LocalConfig.Ignore {
 		jirix.Logger.Warningf("Project %s(%s) won't be deleted due to it's local-config\n\n", op.project.Name, op.source)
 		return nil
@@ -2610,7 +2649,7 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 			jirix.Logger.Warningf(msg)
 			return nil
 		}
-		return s.RemoveAll(op.source).Done()
+		return fmtError(os.RemoveAll(op.source))
 	}
 	rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
 	gcCommand := jirix.Color.Yellow("jiri update -gc")
@@ -2627,11 +2666,11 @@ func (op deleteOperation) String() string {
 }
 
 func (op deleteOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
-	if _, err := jirix.NewSeq().Stat(op.source); err != nil {
-		if runutil.IsNotExist(err) {
+	if _, err := os.Stat(op.source); err != nil {
+		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot delete %q as it does not exist", op.source)
 		}
-		return err
+		return fmtError(err)
 	}
 	updates.deleteDir(op.source)
 	return nil
@@ -2657,10 +2696,12 @@ func (op moveOperation) Run(jirix *jiri.X) error {
 	}
 	// If it was nested project it might have been moved with its parent project
 	if op.source != op.destination {
-		s := jirix.NewSeq()
 		path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-		if err := s.MkdirAll(path, perm).Rename(op.source, op.destination).Done(); err != nil {
-			return err
+		if err := os.MkdirAll(path, perm); err != nil {
+			return fmtError(err)
+		}
+		if err := os.Rename(op.source, op.destination); err != nil {
+			return fmtError(err)
 		}
 	}
 	if err := syncProjectMaster(jirix, op.project, op.state, op.rebaseCurrent, op.rebaseUntracked, op.rebaseAll, op.snapshot); err != nil {
@@ -2674,16 +2715,15 @@ func (op moveOperation) String() string {
 }
 
 func (op moveOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
-	s := jirix.NewSeq()
-	if _, err := s.Stat(op.source); err != nil {
-		if runutil.IsNotExist(err) {
+	if _, err := os.Stat(op.source); err != nil {
+		if os.IsNotExist(err) {
 			return fmt.Errorf("cannot move %q to %q as the source does not exist", op.source, op.destination)
 		}
-		return err
+		return fmtError(err)
 	}
-	if _, err := s.Stat(op.destination); err != nil {
-		if !runutil.IsNotExist(err) {
-			return err
+	if _, err := os.Stat(op.destination); err != nil {
+		if !os.IsNotExist(err) {
+			return fmtError(err)
 		}
 	} else {
 		return fmt.Errorf("cannot move %q to %q as the destination already exists", op.source, op.destination)

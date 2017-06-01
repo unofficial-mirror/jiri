@@ -10,7 +10,6 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/project"
-	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 var (
@@ -56,15 +55,30 @@ Run "jiri help manifest" for details on manifests.
 `,
 }
 
+func isFile(file string) (bool, error) {
+	fileInfo, err := os.Stat(file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return !fileInfo.IsDir(), nil
+}
+
 func runImport(jirix *jiri.X, args []string) error {
 	if len(args) != 2 {
 		return jirix.UsageErrorf("wrong number of arguments")
 	}
 	// Initialize manifest.
 	var manifest *project.Manifest
-	if !flagImportOverwrite {
+	manifestExists, err := isFile(jirix.JiriManifestFile())
+	if err != nil {
+		return err
+	}
+	if !flagImportOverwrite && manifestExists {
 		m, err := project.ManifestFromFile(jirix, jirix.JiriManifestFile())
-		if err != nil && !runutil.IsNotExist(err) {
+		if err != nil {
 			return err
 		}
 		manifest = m
