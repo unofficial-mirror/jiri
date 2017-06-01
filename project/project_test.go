@@ -1072,6 +1072,61 @@ func TestUpdateUniverseRemoteBranch(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "non-master commit")
 }
 
+// TestUpdateWhenRemoteChangesRebased checks that UpdateUniverse can pull from a
+// non-master remote branch if the local changes were rebased somewhere else(gerrit)
+// before being pushed to remote
+func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitRemote := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	gr := git.NewGit(fake.Projects[localProjects[1].Name])
+	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
+	gl := git.NewGit(localProjects[1].Path)
+	if err := gl.Fetch("origin", git.PruneOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	// checkout branch in local repo
+	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create commits in remote repo
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "non-master commit")
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
+	file1CommitRev, _ := gr.CurrentRevision()
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file2", "file2")
+	file2CommitRev, _ := gr.CurrentRevision()
+
+	if err := gl.Fetch("origin", git.PruneOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Cherry pick creation of file1, so that it acts like been rebased on remote repo
+	// As there is a commit creating README on remote not in local repo
+	if err := gitLocal.CherryPick(file1CommitRev); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := project.UpdateUniverse(fake.X, false, false, true /*rebaseCurrent*/, false, false, project.DefaultHookTimeout); err != nil {
+		t.Fatal(err)
+	}
+
+	// It rebased properly and pulled latest changes
+	localRev, _ := gl.CurrentRevision()
+	if file2CommitRev != localRev {
+		t.Fatalf("Current commit is %v, it should be %v\n", localRev, file2CommitRev)
+	}
+}
+
 func TestUpdateWhenConflictMerge(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
@@ -1254,7 +1309,7 @@ func testLocalBranchesAreUpdated(t *testing.T, shouldLocalBeOnABranch, rebaseAll
 		}
 	}
 
-	if err := project.UpdateUniverse(fake.X, false, false, false, rebaseAll, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, false, false, false, false, rebaseAll, project.DefaultHookTimeout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1424,7 +1479,7 @@ func TestFileImportCycle(t *testing.T) {
 	}
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(jirix, false, false, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in local manifest files"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1475,7 +1530,7 @@ func TestRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote2, fileB, "commit B")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1545,7 +1600,7 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote1, fileD, "commit D")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, false, false, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}

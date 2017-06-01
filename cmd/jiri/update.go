@@ -23,6 +23,7 @@ var (
 	rebaseUntrackedFlag bool
 	hookTimeoutFlag     uint
 	rebaseAllFlag       bool
+	rebaseCurrentFlag   bool
 )
 
 func init() {
@@ -36,6 +37,7 @@ func init() {
 	cmdUpdate.Flags.BoolVar(&rebaseUntrackedFlag, "rebase-untracked", false, "Rebase untracked branches onto HEAD.")
 	cmdUpdate.Flags.UintVar(&hookTimeoutFlag, "hook-timeout", project.DefaultHookTimeout, "Timeout in minutes for running the hooks operation.")
 	cmdUpdate.Flags.BoolVar(&rebaseAllFlag, "rebase-all", false, "Rebase all tracked branches. Also rebase all untracked bracnhes if -rebase-untracked is passed")
+	cmdUpdate.Flags.BoolVar(&rebaseCurrentFlag, "rebase-current", false, "Rebase current tracked branches instead of fast-forwarding them.")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -73,7 +75,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		if len(args) > 0 {
 			return project.CheckoutSnapshot(jirix, args[0], gcFlag, hookTimeoutFlag)
 		} else {
-			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag)
+			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseCurrentFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag)
 		}
 	}, retry.AttemptsOpt(attemptsFlag))
 

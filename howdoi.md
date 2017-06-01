@@ -4,6 +4,10 @@
 
 ## How Do I
 
+### rebase current branch instead of fast-forwarding it
+
+`jiri update -rebase-current`
+
 ### rebase all my branches
 
 Run  `jiri update -rebase-all`. This will not rebase un-tracked branches.
