@@ -6,6 +6,7 @@
 package jiritest
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,7 +23,7 @@ func NewX(t *testing.T) (*jiri.X, func()) {
 	ctx := tool.NewContextFromEnv(cmdline.EnvFromOS(), false)
 	color := color.NewColor(false)
 	logger := log.NewLogger(log.InfoLevel, color)
-	root, err := ctx.NewSeq().TempDir("", "")
+	root, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
@@ -30,7 +31,7 @@ func NewX(t *testing.T) (*jiri.X, func()) {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
 	cleanup := func() {
-		if err := ctx.NewSeq().RemoveAll(root).Done(); err != nil {
+		if err := os.RemoveAll(root); err != nil {
 			t.Fatalf("RemoveAll(%q) failed: %v", root, err)
 		}
 	}

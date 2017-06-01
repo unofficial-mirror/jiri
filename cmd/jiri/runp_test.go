@@ -153,10 +153,9 @@ func TestRunP(t *testing.T) {
 	rc := projects[2].Path
 	t1 := projects[3].Path
 
-	s := fake.X.NewSeq()
 	newfile := func(dir, file string) {
 		testfile := filepath.Join(dir, file)
-		_, err := s.Create(testfile)
+		_, err := os.Create(testfile)
 		if err != nil {
 			t.Errorf("failed to create %s: %v", testfile, err)
 		}
@@ -248,7 +247,7 @@ func TestRunP(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if err := s.MkdirAll(filepath.Join(rb, ".jiri", "a1"), os.FileMode(0755)).Done(); err != nil {
+	if err := os.MkdirAll(filepath.Join(rb, ".jiri", "a1"), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
 	}
 }

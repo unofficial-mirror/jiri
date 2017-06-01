@@ -5,25 +5,22 @@
 package jiri
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"fuchsia.googlesource.com/jiri/tool"
 )
 
 // TestFindRootEnvSymlink checks that FindRoot interprets the value of the
 // -root flag as a path, evaluates any symlinks the path might contain, and
 // returns the result.
 func TestFindRootEnvSymlink(t *testing.T) {
-	ctx := tool.NewDefaultContext()
-
 	// Create a temporary directory.
-	tmpDir, err := ctx.NewSeq().TempDir("", "")
+	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
-	defer func() { ctx.NewSeq().RemoveAll(tmpDir).Done() }()
+	defer func() { os.RemoveAll(tmpDir) }()
 
 	// Make sure tmpDir is not a symlink itself.
 	tmpDir, err = filepath.EvalSymlinks(tmpDir)
@@ -34,9 +31,11 @@ func TestFindRootEnvSymlink(t *testing.T) {
 	// Create a directory and a symlink to it.
 	root, perm := filepath.Join(tmpDir, "root"), os.FileMode(0700)
 	symRoot := filepath.Join(tmpDir, "sym_root")
-	seq := ctx.NewSeq().MkdirAll(root, perm).Symlink(root, symRoot)
-	if err := seq.Done(); err != nil {
-		t.Fatalf("%v", err)
+	if err := os.MkdirAll(root, perm); err != nil {
+		t.Fatalf("%s", err)
+	}
+	if err := os.Symlink(root, symRoot); err != nil {
+		t.Fatalf("%s", err)
 	}
 
 	// Set the -root flag to the symlink created above and check that

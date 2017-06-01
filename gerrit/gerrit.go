@@ -15,12 +15,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/collect"
-	"fuchsia.googlesource.com/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/envvar"
 )
 
 var (
@@ -78,21 +81,21 @@ type CLOpts struct {
 
 // Gerrit records a hostname of a Gerrit instance.
 type Gerrit struct {
-	host *url.URL
-	s    runutil.Sequence
+	host  *url.URL
+	jirix *jiri.X
 }
 
 // New is the Gerrit factory.
-func New(s runutil.Sequence, host *url.URL) *Gerrit {
+func New(jirix *jiri.X, host *url.URL) *Gerrit {
 	return &Gerrit{
-		host: host,
-		s:    s,
+		host:  host,
+		jirix: jirix,
 	}
 }
 
 // PostReview posts a review to the given Gerrit reference.
 func (g *Gerrit) PostReview(ref string, message string, labels map[string]string) (e error) {
-	cred, err := hostCredentials(g.s, g.host)
+	cred, err := hostCredentials(g.jirix, g.host)
 	if err != nil {
 		return err
 	}
@@ -143,7 +146,7 @@ type Topic struct {
 
 // SetTopic sets the topic of the given Gerrit reference.
 func (g *Gerrit) SetTopic(cl string, opts CLOpts) (e error) {
-	cred, err := hostCredentials(g.s, g.host)
+	cred, err := hostCredentials(g.jirix, g.host)
 	if err != nil {
 		return err
 	}
@@ -331,7 +334,7 @@ func (g *Gerrit) Query(query string) (_ CLList, e error) {
 		return nil, err
 	}
 	u.Path = "/changes/"
-	cred, _ := hostCredentials(g.s, g.host)
+	cred, _ := hostCredentials(g.jirix, g.host)
 	if cred != nil {
 		// Gerrit requires prefixing the endpoint URL with /a/ for authentication.
 		u.Path = "/a" + u.Path
@@ -394,7 +397,7 @@ func (g *Gerrit) GetChangeURL(changeNumber int) string {
 
 // Submit submits the given changelist through Gerrit.
 func (g *Gerrit) Submit(changeID string) (e error) {
-	cred, err := hostCredentials(g.s, g.host)
+	cred, err := hostCredentials(g.jirix, g.host)
 	if err != nil {
 		return err
 	}
@@ -492,7 +495,7 @@ func (ge PushError) Error() string {
 }
 
 // Push pushes the current branch to Gerrit.
-func Push(seq runutil.Sequence, clOpts CLOpts) error {
+func Push(jirix *jiri.X, dir string, clOpts CLOpts) error {
 	refspec := "HEAD:" + Reference(clOpts)
 	args := []string{"push", clOpts.Remote, refspec}
 	// TODO(jamesr): This should really reuse gitutil/git.go's Push which knows
@@ -504,7 +507,14 @@ func Push(seq runutil.Sequence, clOpts CLOpts) error {
 		args = append(args, "--no-verify")
 	}
 	var stdout, stderr bytes.Buffer
-	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err != nil {
+	command := exec.Command("git", args...)
+	command.Dir = dir
+	command.Stdin = os.Stdin
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	env := jirix.Env()
+	command.Env = envvar.MapToSlice(env)
+	if err := command.Run(); err != nil {
 		return PushError{args, stdout.String(), stderr.String()}
 	}
 	for _, line := range strings.Split(stderr.String(), "\n") {

@@ -5,6 +5,7 @@
 package jiritest
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,9 +39,8 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		Projects: map[string]string{},
 	}
 
-	s := jirix.NewSeq()
 	// Create fake remote manifest projects.
-	remoteDir, err := s.TempDir("", "")
+	remoteDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	}
 	// Create a fake manifest.
 	manifestDir := filepath.Join(remoteDir, manifestProjectPath)
-	if err := s.MkdirAll(manifestDir, os.FileMode(0700)).Done(); err != nil {
+	if err := os.MkdirAll(manifestDir, os.FileMode(0700)); err != nil {
 		t.Fatal(err)
 	}
 	if err := fake.WriteRemoteManifest(&project.Manifest{}); err != nil {
@@ -85,7 +85,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 
 	return fake, func() {
 		cleanup()
-		if err := fake.X.NewSeq().RemoveAll(fake.remote).Done(); err != nil {
+		if err := os.RemoveAll(fake.remote); err != nil {
 			t.Fatalf("RemoveAll(%q) failed: %v", fake.remote, err)
 		}
 	}
@@ -145,7 +145,7 @@ func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
 // CreateRemoteProject creates a new remote project.
 func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	projectDir := filepath.Join(fake.remote, name)
-	if err := fake.X.NewSeq().MkdirAll(projectDir, os.FileMode(0700)).Done(); err != nil {
+	if err := os.MkdirAll(projectDir, os.FileMode(0700)); err != nil {
 		return err
 	}
 	if err := gitutil.New(fake.X).Init(projectDir); err != nil {

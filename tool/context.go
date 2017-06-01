@@ -6,12 +6,10 @@ package tool
 
 import (
 	"io"
-	"net/url"
 	"os"
 
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/envvar"
-	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/jenkins"
 	"fuchsia.googlesource.com/jiri/runutil"
 	"fuchsia.googlesource.com/jiri/timing"
@@ -105,11 +103,6 @@ func (ctx Context) Clone(opts ContextOpts) *Context {
 // Env returns the environment of the context.
 func (ctx Context) Env() map[string]string {
 	return ctx.opts.Env
-}
-
-// Gerrit returns the Gerrit instance of the context.
-func (ctx Context) Gerrit(host *url.URL) *gerrit.Gerrit {
-	return gerrit.New(ctx.NewSeq(), host)
 }
 
 // Jenkins returns a new Jenkins instance that can be used to

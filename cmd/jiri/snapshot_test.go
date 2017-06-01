@@ -20,12 +20,11 @@ import (
 )
 
 func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
-	s := jirix.NewSeq()
-	if _, err := s.Stat(project); err != nil {
+	if _, err := os.Stat(project); err != nil {
 		t.Fatalf("%v", err)
 	}
 	readmeFile := filepath.Join(project, "README")
-	data, err := s.ReadFile(readmeFile)
+	data, err := ioutil.ReadFile(readmeFile)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -43,17 +42,16 @@ func remoteProjectName(i int) string {
 }
 
 func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
-	s := jirix.NewSeq()
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
-	if err := s.WriteFile(path, []byte(message), perm).Done(); err != nil {
+	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
 		t.Fatalf("%v", err)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	defer jirix.NewSeq().Chdir(cwd)
-	if err := s.Chdir(projectDir).Done(); err != nil {
+	defer os.Chdir(cwd)
+	if err := os.Chdir(projectDir); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(path, "creating README"); err != nil {
@@ -65,7 +63,6 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 func TestSnapshot(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 
 	// Setup the initial remote and local projects.
 	numProjects, remoteProjects := 2, []string{}
@@ -108,7 +105,7 @@ func TestSnapshot(t *testing.T) {
 	// Remove the local project repositories.
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
-		if err := s.RemoveAll(localProject).Done(); err != nil {
+		if err := os.RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
 		}
 	}

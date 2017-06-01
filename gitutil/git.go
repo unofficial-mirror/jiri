@@ -776,6 +776,17 @@ func (g *Git) Config(configArgs ...string) error {
 	return g.run(args...)
 }
 
+func (g *Git) ConfigGetKey(key string) (string, error) {
+	out, err := g.runOutput("config", "--get", key)
+	if err != nil {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		g.jirix.Logger.Warningf("wanted one line log, got %d line log: %q", got, out)
+	}
+	return out[0], nil
+}
+
 // RemoteUrl gets the url of the remote with the given name.
 func (g *Git) RemoteUrl(name string) (string, error) {
 	configKey := fmt.Sprintf("remote.%s.url", name)

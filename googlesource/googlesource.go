@@ -78,7 +78,7 @@ func gitCookies(jirix *jiri.X) []*http.Cookie {
 	}
 
 	cookieFile := filepath.Join(homeDir, ".gitcookies")
-	bytes, err := jirix.NewSeq().ReadFile(cookieFile)
+	bytes, err := ioutil.ReadFile(cookieFile)
 	if err != nil {
 		return cookies
 	}

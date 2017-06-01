@@ -163,7 +163,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 		if err != nil {
 			return fmt.Errorf("invalid Gerrit host %q: %v", host, err)
 		}
-		g := jirix.Gerrit(hostUrl)
+		g := gerrit.New(jirix, hostUrl)
 
 		change, err := g.GetChange(cl)
 		if err != nil {
@@ -201,7 +201,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 		if err != nil {
 			return fmt.Errorf("invalid Gerrit host %q: %v", host, err)
 		}
-		g := jirix.Gerrit(hostUrl)
+		g := gerrit.New(jirix, hostUrl)
 
 		var changes gerrit.CLList
 		branch := patchBranchFlag

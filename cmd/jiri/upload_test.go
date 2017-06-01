@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,7 +18,6 @@ import (
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
-	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 func projectName(i int) string {
@@ -457,8 +457,7 @@ func TestUploadUntrackedBranch(t *testing.T) {
 
 // commitFile commits a file with the specified content into a branch
 func commitFile(t *testing.T, jirix *jiri.X, filename string, content string) {
-	s := jirix.NewSeq()
-	if err := s.WriteFile(filename, []byte(content), 0644).Done(); err != nil {
+	if err := ioutil.WriteFile(filename, []byte(content), 0644); err != nil {
 		t.Fatalf("%v", err)
 	}
 	commitMessage := "Commit " + filename
@@ -489,10 +488,9 @@ func assertFilesCommitted(t *testing.T, jirix *jiri.X, files []string) {
 
 // assertFilesExist asserts that the files exist.
 func assertFilesExist(t *testing.T, jirix *jiri.X, files []string) {
-	s := jirix.NewSeq()
 	for _, file := range files {
-		if _, err := s.Stat(file); err != nil {
-			if runutil.IsNotExist(err) {
+		if _, err := os.Stat(file); err != nil {
+			if os.IsNotExist(err) {
 				t.Fatalf("expected file %v to exist but it did not", file)
 			}
 			t.Fatalf("%v", err)

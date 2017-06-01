@@ -132,7 +132,6 @@ func TestStatus(t *testing.T) {
 	setDefaultStatusFlags()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 
 	// Add projects
 	numProjects := 3
@@ -167,7 +166,7 @@ func TestStatus(t *testing.T) {
 	}
 	newfile := func(dir, file string) {
 		testfile := filepath.Join(dir, file)
-		_, err := s.Create(testfile)
+		_, err := os.Create(testfile)
 		if err != nil {
 			t.Errorf("failed to create %s: %s", testfile, err)
 		}
@@ -193,7 +192,6 @@ func TestStatus(t *testing.T) {
 func statusFlagsTest(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
-	s := fake.X.NewSeq()
 
 	// Add projects
 	numProjects := 6
@@ -210,7 +208,7 @@ func statusFlagsTest(t *testing.T) {
 
 	newfile := func(dir, file string) {
 		testfile := filepath.Join(dir, file)
-		_, err := s.Create(testfile)
+		_, err := os.Create(testfile)
 		if err != nil {
 			t.Errorf("failed to create %s: %s", testfile, err)
 		}

@@ -6,7 +6,6 @@ package gerrit
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"net/url"
@@ -14,8 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/collect"
-	"fuchsia.googlesource.com/jiri/runutil"
+	"fuchsia.googlesource.com/jiri/gitutil"
 )
 
 type credentials struct {
@@ -26,12 +26,12 @@ type credentials struct {
 // hostCredentials returns credentials for the given Gerrit host. The
 // function uses best effort to scan common locations where the
 // credentials could exist.
-func hostCredentials(seq runutil.Sequence, hostUrl *url.URL) (_ *credentials, e error) {
+func hostCredentials(jirix *jiri.X, hostUrl *url.URL) (_ *credentials, e error) {
 	// Look for the host credentials in the .netrc file.
 	netrcPath := filepath.Join(os.Getenv("HOME"), ".netrc")
-	file, err := seq.Open(netrcPath)
+	file, err := os.Open(netrcPath)
 	if err != nil {
-		if !runutil.IsNotExist(err) {
+		if !os.IsNotExist(err) {
 			return nil, err
 		}
 	} else {
@@ -47,13 +47,11 @@ func hostCredentials(seq runutil.Sequence, hostUrl *url.URL) (_ *credentials, e 
 	}
 
 	// Look for the host credentials in the git cookie file.
-	args := []string{"config", "--get", "http.cookiefile"}
-	var stdout, stderr bytes.Buffer
-	if err := seq.Capture(&stdout, &stderr).Last("git", args...); err == nil {
-		cookieFilePath := strings.TrimSpace(stdout.String())
-		file, err := seq.Open(cookieFilePath)
+	if cookieFilePath, err := gitutil.New(jirix).ConfigGetKey("http.cookiefile"); err == nil {
+		cookieFilePath = strings.TrimSpace(cookieFilePath)
+		file, err := os.Open(cookieFilePath)
 		if err != nil {
-			if !runutil.IsNotExist(err) {
+			if !os.IsNotExist(err) {
 				return nil, err
 			}
 		} else {
@@ -75,8 +73,9 @@ func hostCredentials(seq runutil.Sequence, hostUrl *url.URL) (_ *credentials, e 
 				}
 			}
 		}
+	} else {
+		return nil, fmt.Errorf("cannot find credentials for %q: %s", hostUrl.String(), err)
 	}
-
 	return nil, fmt.Errorf("cannot find credentials for %q", hostUrl.String())
 }
 
