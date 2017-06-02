@@ -18,9 +18,10 @@ import (
 )
 
 var branchFlags struct {
-	deleteFlag      bool
-	forceDeleteFlag bool
-	listFlag        bool
+	deleteFlag                bool
+	forceDeleteFlag           bool
+	listFlag                  bool
+	overrideProjectConfigFlag bool
 }
 
 var cmdBranch = &cmdline.Command{
@@ -39,6 +40,7 @@ func init() {
 	flags.BoolVar(&branchFlags.deleteFlag, "d", false, "Delete branch from project. Similar to running 'git branch -d <branch-name>'")
 	flags.BoolVar(&branchFlags.forceDeleteFlag, "D", false, "Force delete branch from project. Similar to running 'git branch -D <branch-name>'")
 	flags.BoolVar(&branchFlags.listFlag, "list", false, "Show only projects with current branch <branch>")
+	flags.BoolVar(&branchFlags.overrideProjectConfigFlag, "override-pc", false, "Overrrides project config's ignore and noupdate flag and deletes the branch.")
 }
 
 func displayProjects(jirix *jiri.X, branch string) error {
@@ -156,6 +158,10 @@ func deleteBranches(jirix *jiri.X, branchToDelete string) error {
 				relativePath, err := filepath.Rel(cDir, localProject.Path)
 				if err != nil {
 					return err
+				}
+				if !branchFlags.overrideProjectConfigFlag && (localProject.LocalConfig.Ignore || localProject.LocalConfig.NoUpdate) {
+					jirix.Logger.Warningf("Project %s(%s): branch %q won't be deleted due to it's local-config. Use '-overrride-pc' flag\n\n", localProject.Name, localProject.Path, branchToDelete)
+					break
 				}
 				fmt.Printf("Project %s(%s): ", localProject.Name, relativePath)
 				git := gitutil.New(jirix, gitutil.RootDirOpt(localProject.Path))

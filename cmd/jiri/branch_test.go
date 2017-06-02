@@ -22,6 +22,7 @@ func setDefaultBranchFlags() {
 	branchFlags.forceDeleteFlag = false
 	branchFlags.deleteFlag = false
 	branchFlags.listFlag = false
+	branchFlags.overrideProjectConfigFlag = false
 }
 
 func createBranchCommits(t *testing.T, fake *jiritest.FakeJiriRoot, localProjects []project.Project) {
@@ -147,6 +148,90 @@ func TestBranch(t *testing.T) {
 	branchFlags.listFlag = true
 	if got := executeBranch(t, fake, testBranch); !equalBranchOut(got, listWant) {
 		t.Errorf("got %s, want %s", got, listWant)
+	}
+}
+
+func TestDeleteBranchWithProjectConfig(t *testing.T) {
+	testDeleteBranchWithProjectConfig(t, false)
+	testDeleteBranchWithProjectConfig(t, true)
+}
+
+func testDeleteBranchWithProjectConfig(t *testing.T, override_pc bool) {
+	setDefaultBranchFlags()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Add projects
+	numProjects := 4
+	localProjects := createBranchProjects(t, fake, numProjects)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocals := make([]*gitutil.Git, numProjects)
+	for i, localProject := range localProjects {
+		gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProject.Path))
+		gitLocals[i] = gitLocal
+	}
+
+	testBranch := "testBranch"
+
+	// Test case when new test branch is on HEAD
+	i := 0
+	gitLocals[i].CreateBranch(testBranch)
+	lc := project.LocalConfig{NoUpdate: true}
+	project.WriteLocalConfig(fake.X, localProjects[i], lc)
+
+	// Test when git branch -d fails
+	i = 1
+	gitLocals[i].CreateBranch(testBranch)
+	gitLocals[i].CheckoutBranch(testBranch)
+	writeFile(t, fake.X, localProjects[i].Path, "extrafile", "extrafile")
+	gitLocals[i].CheckoutBranch("master")
+
+	// Test when current branch is test branch
+	i = 2
+	gitLocals[i].CreateBranch(testBranch)
+	gitLocals[i].CheckoutBranch(testBranch)
+
+	// project-3 has no test branch
+
+	projects := make(project.Projects)
+	for _, localProject := range localProjects {
+		projects[localProject.Key()] = localProject
+	}
+
+	setDefaultBranchFlags()
+	branchFlags.deleteFlag = true
+	branchFlags.overrideProjectConfigFlag = override_pc
+	executeBranch(t, fake, testBranch)
+
+	states, err := project.GetProjectStates(fake.X, projects, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// test project states
+	for i = 0; i < numProjects; i++ {
+		localProject := localProjects[i]
+		state, _ := states[localProject.Key()]
+		branchFound := false
+		for _, branch := range state.Branches {
+			if branch.Name == testBranch {
+				branchFound = true
+				break
+			}
+		}
+		if (!override_pc && i == 0) || i == 1 || i == 2 {
+			if !branchFound {
+				t.Errorf("project %q should contain branch %q", localProject.Name, testBranch)
+			}
+		} else {
+			if branchFound {
+				t.Errorf("project %q should not contain branch %q", localProject.Name, testBranch)
+			}
+
+		}
 	}
 }
 
