@@ -24,6 +24,7 @@ var (
 	hookTimeoutFlag     uint
 	rebaseAllFlag       bool
 	rebaseCurrentFlag   bool
+	rebaseTrackedFlag   bool
 )
 
 func init() {
@@ -37,7 +38,8 @@ func init() {
 	cmdUpdate.Flags.BoolVar(&rebaseUntrackedFlag, "rebase-untracked", false, "Rebase untracked branches onto HEAD.")
 	cmdUpdate.Flags.UintVar(&hookTimeoutFlag, "hook-timeout", project.DefaultHookTimeout, "Timeout in minutes for running the hooks operation.")
 	cmdUpdate.Flags.BoolVar(&rebaseAllFlag, "rebase-all", false, "Rebase all tracked branches. Also rebase all untracked bracnhes if -rebase-untracked is passed")
-	cmdUpdate.Flags.BoolVar(&rebaseCurrentFlag, "rebase-current", false, "Rebase current tracked branches instead of fast-forwarding them.")
+	cmdUpdate.Flags.BoolVar(&rebaseCurrentFlag, "rebase-current", false, "Deprecated. Implies -rebase-tracked. Would be removed in future.")
+	cmdUpdate.Flags.BoolVar(&rebaseTrackedFlag, "rebase-tracked", false, "Rebase current tracked branches instead of fast-forwarding them.")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -68,6 +70,10 @@ func runUpdate(jirix *jiri.X, args []string) error {
 			fmt.Printf("warning: automatic update failed: %v\n", err)
 		}
 	}
+	if rebaseCurrentFlag {
+		jirix.Logger.Warningf("Flag -rebase-current has been deprecated, please use -rebase-tracked.\n\n")
+		rebaseTrackedFlag = true
+	}
 
 	// Update all projects to their latest version.
 	// Attempt <attemptsFlag> times before failing.
@@ -75,7 +81,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		if len(args) > 0 {
 			return project.CheckoutSnapshot(jirix, args[0], gcFlag, hookTimeoutFlag)
 		} else {
-			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseCurrentFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag)
+			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag)
 		}
 	}, retry.AttemptsOpt(attemptsFlag))
 

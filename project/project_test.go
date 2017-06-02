@@ -1130,7 +1130,7 @@ func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := project.UpdateUniverse(fake.X, false, false, true /*rebaseCurrent*/, false, false, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, false, false, true /*rebaseTracked*/, false, false, project.DefaultHookTimeout); err != nil {
 		t.Fatal(err)
 	}
 
