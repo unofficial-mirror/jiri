@@ -11,7 +11,6 @@ import (
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/jenkins"
-	"fuchsia.googlesource.com/jiri/runutil"
 	"fuchsia.googlesource.com/jiri/timing"
 )
 
@@ -29,7 +28,6 @@ type ContextOpts struct {
 	Stdin    io.Reader
 	Stdout   io.Writer
 	Stderr   io.Writer
-	Verbose  bool
 	Timer    *timing.Timer
 }
 
@@ -41,7 +39,6 @@ func newContextOpts() *ContextOpts {
 		Stdin:    os.Stdin,
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
-		Verbose:  false,
 		Timer:    nil,
 	}
 }
@@ -76,7 +73,7 @@ func NewContext(opts ContextOpts) *Context {
 
 // NewContextFromEnv returns a new context instance based on the given
 // cmdline environment.
-func NewContextFromEnv(env *cmdline.Env, verbose bool) *Context {
+func NewContextFromEnv(env *cmdline.Env) *Context {
 	opts := ContextOpts{}
 	initOpts(newContextOpts(), &opts)
 	opts.Env = envvar.CopyMap(env.Vars)
@@ -84,7 +81,6 @@ func NewContextFromEnv(env *cmdline.Env, verbose bool) *Context {
 	opts.Stdout = env.Stdout
 	opts.Stderr = env.Stderr
 	opts.Timer = env.Timer
-	opts.Verbose = verbose
 	return NewContext(opts)
 }
 
@@ -116,12 +112,6 @@ func (ctx Context) Manifest() string {
 	return *ctx.opts.Manifest
 }
 
-// NewSeq returns a new instance of Sequence initialized using the options
-// stored in the context.
-func (ctx Context) NewSeq() runutil.Sequence {
-	return runutil.NewSequence(ctx.opts.Env, ctx.opts.Stdin, ctx.opts.Stdout, ctx.opts.Stderr, ctx.opts.Verbose)
-}
-
 // Stdin returns the standard input of the context.
 func (ctx Context) Stdin() io.Reader {
 	return ctx.opts.Stdin
@@ -135,11 +125,6 @@ func (ctx Context) Stdout() io.Writer {
 // Stderr returns the standard error output of the context.
 func (ctx Context) Stderr() io.Writer {
 	return ctx.opts.Stderr
-}
-
-// Verbose returns the verbosity setting of the context.
-func (ctx Context) Verbose() bool {
-	return ctx.opts.Verbose
 }
 
 // Timer returns the timer associated with the context, which may be nil.

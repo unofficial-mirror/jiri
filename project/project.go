@@ -6,6 +6,7 @@ package project
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"hash/fnv"
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -23,12 +25,11 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/collect"
+	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/googlesource"
-	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/osutil"
-	"fuchsia.googlesource.com/jiri/runutil"
 )
 
 var (
@@ -1081,6 +1082,9 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 	err := updateFn(FastScan)
 	if err != nil {
 		if err2 := updateFn(FullScan); err2 != nil {
+			if err.Error() == err2.Error() {
+				return err
+			}
 			return fmt.Errorf("%v, %v", err, err2)
 		}
 	}
@@ -2375,8 +2379,6 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 		return fmt.Errorf("not able to create tmp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	// Hack until sequence is changed to use logger or is removed
-	showHookOutput := jirix.Logger.LoggerLevel >= log.DebugLevel
 	for _, hook := range hooks {
 		jirix.Logger.Infof("running hook(%v) for project %q", hook.Name, hook.ProjectName)
 		go func(hook Hook) {
@@ -2393,17 +2395,26 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 
 			fmt.Fprintf(outFile, "output for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
 			fmt.Fprintf(errFile, "Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
-			// Hack until sequence is changesd to use logger or is removed
-			s := jirix.NewSeq().Verbose(showHookOutput).CaptureAll(outFile, errFile)
-			if err := s.Dir(hook.ActionPath).Timeout(time.Duration(runHookTimeout) * time.Minute).Last(filepath.Join(hook.ActionPath, hook.Action)); err != nil {
-				ch <- result{outFile, errFile, err}
-				return
+			cmdLine := filepath.Join(hook.ActionPath, hook.Action)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runHookTimeout)*time.Minute)
+			defer cancel()
+			command := exec.CommandContext(ctx, cmdLine)
+			command.Stdin = os.Stdin
+			command.Stdout = outFile
+			command.Stderr = errFile
+			env := jirix.Env()
+			command.Env = envvar.MapToSlice(env)
+			jirix.Logger.Tracef("Run: %q", cmdLine)
+			err = command.Run()
+			if ctx.Err() == context.DeadlineExceeded {
+				err = ctx.Err()
 			}
-			ch <- result{outFile, errFile, nil}
+			ch <- result{outFile, errFile, err}
 		}(hook)
 
 	}
-	multiErr := make(MultiError, 0)
+
+	err = nil
 	for range hooks {
 		out := <-ch
 		defer func() {
@@ -2414,44 +2425,37 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 				out.errFile.Close()
 			}
 		}()
-		if out.err != nil && runutil.IsTimeout(out.err) {
-			jirix.Logger.Errorf("Timeout while executing hook")
-			jirix.IncrementFailures()
-			if out.outFile != nil {
-				out.outFile.Sync()
-				out.outFile.Seek(0, 0)
-				io.Copy(os.Stdout, out.outFile)
-			}
-			multiErr = append(multiErr, out.err)
+		if out.err == context.DeadlineExceeded {
+			out.outFile.Sync()
+			out.outFile.Seek(0, 0)
+			var buf bytes.Buffer
+			io.Copy(&buf, out.outFile)
+			jirix.Logger.Errorf("Timeout while executing hook\n%s\n\n", buf)
+			err = fmt.Errorf("Hooks execution failed")
 			continue
 		}
 		if out.outFile != nil {
 			out.outFile.Sync()
 			out.outFile.Seek(0, 0)
-			var byteBuffer bytes.Buffer
-			io.Copy(&byteBuffer, out.outFile)
-			if byteBuffer.String() != "" {
-				jirix.Logger.Debugf("%s\n", byteBuffer.String())
+			var buf bytes.Buffer
+			io.Copy(&buf, out.outFile)
+			if buf.String() != "" {
+				jirix.Logger.Debugf("%s\n", buf)
 			}
 		}
 		if out.err != nil {
+			var buf bytes.Buffer
 			if out.errFile != nil {
 				out.errFile.Sync()
 				out.errFile.Seek(0, 0)
-				var byteBuffer bytes.Buffer
-				io.Copy(&byteBuffer, out.errFile)
-				if byteBuffer.String() != "" {
-					jirix.Logger.Errorf("%s\n", byteBuffer.String())
-				}
+				var buf bytes.Buffer
+				io.Copy(&buf, out.errFile)
 			}
-			multiErr = append(multiErr, out.err)
+			jirix.Logger.Errorf("%s\n%s\n", err, buf)
+			err = fmt.Errorf("Hooks execution failed")
 		}
 	}
-
-	if len(multiErr) != 0 {
-		return multiErr
-	}
-	return nil
+	return err
 }
 
 func applyGitHooks(jirix *jiri.X, ops []operation) error {

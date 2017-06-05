@@ -134,7 +134,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	}
 	logger := log.NewLogger(loggerLevel, color)
 
-	ctx := tool.NewContextFromEnv(env, false)
+	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())
 	if err != nil {
 		return nil, err

@@ -632,9 +632,6 @@ func TestHookLoadSimple(t *testing.T) {
 	if err == nil {
 		t.Fatal("run hook should throw error as there is no action.sh script")
 	}
-	if !strings.Contains(err.Error(), "no such file or directory") || !strings.Contains(err.Error(), "action.sh") {
-		t.Fatal(err)
-	}
 }
 
 // TestHookLoadError tests that manifest load

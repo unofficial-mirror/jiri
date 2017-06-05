@@ -20,7 +20,7 @@ import (
 
 // NewX is similar to jiri.NewX, but is meant for usage in a testing environment.
 func NewX(t *testing.T) (*jiri.X, func()) {
-	ctx := tool.NewContextFromEnv(cmdline.EnvFromOS(), false)
+	ctx := tool.NewContextFromEnv(cmdline.EnvFromOS())
 	color := color.NewColor(false)
 	logger := log.NewLogger(log.InfoLevel, color)
 	root, err := ioutil.TempDir("", "")
