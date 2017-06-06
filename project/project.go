@@ -622,15 +622,16 @@ func (p *Project) CacheDirPath(jirix *jiri.X) (string, error) {
 func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 	g := git.NewGit(p.Path)
 	file := filepath.Join(p.Path, ".git", "JIRI_HEAD")
-	head := "ref: refs/remotes/origin/master"
+	head := "refs/remotes/origin/master"
 	var err error
-	if p.Revision != "" {
-		head, err = g.CurrentRevisionForRef(p.Revision)
-		if err != nil {
-			return fmt.Errorf("Cannot find revision for ref %q for project %s(%s): %s", p.Revision, p.Name, p.Path, err)
-		}
+	if p.Revision != "" && p.Revision != "HEAD" {
+		head = p.Revision
 	} else if p.RemoteBranch != "" {
-		head = "ref: refs/remotes/origin/" + p.RemoteBranch
+		head = "refs/remotes/origin/" + p.RemoteBranch
+	}
+	head, err = g.CurrentRevisionForRef(head)
+	if err != nil {
+		return fmt.Errorf("Cannot find revision for ref %q for project %s(%s): %s", head, p.Name, p.Path, err)
 	}
 	if err := safeWriteFile(jirix, file, []byte(head)); err != nil {
 		return err

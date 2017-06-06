@@ -513,7 +513,7 @@ func TestBranchUpdateWhenNoRebase(t *testing.T) {
 	localRev, _ := gl.CurrentRevision()
 
 	if remoteRev == localRev {
-		t.Fatal("local branch master should be updated")
+		t.Fatal("local branch master should not be updated")
 	}
 }
 
@@ -1172,11 +1172,11 @@ func TestUpdateWhenConflictMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// It rebased properly and pulled latest changes
 	localRev, _ := gl.CurrentRevision()
 	if rev != localRev {
 		t.Fatalf("Current commit is %v, it should be %v\n", localRev, rev)
 	}
+	checkJiriRevFiles(t, fake.X, localProjects[1])
 }
 
 // TestCheckoutSnapshotUrl tests checking out snapshot functionality from a url
