@@ -27,6 +27,7 @@ import (
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/googlesource"
 	"fuchsia.googlesource.com/jiri/log"
+	"fuchsia.googlesource.com/jiri/osutil"
 	"fuchsia.googlesource.com/jiri/runutil"
 )
 
@@ -172,7 +173,7 @@ func safeWriteFile(jirix *jiri.X, filename string, data []byte) error {
 	if err := ioutil.WriteFile(tmp, data, 0644); err != nil {
 		return fmtError(err)
 	}
-	return fmtError(os.Rename(tmp, filename))
+	return fmtError(osutil.Rename(tmp, filename))
 }
 
 type LocalConfig struct {
@@ -2553,7 +2554,7 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	if err := os.Chmod(tmpDir, os.FileMode(0755)); err != nil {
 		return fmtError(err)
 	}
-	if err := os.Rename(tmpDir, op.destination); err != nil {
+	if err := osutil.Rename(tmpDir, op.destination); err != nil {
 		return fmtError(err)
 	}
 	if err := checkoutHeadRevision(jirix, op.project, false); err != nil {
@@ -2700,7 +2701,7 @@ func (op moveOperation) Run(jirix *jiri.X) error {
 		if err := os.MkdirAll(path, perm); err != nil {
 			return fmtError(err)
 		}
-		if err := os.Rename(op.source, op.destination); err != nil {
+		if err := osutil.Rename(op.source, op.destination); err != nil {
 			return fmtError(err)
 		}
 	}

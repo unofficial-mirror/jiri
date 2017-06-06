@@ -212,16 +212,16 @@ func updateExecutable(path string, b []byte) error {
 		return err
 	}
 
-	err = os.Rename(path, oldfile.Name())
+	err = osutil.Rename(path, oldfile.Name())
 	if err != nil {
 		return err
 	}
 
 	// Replace the existing version.
-	err = os.Rename(newfile.Name(), path)
+	err = osutil.Rename(newfile.Name(), path)
 	if err != nil {
 		// Try to rollback the change in case of error.
-		rerr := os.Rename(oldfile.Name(), path)
+		rerr := osutil.Rename(oldfile.Name(), path)
 		if rerr != nil {
 			return rerr
 		}
