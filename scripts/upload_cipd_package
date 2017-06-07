@@ -9,11 +9,19 @@ readonly JIRI_REPO_URL="https://fuchsia.googlesource.com/jiri"
 readonly GS_BUCKET_URL="https://fuchsia-build.storage.googleapis.com/jiri"
 
 # Accept the first argument as a list of OSes to build for.  Possible values
-# are valid GOOS strings from https://golang.org/doc/install/source#environment.
-if [[ $# -eq 1 ]]; then
+# are valid GOOS strings from [linux darwin]
+if [[ $# -ge 1 ]]; then
   readonly TARGETS="${1}"
 else
   readonly TARGETS="linux darwin"
+fi
+
+# Accept the first argument as a list of OSes to build for.  Possible values
+# are valid GOARCH strings from [amd64 arm64]
+if [[ $# -eq 2 ]]; then
+  readonly ARCHS="${2}"
+else
+  readonly ARCHS="amd64 arm64"
 fi
 
 # Determine and validate the version of jiri.
@@ -32,7 +40,6 @@ trap "rm -rf -- "${TEMP_DIR}"" EXIT
 failed=false
 RED='\033[0;31m'
 NC='\033[0m'
-readonly ARCHS="amd64 arm64"
 for target in ${TARGETS}; do
   for arch in ${ARCHS}; do
     if [[ "$target" == "darwin" && "$arch" == "arm64" ]]; then
