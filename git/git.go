@@ -33,6 +33,20 @@ func (g *Git) CurrentRevision() (string, error) {
 	return head.Target().String(), nil
 }
 
+// BranchExists tests whether a branch with the given name exists in
+// the local repository.
+func (g *Git) BranchExists(branch string) (bool, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return false, err
+	}
+	defer repo.Free()
+	if _, err := repo.LookupBranch(branch, git2go.BranchAll); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
 // Fetch fetches refs and tags from the given remote.
 func (g *Git) Fetch(remote string, opts ...FetchOpt) error {
 	return g.FetchRefspec(remote, "", opts...)

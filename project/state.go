@@ -104,20 +104,11 @@ func GetProjectStates(jirix *jiri.X, projects Projects, checkDirty bool) (map[Pr
 	return states, nil
 }
 
-func GetProjectState(jirix *jiri.X, key ProjectKey, checkDirty bool) (*ProjectState, error) {
-	projects, err := LocalProjects(jirix, FastScan)
-	if err != nil {
-		return nil, err
-	}
+func GetProjectState(jirix *jiri.X, project Project, checkDirty bool) (*ProjectState, error) {
 	sem := make(chan error, 1)
-	for k, project := range projects {
-		if k == key {
-			state := &ProjectState{
-				Project: project,
-			}
-			setProjectState(jirix, state, checkDirty, sem)
-			return state, <-sem
-		}
+	state := &ProjectState{
+		Project: project,
 	}
-	return nil, fmt.Errorf("failed to find project key %v", key)
+	setProjectState(jirix, state, checkDirty, sem)
+	return state, <-sem
 }

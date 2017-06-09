@@ -824,23 +824,23 @@ func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, error) {
 	return LoadManifestFile(jirix, snapshot, nil, false)
 }
 
-// CurrentProjectKey gets the key of the current project from the current
-// directory by reading the jiri project metadata located in a directory at the
-// root of the current repository.
-func CurrentProjectKey(jirix *jiri.X) (ProjectKey, error) {
+// CurrentProject gets the current project from the current directory by
+// reading the jiri project metadata located in a directory at the root of the
+// current repository.
+func CurrentProject(jirix *jiri.X) (*Project, error) {
 	topLevel, err := gitutil.New(jirix).TopLevel()
 	if err != nil {
-		return "", nil
+		return nil, nil
 	}
 	metadataDir := filepath.Join(topLevel, jiri.ProjectMetaDir)
 	if _, err := os.Stat(metadataDir); err == nil {
 		project, err := ProjectFromFile(jirix, filepath.Join(metadataDir, jiri.ProjectMetaFile))
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return project.Key(), nil
+		return project, nil
 	}
-	return "", nil
+	return nil, nil
 }
 
 // setProjectRevisions sets the current project revision for

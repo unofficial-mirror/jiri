@@ -138,12 +138,11 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		return err
 	}
 	if len(args) == 0 {
-		currentProjectKey, err := project.CurrentProjectKey(jirix)
+		currentProject, err := project.CurrentProject(jirix)
 		if err != nil {
 			return err
 		}
-		state, err := project.GetProjectState(jirix, currentProjectKey, true)
-		if err != nil {
+		if currentProject == nil {
 			// jiri was run from outside of a project so let's
 			// use all available projects.
 			states, err = project.GetProjectStates(jirix, projects, false)
@@ -154,10 +153,14 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 				keys = append(keys, key)
 			}
 		} else {
-			states = map[project.ProjectKey]*project.ProjectState{
-				currentProjectKey: state,
+			state, err := project.GetProjectState(jirix, *currentProject, true)
+			if err != nil {
+				return err
 			}
-			keys = append(keys, currentProjectKey)
+			states = map[project.ProjectKey]*project.ProjectState{
+				currentProject.Key(): state,
+			}
+			keys = append(keys, currentProject.Key())
 		}
 	} else {
 		var err error

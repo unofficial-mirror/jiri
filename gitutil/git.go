@@ -116,12 +116,6 @@ func (g *Git) AddRemote(name, path string) error {
 	return g.run("remote", "add", name, path)
 }
 
-// BranchExists tests whether a branch with the given name exists in
-// the local repository.
-func (g *Git) BranchExists(branch string) bool {
-	return g.run("show-branch", branch) == nil
-}
-
 // BranchesDiffer tests whether two branches have any changes between them.
 func (g *Git) BranchesDiffer(branch1, branch2 string) (bool, error) {
 	out, err := g.runOutput("--no-pager", "diff", "--name-only", branch1+".."+branch2)
@@ -745,6 +739,22 @@ func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
 // Rebase rebases to a particular upstream branch.
 func (g *Git) Rebase(upstream string) error {
 	return g.run("rebase", upstream)
+}
+
+// CherryPickAbort aborts an in-progress cherry-pick operation.
+func (g *Git) CherryPickAbort() error {
+	// First check if cherry-pick is in progress
+	path := ".git/CHERRY_PICK_HEAD"
+	if g.rootDir != "" {
+		path = filepath.Join(g.rootDir, path)
+	}
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil // Not in progress return
+		}
+		return err
+	}
+	return g.run("cherry-pick", "--abort")
 }
 
 // RebaseAbort aborts an in-progress rebase operation.
