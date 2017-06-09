@@ -1805,7 +1805,7 @@ func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) Projects {
 		repoStatuses, err := googlesource.GetRepoStatuses(jirix, host, branches)
 		if err != nil {
 			// Log the error but don't fail.
-			fmt.Fprintf(jirix.Stderr(), "Error fetching repo statuses from remote: %v\n", err)
+			jirix.Logger.Warningf("Failed fetching repo statuses from remote for faster execution: %v\n\n", err)
 			continue
 		}
 		for _, p := range projects {
