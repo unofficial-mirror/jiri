@@ -28,6 +28,7 @@ import (
 	"fuchsia.googlesource.com/jiri/googlesource"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/osutil"
+	"fuchsia.googlesource.com/jiri/retry"
 	"fuchsia.googlesource.com/jiri/runutil"
 )
 
@@ -773,7 +774,7 @@ func CreateSnapshot(jirix *jiri.X, file string, localManifest bool) error {
 
 // CheckoutSnapshot updates project state to the state specified in the given
 // snapshot file.  Note that the snapshot file must not contain remote imports.
-func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool, runHookTimeout uint) error {
+func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool, runHookTimeout uint, attempts int) error {
 	// Find all local projects.
 	scanMode := FastScan
 	if gc {
@@ -787,7 +788,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool, runHookTimeout ui
 	if err != nil {
 		return err
 	}
-	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/); err != nil {
+	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/, attempts); err != nil {
 		return err
 	}
 	return WriteUpdateHistorySnapshot(jirix, snapshot, false)
@@ -1017,7 +1018,7 @@ func matchLocalWithRemote(localProjects, remoteProjects Projects) {
 // counterparts identified in the manifest. Optionally, the 'gc' flag can be
 // used to indicate that local projects that no longer exist remotely should be
 // removed.
-func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bool, rebaseUntracked bool, rebaseAll bool, runHookTimeout uint) (e error) {
+func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bool, rebaseUntracked bool, rebaseAll bool, runHookTimeout uint, attempts int) (e error) {
 	jirix.Logger.Infof("Updating all projects")
 
 	updateFn := func(scanMode ScanMode) error {
@@ -1044,7 +1045,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 		}
 
 		// Actually update the projects.
-		return updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, rebaseTracked, rebaseUntracked, rebaseAll, false /*snapshot*/)
+		return updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, rebaseTracked, rebaseUntracked, rebaseAll, false /*snapshot*/, attempts)
 	}
 
 	// Specifying gc should always force a full filesystem scan.
@@ -1898,7 +1899,7 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 	return nil
 }
 
-func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) error {
+func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects, attempts int) error {
 	fetchLimit := make(chan struct{}, jirix.Jobs)
 	errs := make(chan error, len(localProjects))
 	var wg sync.WaitGroup
@@ -1914,8 +1915,16 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 			go func(project Project) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
-				if err := fetchAll(jirix, project); err != nil {
-					errs <- fmt.Errorf("fetch failed for %v: %v", project.Name, err)
+				err := retry.Function(jirix.Context, func() error {
+					err := fetchAll(jirix, project)
+					if err != nil {
+						//xxx skip this one
+						fmt.Printf(">>> fetchAll failed for %v: %v", project.Name, err)
+					}
+					return err
+				}, retry.AttemptsOpt(attempts))
+				if err != nil {
+					errs <- fmt.Errorf("fetch failed for %v after %v attempts: %v", project.Name, attempts, err)
 					return
 				}
 			}(project)
@@ -2123,7 +2132,7 @@ func runCommonOperations(jirix *jiri.X, ops operations) error {
 	return nil
 }
 
-func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, runHookTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot bool) error {
+func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, runHookTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot bool, attempts int) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
@@ -2138,7 +2147,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		}
 		jirix.TimerPop()
 		jirix.TimerPush("fetch local projects")
-		if err := fetchLocalProjects(jirix, localProjects, remoteProjects); err != nil {
+		if err := fetchLocalProjects(jirix, localProjects, remoteProjects, attempts); err != nil {
 			errs <- err
 			return
 		}
@@ -2239,6 +2248,7 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 	defer os.RemoveAll(tmpDir)
 	// Hack until sequence is changed to use logger or is removed
 	showHookOutput := jirix.Logger.LoggerLevel >= log.DebugLevel
+	//xxx add retries for these too
 	for _, hook := range hooks {
 		jirix.Logger.Infof("running hook(%v) for project %q", hook.Name, hook.ProjectName)
 		go func(hook Hook) {

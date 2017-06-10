@@ -65,7 +65,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 
 	if autoupdateFlag {
 		// Try to update Jiri itself.
-		err := jiri.UpdateAndExecute(forceAutoupdateFlag)
+		err := jiri.UpdateAndExecute(forceAutoupdateFlag, jirix.Logger)
 		if err != nil {
 			fmt.Printf("warning: automatic update failed: %v\n", err)
 		}
@@ -79,9 +79,9 @@ func runUpdate(jirix *jiri.X, args []string) error {
 	// Attempt <attemptsFlag> times before failing.
 	err := retry.Function(jirix.Context, func() error {
 		if len(args) > 0 {
-			return project.CheckoutSnapshot(jirix, args[0], gcFlag, hookTimeoutFlag)
+			return project.CheckoutSnapshot(jirix, args[0], gcFlag, hookTimeoutFlag, attemptsFlag)
 		} else {
-			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag)
+			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, hookTimeoutFlag, attemptsFlag)
 		}
 	}, retry.AttemptsOpt(attemptsFlag))
 

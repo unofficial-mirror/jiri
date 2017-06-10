@@ -25,7 +25,7 @@ func runSelfUpdate(jirix *jiri.X, args []string) error {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
 
-	if err := jiri.Update(true); err != nil {
+	if err := jiri.Update(true, jirix.Logger); err != nil {
 		return fmt.Errorf("Update failed: %s", err)
 	}
 	fmt.Println("Tool updated.")

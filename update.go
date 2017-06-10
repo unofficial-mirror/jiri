@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 
+	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/osutil"
 	"fuchsia.googlesource.com/jiri/version"
 )
@@ -35,16 +36,18 @@ var (
 
 // Update checks whether a new version of Jiri is available and if so,
 // it will download it and replace the current version with the new one.
-func Update(force bool) error {
+func Update(force bool, logger *log.Logger) error {
 	if !force && version.GitCommit == "" {
 		return updateTestVersionErr
 	}
+	logger.Tracef("Checking for new jiri version")
 	commit, err := getCurrentCommit(JiriRepository)
 	if err != nil {
 		return err
 	}
 	if force || commit != version.GitCommit {
 		// Check if the prebuilt for new version exsits.
+		logger.Tracef("Checking for new prebuilt jiri")
 		has, err := hasPrebuilt(JiriStorageBucket, commit)
 		if err != nil {
 			return fmt.Errorf("cannot check if prebuilt is available, %s", err)
@@ -54,6 +57,7 @@ func Update(force bool) error {
 		}
 
 		// New version is available, download and update to it.
+		logger.Tracef("Downloading new prebuilt jiri")
 		b, err := downloadBinary(JiriStorageBucket, commit)
 		if err != nil {
 			return fmt.Errorf("cannot download latest jiri binary, %s", err)
@@ -62,22 +66,27 @@ func Update(force bool) error {
 		if err != nil {
 			return fmt.Errorf("cannot get executable path, %s", err)
 		}
-		return updateExecutable(path, b)
+		err = updateExecutable(path, b)
+		if err != nil {
+			logger.Tracef("Updated prebuilt jiri")
+		}
+		return err
 	}
 	return updateVersionErr
 }
 
-func UpdateAndExecute(force bool) error {
+func UpdateAndExecute(force bool, logger *log.Logger) error {
 	// Capture executable path before it is replaced in Update func
 	path, err := osutil.Executable()
 	if err != nil {
 		return fmt.Errorf("cannot get executable path, %s", err)
 	}
-	if err := Update(force); err != nil {
+	if err := Update(force, logger); err != nil {
 		if err != updateNotAvailableErr && err != updateVersionErr &&
 			err != updateTestVersionErr {
 			return err
 		} else {
+			logger.Tracef("%v", err)
 			return nil
 		}
 	}
