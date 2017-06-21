@@ -5,11 +5,15 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/analytics_util"
 	"fuchsia.googlesource.com/jiri/cmdline"
 )
 
@@ -31,18 +35,27 @@ does not exists, it will be created.
 }
 
 var (
-	cacheFlag  string
-	sharedFlag bool
+	cacheFlag             string
+	sharedFlag            bool
+	showAnalyticsDataFlag bool
+	analyticsOptFlag      string
 )
 
 func init() {
-	cmdInit.Flags.StringVar(&cacheFlag, "cache", "", "Jiri cache directory")
-	cmdInit.Flags.BoolVar(&sharedFlag, "shared", false, "Use shared cache, which doesn't commit or push")
+	cmdInit.Flags.StringVar(&cacheFlag, "cache", "", "Jiri cache directory.")
+	cmdInit.Flags.BoolVar(&sharedFlag, "shared", false, "Use shared cache, which doesn't commit or push.")
+	cmdInit.Flags.BoolVar(&showAnalyticsDataFlag, "show-analytics-data", false, "Show analytics data that jiri collect when you opt-in and exits.")
+	cmdInit.Flags.StringVar(&analyticsOptFlag, "analytics-opt", "", "Opt in/out of analytics collection. Takes true/false")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("wrong number of arguments")
+	}
+
+	if showAnalyticsDataFlag {
+		fmt.Printf("%s\n", analytics_util.CollectedData)
+		return nil
 	}
 
 	var dir string
@@ -89,13 +102,47 @@ func runInit(env *cmdline.Env, args []string) error {
 		}
 	}
 
-	config := jiri.Config{
-		CachePath: cacheFlag,
+	config := &jiri.Config{}
+	configPath := filepath.Join(d, jiri.ConfigFile)
+	if _, err := os.Stat(configPath); err == nil {
+		config, err = jiri.ConfigFromFile(configPath)
+		if err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
 	}
+
 	if cacheFlag != "" {
+		config.CachePath = cacheFlag
 		config.Shared = sharedFlag
 	}
-	configPath := filepath.Join(d, jiri.ConfigFile)
+
+	if analyticsOptFlag != "" {
+		if val, err := strconv.ParseBool(analyticsOptFlag); err != nil {
+			return fmt.Errorf("'analytics-opt' flag should be true or false")
+		} else {
+			if val {
+				config.AnalyticsOptIn = "yes"
+				config.AnalyticsVersion = analytics_util.Version
+
+				bytes := make([]byte, 16)
+				io.ReadFull(rand.Reader, bytes)
+				if err != nil {
+					return err
+				}
+				bytes[6] = (bytes[6] & 0x0f) | 0x40
+				bytes[8] = (bytes[8] & 0x3f) | 0x80
+
+				config.AnalyticsUserId = fmt.Sprintf("%x-%x-%x-%x-%x", bytes[0:4], bytes[4:6], bytes[6:8], bytes[8:10], bytes[10:])
+			} else {
+				config.AnalyticsOptIn = "no"
+				config.AnalyticsVersion = ""
+				config.AnalyticsUserId = ""
+			}
+		}
+	}
+
 	if err := config.Write(configPath); err != nil {
 		return err
 	}

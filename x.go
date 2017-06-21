@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"fuchsia.googlesource.com/jiri/analytics_util"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/color"
 	"fuchsia.googlesource.com/jiri/envvar"
@@ -43,9 +44,14 @@ const (
 
 // Config represents jiri global config
 type Config struct {
-	CachePath string   `xml:"cache>path,omitempty"`
-	Shared    bool     `xml:"cache>shared,omitempty"`
-	XMLName   struct{} `xml:"config"`
+	CachePath       string `xml:"cache>path,omitempty"`
+	Shared          bool   `xml:"cache>shared,omitempty"`
+	AnalyticsOptIn  string `xml:"analytics>optin,omitempty"`
+	AnalyticsUserId string `xml:"analytics>userId,omitempty"`
+	// version user has opted-in to
+	AnalyticsVersion string `xml:"analytics>version,omitempty"`
+
+	XMLName struct{} `xml:"config"`
 }
 
 func (c *Config) Write(filename string) error {
@@ -387,7 +393,32 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	enablesdAnalytics := false
+	userId := ""
+	analyticsCommandMsg := fmt.Sprintf("To check what data we collect run '%s'\n"+
+		"To opt-in run '%s'\n"+
+		"To opt-out run '%s'", x.Color.Yellow("jiri init -show-analytics-data"),
+		x.Color.Yellow("jiri init -analytics-opt=true"),
+		x.Color.Yellow("jiri init -analytics-opt=false"))
+	if x.config == nil || x.config.AnalyticsOptIn == "" {
+		x.Logger.Warningf("Please opt in or out of analytics collection. You will receive this warning until an option is selected.\n%s\n\n", analyticsCommandMsg)
+	} else if x.config.AnalyticsOptIn == "yes" {
+		if x.config.AnalyticsUserId == "" || x.config.AnalyticsVersion == "" {
+			x.Logger.Warningf("Please opt in or out of analytics collection. You will receive this warning until an option is selected.\n%s\n\n", analyticsCommandMsg)
+		} else if x.config.AnalyticsVersion != analytics_util.Version {
+			x.Logger.Warningf("You have opted in for old version of data collection. Please opt in/out again\n%s\n\n", analyticsCommandMsg)
+		} else {
+			userId = x.config.AnalyticsUserId
+			enablesdAnalytics = true
+		}
+	}
+	as := analytics_util.NewAnalyticsSession(enablesdAnalytics, "UA-101128147-1", userId)
+	id := as.AddCommand(env.CommandName, env.CommandFlags)
+
 	err = r(x, args)
 	x.Logger.DisableProgress()
+
+	as.Done(id)
+	as.SendAllAndWaitToFinish()
 	return err
 }

@@ -48,6 +48,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -213,6 +214,7 @@ func Parse(root *Command, env *Env, args []string) (Runner, []string, error) {
 	}
 	// Set env.Usage to the usage of the root command, in case the parse fails.
 	path := []*Command{root}
+
 	env.Usage = makeHelpRunner(path, env).usageFunc
 	cleanTree(root)
 	if err := checkTreeInvariants(path, env); err != nil {
@@ -380,11 +382,17 @@ func (cmd *Command) parse(path []*Command, env *Env, args []string, setFlags map
 	if len(cmd.Children) > 0 {
 		for _, child := range cmd.Children {
 			if child.Name == subName {
+				if env.CommandName != "" {
+					env.CommandName = env.CommandName + "->" + subName
+				} else {
+					env.CommandName = subName
+				}
 				return child.parse(path, env, subArgs, setFlags)
 			}
 		}
 		// Every non-leaf command gets a default help command.
 		if helpName == subName {
+			env.CommandName = subName
 			return runHelp.newCommand().parse(path, env, subArgs, setFlags)
 		}
 	}
@@ -454,6 +462,24 @@ func parseFlags(path []*Command, env *Env, args []string) ([]string, map[string]
 		return nil, nil, err
 	}
 	cmd.ParsedFlags = flags
+	env.CommandFlags = make(map[string]string)
+	flags.Visit(func(f *flag.Flag) {
+		val := f.Value.String()
+		str := true
+		if _, err := strconv.ParseBool(val); err == nil {
+			str = false
+		} else if _, err := strconv.ParseFloat(val, 10); err == nil {
+			str = false
+		} else if _, err := strconv.ParseInt(val, 10, 64); err == nil {
+			str = false
+		}
+		if str {
+			// Don't store string flag value
+			env.CommandFlags[f.Name] = ""
+		} else {
+			env.CommandFlags[f.Name] = val
+		}
+	})
 	return flags.Args(), extractSetFlags(flags), nil
 }
 

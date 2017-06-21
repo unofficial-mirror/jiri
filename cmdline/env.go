@@ -40,6 +40,11 @@ type Env struct {
 	// Usage is a function that prints usage information to w.  Typically set by
 	// calls to Main or Parse to print usage of the leaf command.
 	Usage func(env *Env, w io.Writer)
+
+	// Comamnd name
+	CommandName string
+	// command flags
+	CommandFlags map[string]string
 }
 
 func (e *Env) clone() *Env {
