@@ -28,7 +28,6 @@ import (
 	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/googlesource"
 	"fuchsia.googlesource.com/jiri/osutil"
 )
 
@@ -1815,80 +1814,70 @@ func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, proje
 	return ld.Load(jirix, root, file, cycleKey, localManifest)
 }
 
-// groupByGoogleSourceHosts returns a map of googlesource host to a Projects
-// map where all project remotes come from that host.
-func groupByGoogleSourceHosts(ps Projects) map[string]Projects {
-	m := make(map[string]Projects)
-	for _, p := range ps {
-		if !googlesource.IsGoogleSourceRemote(p.Remote) {
-			continue
-		}
-		u, err := url.Parse(p.Remote)
-		if err != nil {
-			continue
-		}
-		host := u.Scheme + "://" + u.Host
-		if _, ok := m[host]; !ok {
-			m[host] = Projects{}
-		}
-		m[host][p.Key()] = p
-	}
-	return m
-}
-
-// getRemoteHeadRevisions attempts to get the repo statuses from remote for
+// setRemoteHeadRevisions set the repo statuses from remote for
 // projects at HEAD so we can detect when a local project is already
 // up-to-date.
-func getRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects) Projects {
-	projectsAtHead := Projects{}
-	ps := make(Projects)
-	for k, rp := range remoteProjects {
-		ps[k] = rp
-		if rp.Revision == "HEAD" {
-			projectsAtHead[rp.Key()] = rp
-		}
-	}
-	gsHostsMap := groupByGoogleSourceHosts(projectsAtHead)
-	for host, projects := range gsHostsMap {
-		// Create a slice of branch names, with duplicates removed.
-		branchesMap := make(map[string]bool)
-		for _, p := range projects {
-			branchesMap[p.RemoteBranch] = true
-		}
-		branches := make([]string, 0, len(branchesMap))
-		for b, _ := range branchesMap {
-			branches = append(branches, b)
-		}
+func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProjects Projects) MultiError {
+	jirix.TimerPush("Set Remote Revisions")
+	defer jirix.TimerPop()
 
-		repoStatuses, err := googlesource.GetRepoStatuses(jirix, host, branches)
-		if err != nil {
-			// Log the error but don't fail.
-			jirix.Logger.Warningf("Failed fetching repo statuses from remote for faster execution: %v\n\n", err)
+	keys := make(chan ProjectKey, len(remoteProjects))
+	updatedRemotes := make(chan Project, len(remoteProjects))
+	errs := make(chan error, len(remoteProjects))
+	var wg sync.WaitGroup
+
+	for i := uint(0); i < jirix.Jobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for key := range keys {
+				local := localProjects[key]
+				remote := remoteProjects[key]
+				g := git.NewGit(local.Path)
+				b := "master"
+				if remote.RemoteBranch != "" {
+					b = remote.RemoteBranch
+				}
+				rev, err := g.CurrentRevisionForRef("remotes/origin/" + b)
+				if err != nil {
+					errs <- err
+					return
+				}
+				remote.Revision = rev
+				updatedRemotes <- remote
+			}
+		}()
+	}
+
+	for key, _ := range localProjects {
+		remote, ok := remoteProjects[key]
+		if !ok || remote.Revision != "HEAD" {
 			continue
 		}
-		for _, p := range projects {
-			u, err := url.Parse(p.Remote)
-			if err != nil {
-				continue
-			}
-			status, ok := repoStatuses[strings.Trim(u.Path, "/")]
-			if !ok {
-				continue
-			}
-			rev, ok := status.Branches[p.RemoteBranch]
-			if !ok || rev == "" {
-				continue
-			}
-			rp := ps[p.Key()]
-			rp.Revision = rev
-			ps[p.Key()] = rp
-		}
+		keys <- key
 	}
-	return ps
+
+	close(keys)
+	wg.Wait()
+	close(updatedRemotes)
+	close(errs)
+
+	for remote := range updatedRemotes {
+		remoteProjects[remote.Key()] = remote
+	}
+
+	var multiErr MultiError
+	for err := range errs {
+		multiErr = append(multiErr, err)
+	}
+
+	return multiErr
 }
 
 // updateCache creates the cache or updates it if already present.
 func updateCache(jirix *jiri.X, remoteProjects Projects) error {
+	jirix.TimerPush("update cache")
+	defer jirix.TimerPop()
 	if jirix.Cache == "" {
 		return nil
 	}
@@ -1957,6 +1946,8 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 }
 
 func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) error {
+	jirix.TimerPush("fetch local projects")
+	defer jirix.TimerPop()
 	fetchLimit := make(chan struct{}, jirix.Jobs)
 	errs := make(chan error, len(localProjects))
 	var wg sync.WaitGroup
@@ -2185,50 +2176,21 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
-	jirix.TimerPush("Fetch local projects and get remote revisions")
-	errs := make(chan error)
-	states := make(map[ProjectKey]*ProjectState, len(localProjects))
-	go func() {
-		jirix.TimerPush("update cache")
-		if err := updateCache(jirix, remoteProjects); err != nil {
-			errs <- err
-			return
-		}
-		jirix.TimerPop()
-		jirix.TimerPush("fetch local projects")
-		if err := fetchLocalProjects(jirix, localProjects, remoteProjects); err != nil {
-			errs <- err
-			return
-		}
-		jirix.TimerPop()
-		jirix.TimerPush("get project states")
-		s, err := GetProjectStates(jirix, localProjects, false)
-		if err != nil {
-			errs <- err
-			return
-		}
-		jirix.TimerPop()
-		for k, v := range s {
-			states[k] = v
-		}
-		errs <- nil
-	}()
-	var ps Projects
-	go func() {
-		ps = getRemoteHeadRevisions(jirix, remoteProjects)
-		errs <- nil
-	}()
-	multiErr := make(MultiError, 0)
-	for i := 1; i <= 2; i++ {
-		if err := <-errs; err != nil {
-			multiErr = append(multiErr, err)
-		}
+	if err := updateCache(jirix, remoteProjects); err != nil {
+		return err
 	}
-	jirix.TimerPop()
-	if len(multiErr) != 0 {
-		return multiErr
+	if err := fetchLocalProjects(jirix, localProjects, remoteProjects); err != nil {
+		return err
 	}
-	ops := computeOperations(localProjects, ps, states, gc, rebaseTracked, rebaseUntracked, rebaseAll, snapshot)
+	states, err := GetProjectStates(jirix, localProjects, false)
+	if err != nil {
+		return err
+	}
+	if err := setRemoteHeadRevisions(jirix, remoteProjects, localProjects); err != nil {
+		return err
+	}
+
+	ops := computeOperations(localProjects, remoteProjects, states, gc, rebaseTracked, rebaseUntracked, rebaseAll, snapshot)
 	moveOperations := []moveOperation{}
 	deleteOperations := []deleteOperation{}
 	updateOperations := operations{}
@@ -2268,14 +2230,14 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		return err
 	}
 	jirix.TimerPush("jiri revision files")
-	for _, project := range ps {
+	for _, project := range remoteProjects {
 		if !(project.LocalConfig.Ignore || project.LocalConfig.NoUpdate) {
 			project.writeJiriRevisionFiles(jirix)
 		}
 	}
 	jirix.TimerPop()
 
-	if projectStatuses, err := getProjectStatus(jirix, ps); err != nil {
+	if projectStatuses, err := getProjectStatus(jirix, remoteProjects); err != nil {
 		return fmt.Errorf("Error getting project status: %s", err)
 	} else if len(projectStatuses) != 0 {
 		cwd, err := os.Getwd()

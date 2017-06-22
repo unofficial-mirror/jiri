@@ -476,13 +476,11 @@ func deleteBranches(jirix *jiri.X, branchToDelete string) error {
 	if err != nil {
 		return err
 	}
-	jirix.TimerPush("Get states")
 	states, err := project.GetProjectStates(jirix, localProjects, false)
 	if err != nil {
 		return err
 	}
 
-	jirix.TimerPop()
 	jirix.TimerPush("Process")
 	errors := false
 	projectFound := false

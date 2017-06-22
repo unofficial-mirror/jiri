@@ -326,10 +326,8 @@ func runRunp(jirix *jiri.X, args []string) error {
 	projectStateRequired := branchRE != nil || runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted
 	var states map[project.ProjectKey]*project.ProjectState
 	if projectStateRequired {
-		jirix.TimerPush("project states")
 		var err error
 		states, err = project.GetProjectStates(jirix, projects, runpFlags.untracked || runpFlags.noUntracked || runpFlags.uncommitted || runpFlags.noUncommitted)
-		jirix.TimerPop()
 		if err != nil {
 			return err
 		}

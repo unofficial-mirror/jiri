@@ -85,6 +85,8 @@ func setProjectState(jirix *jiri.X, state *ProjectState, checkDirty bool, ch cha
 }
 
 func GetProjectStates(jirix *jiri.X, projects Projects, checkDirty bool) (map[ProjectKey]*ProjectState, error) {
+	jirix.TimerPush("Get project states")
+	defer jirix.TimerPop()
 	states := make(map[ProjectKey]*ProjectState, len(projects))
 	sem := make(chan error, len(projects))
 	for key, project := range projects {
