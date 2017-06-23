@@ -1002,7 +1002,7 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 	return ld.Projects, ld.Hooks, ld.TmpDir, nil
 }
 
-func matchLocalWithRemote(localProjects, remoteProjects Projects) {
+func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 	localKeysNotInRemote := make(map[ProjectKey]bool)
 	for key, _ := range localProjects {
 		if _, ok := remoteProjects[key]; !ok {
@@ -1055,7 +1055,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 
 		// Determine the set of remote projects and match them up with the locals.
 		remoteProjects, hooks, tmpLoadDir, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
-		matchLocalWithRemote(localProjects, remoteProjects)
+		MatchLocalWithRemote(localProjects, remoteProjects)
 
 		// Make sure we clean up the tmp dir used to load remote manifest projects.
 		if tmpLoadDir != "" {

@@ -188,6 +188,8 @@ type Change struct {
 	Topic            string
 	Branch           string
 	Revisions        Revisions
+	Subject          string
+	Number           int `json:"_number"`
 	Owner            Owner
 	Labels           map[string]map[string]interface{}
 
@@ -208,7 +210,11 @@ type Fetch struct {
 type Http struct {
 	Ref string
 }
+type Parent struct {
+	Commit string
+}
 type Commit struct {
+	Parents []Parent
 	Message string
 }
 type Owner struct {
@@ -372,6 +378,10 @@ func (g *Gerrit) Query(query string) (_ CLList, e error) {
 
 func (g *Gerrit) ListOpenChangesByTopic(topic string) (CLList, error) {
 	return g.Query("topic:\"" + topic + "\" status:open")
+}
+
+func (g *Gerrit) ListChangesByCommit(commit string) (CLList, error) {
+	return g.Query(fmt.Sprintf("commit:%s", commit))
 }
 
 // GetChange returns a Change object for the given changeId number.

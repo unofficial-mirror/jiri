@@ -37,7 +37,8 @@ type Logger struct {
 type LogLevel int
 
 const (
-	ErrorLevel LogLevel = iota
+	NoLogLevel LogLevel = iota
+	ErrorLevel
 	WarningLevel
 	InfoLevel
 	DebugLevel
