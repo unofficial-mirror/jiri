@@ -89,15 +89,24 @@ func runStatus(jirix *jiri.X, args []string) error {
 		if statusFlags.branch != "" && (statusFlags.branch != state.CurrentBranch.Name) {
 			continue
 		}
+		relativePath, err := filepath.Rel(cDir, localProject.Path)
+		if err != nil {
+			return err
+		}
+		errorMsg := fmt.Sprintf("getting status for project %s(%s)", localProject.Name, relativePath)
 		changes, headRev, extraCommits, err := getStatus(jirix, localProject, remoteProject, state.CurrentBranch)
 		if err != nil {
-			return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
+			jirix.Logger.Errorf("%s :%s\n\n", errorMsg, err)
+			jirix.IncrementFailures()
+			continue
 		}
 		revisionMessage := ""
 		git := gitutil.New(jirix, gitutil.RootDirOpt(state.Project.Path))
 		currentLog, err := git.OneLineLog(state.CurrentBranch.Revision)
 		if err != nil {
-			return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
+			jirix.Logger.Errorf("%s :%s\n\n", errorMsg, err)
+			jirix.IncrementFailures()
+			continue
 		}
 		currentLog = colorFormatGitLog(jirix, currentLog)
 		if statusFlags.checkHead {
@@ -106,7 +115,9 @@ func runStatus(jirix *jiri.X, args []string) error {
 			} else if headRev != state.CurrentBranch.Revision {
 				headLog, err := git.OneLineLog(headRev)
 				if err != nil {
-					return fmt.Errorf("Error while getting status for project %q :%s", localProject.Name, err)
+					jirix.Logger.Errorf("%s :%s\n\n", errorMsg, err)
+					jirix.IncrementFailures()
+					continue
 				}
 				headLog = colorFormatGitLog(jirix, headLog)
 				revisionMessage = fmt.Sprintf("\n%s: %s", jirix.Color.Yellow("JIRI_HEAD"), headLog)
@@ -115,10 +126,6 @@ func runStatus(jirix *jiri.X, args []string) error {
 		}
 		if statusFlags.branch != "" || changes != "" || revisionMessage != "" ||
 			len(extraCommits) != 0 {
-			relativePath, err := filepath.Rel(cDir, localProject.Path)
-			if err != nil {
-				return err
-			}
 			fmt.Printf("%s: %s", jirix.Color.Yellow(relativePath), revisionMessage)
 			fmt.Println()
 			branch := state.CurrentBranch.Name
@@ -141,6 +148,9 @@ func runStatus(jirix *jiri.X, args []string) error {
 			fmt.Println()
 		}
 
+	}
+	if jirix.Failures() != 0 {
+		return fmt.Errorf("completed with non-fatal errors")
 	}
 	return nil
 }
