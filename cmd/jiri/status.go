@@ -163,8 +163,10 @@ func getStatus(jirix *jiri.X, local project.Project, remote project.Project, cur
 		if err != nil {
 			return "", "", nil, err
 		}
-		if headRev, err = g.CurrentRevisionForRef(headRev); err != nil {
+		if r, err := g.CurrentRevisionForRef(headRev); err != nil {
 			return "", "", nil, fmt.Errorf("Cannot find revision for ref %q for project %q: %s", headRev, local.Name, err)
+		} else {
+			headRev = r
 		}
 	}
 
