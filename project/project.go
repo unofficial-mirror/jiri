@@ -274,7 +274,7 @@ func (projects ProjectsByPath) Less(i, j int) bool {
 }
 
 // HooksByName implements the Sort interface. It sorts Hooks by the Name
-// field.
+// and ProjectName field.
 type HooksByName []Hook
 
 func (hooks HooksByName) Len() int {
@@ -284,6 +284,9 @@ func (hooks HooksByName) Swap(i, j int) {
 	hooks[i], hooks[j] = hooks[j], hooks[i]
 }
 func (hooks HooksByName) Less(i, j int) bool {
+	if hooks[i].Name == hooks[j].Name {
+		return hooks[i].ProjectName < hooks[j].ProjectName
+	}
 	return hooks[i].Name < hooks[j].Name
 }
 
