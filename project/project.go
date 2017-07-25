@@ -670,6 +670,26 @@ func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 	}
 }
 
+func (p *Project) IsOnJiriHead() (bool, error) {
+	g := git.NewGit(p.Path)
+	jiriHead := "refs/remotes/origin/master"
+	var err error
+	if p.Revision != "" && p.Revision != "HEAD" {
+		jiriHead = p.Revision
+	} else if p.RemoteBranch != "" {
+		jiriHead = "refs/remotes/origin/" + p.RemoteBranch
+	}
+	jiriHead, err = g.CurrentRevisionForRef(jiriHead)
+	if err != nil {
+		return false, fmt.Errorf("Cannot find revision for ref %q for project %s(%s): %s", jiriHead, p.Name, p.Path, err)
+	}
+	head, err := g.CurrentRevision()
+	if err != nil {
+		return false, fmt.Errorf("Cannot find current revision  for project %s(%s): %s", p.Name, p.Path, err)
+	}
+	return head == jiriHead, nil
+}
+
 func isPathDir(dir string) bool {
 	if dir != "" {
 		if fi, err := os.Stat(dir); err == nil {
@@ -2219,10 +2239,94 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		}
 	}
 	jirix.TimerPop()
+
+	if projectStatuses, err := getProjectStatus(jirix, ps); err != nil {
+		return fmt.Errorf("Error getting project status: %s", err)
+	} else if len(projectStatuses) != 0 {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmtError(err)
+		}
+		msg := "Projects with local changes and/or not on JIRI_HEAD:"
+		for _, p := range projectStatuses {
+			relativePath, err := filepath.Rel(cwd, p.Project.Path)
+			if err != nil {
+				// Just use the full path if an error occurred.
+				relativePath = p.Project.Path
+			}
+			msg = fmt.Sprintf("%s\n%s (%s):", msg, p.Project.Name, relativePath)
+			if p.HasChanges {
+				msg = fmt.Sprintf("%s (%s)", msg, jirix.Color.Yellow("Has changes"))
+			}
+			if !p.IsOnJiriHead {
+				msg = fmt.Sprintf("%s (%s)", msg, jirix.Color.Yellow("Not on JIRI_HEAD"))
+			}
+		}
+		jirix.Logger.Warningf("%s\n\n", msg)
+	}
+
 	if err := runHooks(jirix, ops, hooks, runHookTimeout); err != nil {
 		return err
 	}
 	return applyGitHooks(jirix, ops)
+}
+
+type ProjectStatus struct {
+	Project      Project
+	HasChanges   bool
+	IsOnJiriHead bool
+}
+
+func getProjectStatus(jirix *jiri.X, ps Projects) ([]ProjectStatus, MultiError) {
+	jirix.TimerPush("jiri status")
+	defer jirix.TimerPop()
+	workQueue := make(chan Project, len(ps))
+	projectStatuses := make(chan ProjectStatus, len(ps))
+	errs := make(chan error, len(ps))
+	var wg sync.WaitGroup
+	for _, project := range ps {
+		workQueue <- project
+	}
+	close(workQueue)
+	for i := uint(0); i < jirix.Jobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for project := range workQueue {
+				if project.LocalConfig.Ignore || project.LocalConfig.NoUpdate {
+					continue
+				}
+				g := git.NewGit(project.Path)
+				uncommitted, err := g.HasUncommittedChanges()
+				if err != nil {
+					errs <- fmt.Errorf("Cannot get uncommited changes for project %q: %s", project.Name, err)
+					continue
+				}
+
+				isOnJiriHead, err := project.IsOnJiriHead()
+				if err != nil {
+					errs <- err
+					continue
+				}
+				if uncommitted || !isOnJiriHead {
+					projectStatuses <- ProjectStatus{project, uncommitted, isOnJiriHead}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(projectStatuses)
+	close(errs)
+
+	var multiErr MultiError
+	for err := range errs {
+		multiErr = append(multiErr, err)
+	}
+	var psa []ProjectStatus
+	for projectStatus := range projectStatuses {
+		psa = append(psa, projectStatus)
+	}
+	return psa, multiErr
 }
 
 // runHooks runs all hooks for the given operations.
