@@ -10,6 +10,10 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
+var (
+	sourceManifestFilename string
+)
+
 var cmdSnapshot = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runSnapshot),
 	Name:   "snapshot",
@@ -22,9 +26,13 @@ in a manifest.
 	ArgsLong: "<snapshot> is the snapshot manifest file.",
 }
 
+func init() {
+	cmdSnapshot.Flags.StringVar(&sourceManifestFilename, "source-manifest", "", "Source manifest filename.")
+}
+
 func runSnapshot(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
-	return project.CreateSnapshot(jirix, args[0], false)
+	return project.CreateSnapshot(jirix, args[0], sourceManifestFilename, false)
 }

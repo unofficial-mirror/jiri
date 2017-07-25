@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
@@ -41,6 +43,10 @@ func remoteProjectName(i int) string {
 	return "test-remote-project-" + fmt.Sprintf("%d", i+1)
 }
 
+func setDefaultSnapshotFlag() {
+	sourceManifestFilename = ""
+}
+
 func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
@@ -61,6 +67,7 @@ func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 
 // TestSnapshot tests creating and checking out a snapshot.
 func TestSnapshot(t *testing.T) {
+	setDefaultSnapshotFlag()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
@@ -122,5 +129,112 @@ func TestSnapshot(t *testing.T) {
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
 		checkReadme(t, fake.X, localProject, "revision 1")
+	}
+}
+
+// TestSnapshot tests creating source manifest.
+func TestSourceManifestSnapshot(t *testing.T) {
+	setDefaultSnapshotFlag()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Setup the initial remote and local projects.
+	numProjects := 3
+	for i := 0; i < numProjects; i++ {
+		if err := fake.CreateRemoteProject(remoteProjectName(i)); err != nil {
+			t.Fatalf("%v", err)
+		}
+		rb := ""
+		if i == 2 {
+			rb = "test-branch"
+			g := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[remoteProjectName(i)]))
+			if err := g.CreateAndCheckoutBranch(rb); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := fake.AddProject(project.Project{
+			Name:         remoteProjectName(i),
+			Path:         localProjectName(i),
+			Remote:       fake.Projects[remoteProjectName(i)],
+			RemoteBranch: rb,
+		}); err != nil {
+			t.Fatalf("%s", err)
+		}
+	}
+
+	// Create initial commits in the remote projects and use UpdateUniverse()
+	// to mirror them locally.
+	for i := 0; i < numProjects; i++ {
+		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], "revision 1")
+	}
+	if err := project.UpdateUniverse(fake.X, true, false, false, false, false, project.DefaultHookTimeout); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Get local revision
+	paths := []string{"manifest"}
+	for i := 0; i < numProjects; i++ {
+		paths = append(paths, localProjectName(i))
+	}
+	revMap := make(map[string]string)
+	for _, path := range paths {
+		g := git.NewGit(filepath.Join(fake.X.Root, path))
+		if rev, err := g.CurrentRevision(); err != nil {
+			t.Fatal(err)
+		} else {
+			revMap[path] = rev
+		}
+
+	}
+
+	// Create a snapshot.
+	var stdout bytes.Buffer
+	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout, Env: fake.X.Context.Env()})
+
+	tmpfile, err := ioutil.TempFile("", "jiri-snapshot-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	smTmpfile, err := ioutil.TempFile("", "jiri-sm-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(smTmpfile.Name())
+	sourceManifestFilename = smTmpfile.Name()
+
+	if err := runSnapshot(fake.X, []string{tmpfile.Name()}); err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	sm := &project.SourceManifest{
+		Version: project.SourceManifestVersion,
+	}
+	sm.Checkouts = append(sm.Checkouts, project.SourceCheckout{
+		LocalPath: "manifest",
+		RepoURL:   fake.Projects["manifest"],
+		SCMType:   project.GIT,
+		Revision:  revMap["manifest"],
+	})
+	for i := 0; i < numProjects; i++ {
+		sc := project.SourceCheckout{
+			SCMType:   project.GIT,
+			LocalPath: localProjectName(i),
+			RepoURL:   fake.Projects[remoteProjectName(i)],
+			Revision:  revMap[localProjectName(i)],
+		}
+		sm.Checkouts = append(sm.Checkouts, sc)
+	}
+	sm.Checkouts[3].TrackingRef = "refs/heads/test-branch"
+
+	want, err := json.MarshalIndent(sm, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to serialize JSON output: %s\n", err)
+	}
+
+	got, _ := ioutil.ReadFile(smTmpfile.Name())
+	if string(got) != string(want) {
+		t.Fatalf("%s, \n%s", (string(got)), string(want))
 	}
 }
