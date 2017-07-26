@@ -2960,6 +2960,11 @@ func computeOperations(localProjects, remoteProjects Projects, states map[Projec
 			local = &project
 		}
 		if project, ok := remoteProjects[key]; ok {
+			// update remote local config
+			if local != nil {
+				project.LocalConfig = local.LocalConfig
+				remoteProjects[key] = project
+			}
 			remote = &project
 		}
 		if s, ok := states[key]; ok {
@@ -2986,7 +2991,7 @@ func computeOp(local, remote *Project, state *ProjectState, gc, rebaseTracked, r
 			source:      local.Path,
 		}, gc}
 	case local != nil && remote != nil:
-		remote.LocalConfig = local.LocalConfig
+
 		localBranchesNeedUpdating := false
 		if !snapshot {
 			cb := state.CurrentBranch
