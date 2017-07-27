@@ -490,6 +490,7 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	prune := false
 	updateShallow := false
 	depth := 0
+	fetchTag := ""
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case TagsOpt:
@@ -502,6 +503,8 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 			depth = int(typedOpt)
 		case UpdateShallowOpt:
 			updateShallow = bool(typedOpt)
+		case FetchTagOpt:
+			fetchTag = string(typedOpt)
 		}
 	}
 	args := []string{}
@@ -523,6 +526,9 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	}
 	if remote != "" {
 		args = append(args, remote)
+	}
+	if fetchTag != "" {
+		args = append(args, "tag", fetchTag)
 	}
 	if refspec != "" {
 		args = append(args, refspec)
