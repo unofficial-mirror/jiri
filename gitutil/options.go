@@ -73,10 +73,6 @@ type TagsOpt bool
 
 func (TagsOpt) fetchOpt() {}
 
-type FetchTagOpt string
-
-func (FetchTagOpt) fetchOpt() {}
-
 type AllOpt bool
 
 func (AllOpt) fetchOpt() {}
