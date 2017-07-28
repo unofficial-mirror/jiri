@@ -2418,6 +2418,7 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runHookTimeout)*time.Minute)
 			defer cancel()
 			command := exec.CommandContext(ctx, cmdLine)
+			command.Dir = hook.ActionPath
 			command.Stdin = os.Stdin
 			command.Stdout = outFile
 			command.Stderr = errFile
