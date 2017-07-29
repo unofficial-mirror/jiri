@@ -17,7 +17,7 @@ import (
 var (
 	gcFlag              bool
 	localManifestFlag   bool
-	attemptsFlag        int
+	attemptsFlag        uint
 	autoupdateFlag      bool
 	forceAutoupdateFlag bool
 	rebaseUntrackedFlag bool
@@ -33,7 +33,7 @@ func init() {
 
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.BoolVar(&localManifestFlag, "local-manifest", false, "Use local manifest")
-	cmdUpdate.Flags.IntVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
+	cmdUpdate.Flags.UintVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")
 	cmdUpdate.Flags.BoolVar(&autoupdateFlag, "autoupdate", true, "Automatically update to the new version.")
 	cmdUpdate.Flags.BoolVar(&forceAutoupdateFlag, "force-autoupdate", false, "Always update to the current version.")
 	cmdUpdate.Flags.BoolVar(&rebaseUntrackedFlag, "rebase-untracked", false, "Rebase untracked branches onto HEAD.")
@@ -65,10 +65,16 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
 
+	if attemptsFlag < 1 {
+		return jirix.UsageErrorf("Number of attempts should be >= 1")
+	}
+	jirix.Attempts = attemptsFlag
+
 	if autoupdateFlag {
 		// Try to update Jiri itself.
-		err := jiri.UpdateAndExecute(forceAutoupdateFlag)
-		if err != nil {
+		if err := retry.Function(jirix, func() error {
+			return jiri.UpdateAndExecute(forceAutoupdateFlag)
+		}, fmt.Sprintf("download jiri binary"), retry.AttemptsOpt(jirix.Attempts)); err != nil {
 			fmt.Printf("warning: automatic update failed: %v\n", err)
 		}
 	}
@@ -77,15 +83,13 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		rebaseTrackedFlag = true
 	}
 
-	// Update all projects to their latest version.
-	// Attempt <attemptsFlag> times before failing.
-	err := retry.Function(jirix.Context, func() error {
-		if len(args) > 0 {
-			return project.CheckoutSnapshot(jirix, args[0], gcFlag, runHooksFlag, hookTimeoutFlag)
-		} else {
-			return project.UpdateUniverse(jirix, gcFlag, localManifestFlag, rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, runHooksFlag, hookTimeoutFlag)
-		}
-	}, retry.AttemptsOpt(attemptsFlag))
+	var err error
+	if len(args) > 0 {
+		err = project.CheckoutSnapshot(jirix, args[0], gcFlag, runHooksFlag, hookTimeoutFlag)
+	} else {
+		err = project.UpdateUniverse(jirix, gcFlag, localManifestFlag,
+			rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, runHooksFlag, hookTimeoutFlag)
+	}
 
 	if err2 := project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag); err2 != nil {
 		if err != nil {

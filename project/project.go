@@ -30,6 +30,7 @@ import (
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/osutil"
+	"fuchsia.googlesource.com/jiri/retry"
 )
 
 var (
@@ -783,6 +784,20 @@ func (sm ScanMode) String() string {
 // project names to a collections of commits.
 type Update map[string][]CL
 
+// clone is a wrapper that reattempts a git clone operation on failure.
+func clone(jirix *jiri.X, repo, path string, opts ...gitutil.CloneOpt) error {
+	return retry.Function(jirix, func() error {
+		return gitutil.New(jirix).Clone(repo, path, opts...)
+	}, fmt.Sprintf("Cloning %s", repo), retry.AttemptsOpt(jirix.Attempts))
+}
+
+// fetch is a wrapper that reattempts a git fetch operation on failure.
+func fetch(jirix *jiri.X, path, remote string, opts ...gitutil.FetchOpt) error {
+	return retry.Function(jirix, func() error {
+		return gitutil.New(jirix, gitutil.RootDirOpt(path)).Fetch(remote, opts...)
+	}, fmt.Sprintf("Fetching for %s", path), retry.AttemptsOpt(jirix.Attempts))
+}
+
 // CreateSnapshot creates a manifest that encodes the current state of
 // HEAD of all projects and writes this snapshot out to the given file.
 func CreateSnapshot(jirix *jiri.X, file string, localManifest bool) error {
@@ -1385,10 +1400,10 @@ func fetchAll(jirix *jiri.X, project Project) error {
 		return err
 	}
 	if project.HistoryDepth > 0 {
-		return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true),
+		return fetch(jirix, project.Path, "origin", gitutil.PruneOpt(true),
 			gitutil.DepthOpt(project.HistoryDepth), gitutil.UpdateShallowOpt(true))
 	} else {
-		return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
+		return fetch(jirix, project.Path, "origin", gitutil.PruneOpt(true))
 	}
 }
 
@@ -1758,19 +1773,19 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 			return err
 		}
 		if jirix.Shared {
-			if err := gitutil.New(jirix).Clone(cacheDirPath, path,
-				gitutil.SharedOpt(true), gitutil.NoCheckoutOpt(true)); err != nil {
+			if err := clone(jirix, cacheDirPath, path, gitutil.SharedOpt(true),
+				gitutil.NoCheckoutOpt(true)); err != nil {
 				return err
 			}
 		} else {
-			if err := gitutil.New(jirix).Clone(remoteUrl, path,
-				gitutil.ReferenceOpt(cacheDirPath), gitutil.NoCheckoutOpt(true)); err != nil {
+			if err := clone(jirix, remoteUrl, path, gitutil.ReferenceOpt(cacheDirPath),
+				gitutil.NoCheckoutOpt(true)); err != nil {
 				return err
 			}
 		}
 
 	} else {
-		if err := gitutil.New(jirix).Clone(remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
+		if err := clone(jirix, remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -2027,11 +2042,15 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		if _, err := os.Stat(filepath.Join(dir, "shallow")); err == nil {
 			// Shallow cache, fetch only manifest tracked remote branch
 			refspec := fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
-			if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true)); err != nil {
+
+			if err := retry.Function(jirix, func() error {
+				return gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true))
+			}, fmt.Sprintf("Fetching for %s:%s", dir, refspec),
+				retry.AttemptsOpt(jirix.Attempts)); err != nil {
 				return err
 			}
 		} else {
-			if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("origin", gitutil.PruneOpt(true)); err != nil {
+			if err := fetch(jirix, dir, "origin", gitutil.PruneOpt(true)); err != nil {
 				return err
 			}
 		}
@@ -2512,7 +2531,7 @@ func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 	}
 	defer os.RemoveAll(tmpDir)
 	for _, hook := range hooks {
-		jirix.Logger.Infof("running hook(%v) for project %q", hook.Name, hook.ProjectName)
+		jirix.Logger.Infof("running hook(%s) for project %q", hook.Name, hook.ProjectName)
 		go func(hook Hook) {
 			outFile, err := ioutil.TempFile(tmpDir, hook.Name+"-out")
 			if err != nil {
@@ -2528,20 +2547,24 @@ func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 			fmt.Fprintf(outFile, "output for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
 			fmt.Fprintf(errFile, "Error for hook(%v) for project %q\n", hook.Name, hook.ProjectName)
 			cmdLine := filepath.Join(hook.ActionPath, hook.Action)
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runHookTimeout)*time.Minute)
-			defer cancel()
-			command := exec.CommandContext(ctx, cmdLine)
-			command.Dir = hook.ActionPath
-			command.Stdin = os.Stdin
-			command.Stdout = outFile
-			command.Stderr = errFile
-			env := jirix.Env()
-			command.Env = envvar.MapToSlice(env)
-			jirix.Logger.Tracef("Run: %q", cmdLine)
-			err = command.Run()
-			if ctx.Err() == context.DeadlineExceeded {
-				err = ctx.Err()
-			}
+			err = retry.Function(jirix, func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(runHookTimeout)*time.Minute)
+				defer cancel()
+				command := exec.CommandContext(ctx, cmdLine)
+				command.Dir = hook.ActionPath
+				command.Stdin = os.Stdin
+				command.Stdout = outFile
+				command.Stderr = errFile
+				env := jirix.Env()
+				command.Env = envvar.MapToSlice(env)
+				jirix.Logger.Tracef("Run: %q", cmdLine)
+				err = command.Run()
+				if ctx.Err() == context.DeadlineExceeded {
+					err = ctx.Err()
+				}
+				return err
+			}, fmt.Sprintf("running hook(%s) for project %s", hook.Name, hook.ProjectName),
+				retry.AttemptsOpt(jirix.Attempts))
 			ch <- result{outFile, errFile, err}
 		}(hook)
 
@@ -2810,8 +2833,7 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	}
 
 	if jirix.Shared && cache != "" {
-		if err := gitutil.New(jirix).Clone(cache, tmpDir,
-			gitutil.SharedOpt(true),
+		if err := clone(jirix, cache, tmpDir, gitutil.SharedOpt(true),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
 			return err
 		}
@@ -2821,8 +2843,7 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 			ref = ""
 		}
 		remote := rewriteRemote(jirix, op.project.Remote)
-		if err := gitutil.New(jirix).Clone(remote, tmpDir,
-			gitutil.ReferenceOpt(ref),
+		if err := clone(jirix, remote, tmpDir, gitutil.ReferenceOpt(ref),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
 			return err
 		}

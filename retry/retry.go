@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"fuchsia.googlesource.com/jiri/tool"
+	"fuchsia.googlesource.com/jiri"
 )
 
 type RetryOpt interface {
@@ -27,12 +27,12 @@ func (i IntervalOpt) retryOpt() {}
 
 const (
 	defaultAttempts = 3
-	defaultInterval = 10 * time.Second
+	defaultInterval = 5 * time.Second
 )
 
 // Function retries the given function for the given number of
 // attempts at the given interval.
-func Function(ctx *tool.Context, fn func() error, opts ...RetryOpt) error {
+func Function(jirix *jiri.X, fn func() error, task string, opts ...RetryOpt) error {
 	attempts, interval := defaultAttempts, defaultInterval
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
@@ -46,16 +46,19 @@ func Function(ctx *tool.Context, fn func() error, opts ...RetryOpt) error {
 	var err error
 	for i := 1; i <= attempts; i++ {
 		if i > 1 {
-			fmt.Fprintf(ctx.Stdout(), "Attempt %d/%d:\n", i, attempts)
+			jirix.Logger.Infof("Attempt %d/%d: %s\n\n", i, attempts, task)
 		}
 		if err = fn(); err == nil {
 			return nil
 		}
-		fmt.Fprintf(ctx.Stderr(), "%v\n", err)
 		if i < attempts {
-			fmt.Fprintf(ctx.Stdout(), "Wait for %v before next attempt...\n", interval)
+			jirix.Logger.Errorf("%s\n\n", err)
+			jirix.Logger.Infof("Wait for %s before next attempt...: %s\n\n", interval, task)
 			time.Sleep(interval)
 		}
 	}
-	return fmt.Errorf("Failed %d times in a row. Last error:\n%v", attempts, err)
+	if attempts > 1 {
+		return fmt.Errorf("%q failed %d times in a row, Last error: %s", task, attempts, err)
+	}
+	return err
 }

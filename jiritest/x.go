@@ -35,5 +35,5 @@ func NewX(t *testing.T) (*jiri.X, func()) {
 			t.Fatalf("RemoveAll(%q) failed: %v", root, err)
 		}
 	}
-	return &jiri.X{Context: ctx, Root: root, Jobs: jiri.DefaultJobs, Color: color, Logger: logger}, cleanup
+	return &jiri.X{Context: ctx, Root: root, Jobs: jiri.DefaultJobs, Color: color, Logger: logger, Attempts: 1}, cleanup
 }
