@@ -958,10 +958,10 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 	// the root.
 	projects := Projects{}
 	jirix.TimerPush("scan fs")
-	err = findLocalProjects(jirix, jirix.Root, projects)
+	multiErr := findLocalProjects(jirix, jirix.Root, projects)
 	jirix.TimerPop()
-	if err != nil {
-		return nil, err
+	if multiErr != nil {
+		return nil, multiErr
 	}
 	return setProjectRevisions(jirix, projects)
 }
@@ -1289,8 +1289,8 @@ func ProjectAtPath(jirix *jiri.X, path string) (Project, error) {
 
 // findLocalProjects scans the filesystem for all projects.  Note that project
 // directories can be nested recursively.
-func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
-	log := make(chan string, 1)
+func findLocalProjects(jirix *jiri.X, path string, projects Projects) MultiError {
+	log := make(chan string, jirix.Jobs)
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -1299,8 +1299,8 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 			jirix.Logger.Warningf("%s", str)
 		}
 	}()
-	errs := make(chan error, 1)
-	multiErr := make(MultiError, 0)
+	errs := make(chan error, jirix.Jobs)
+	var multiErr MultiError
 	go func() {
 		defer wg.Done()
 		for err := range errs {
@@ -1308,13 +1308,10 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 		}
 	}()
 	var pwg sync.WaitGroup
-	limit := make(chan struct{}, jirix.Jobs)
-	var processPath func(path string)
+	workq := make(chan string, jirix.Jobs)
 	projectsMutex := &sync.Mutex{}
-	processPath = func(path string) {
+	processPath := func(path string) {
 		defer pwg.Done()
-		limit <- struct{}{}
-		defer func() { <-limit }()
 		isLocal, err := IsLocalProject(jirix, path)
 		if err != nil {
 			errs <- fmt.Errorf("Error while processing path %q: %v", path, err)
@@ -1348,23 +1345,34 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) error {
 			errs <- fmt.Errorf("cannot read dir %q: %v", path, err)
 			return
 		}
-		for _, fileInfo := range fileInfos {
-			if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
-				pwg.Add(1)
-				go processPath(filepath.Join(path, fileInfo.Name()))
+		pwg.Add(1)
+		go func(fileInfos []os.FileInfo) {
+			defer pwg.Done()
+			for _, fileInfo := range fileInfos {
+				if fileInfo.IsDir() && !strings.HasPrefix(fileInfo.Name(), ".") {
+					pwg.Add(1)
+					workq <- filepath.Join(path, fileInfo.Name())
+				}
 			}
-		}
+		}(fileInfos)
 	}
 	pwg.Add(1)
-	processPath(path)
+	workq <- path
+	for i := uint(0); i < jirix.Jobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range workq {
+				processPath(path)
+			}
+		}()
+	}
 	pwg.Wait()
 	close(errs)
 	close(log)
+	close(workq)
 	wg.Wait()
-	if len(multiErr) != 0 {
-		return multiErr
-	}
-	return nil
+	return multiErr
 }
 
 func fetchAll(jirix *jiri.X, project Project) error {
