@@ -16,6 +16,12 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
+func setDefaultGrepFlags() {
+	grepFlags.n = false
+	grepFlags.e = ""
+	grepFlags.h = true
+}
+
 func makeProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
 	projects := []*project.Project{}
 	for _, name := range []string{"a", "b", "c", "t1", "t2"} {
@@ -63,11 +69,7 @@ func expectGrep(t *testing.T, fake *jiritest.FakeJiriRoot, args []string, expect
 		}
 	}
 }
-
-func TestGrep(t *testing.T) {
-	fake, cleanup := jiritest.NewFakeJiriRoot(t)
-	defer cleanup()
-
+func setup(t *testing.T, fake *jiritest.FakeJiriRoot) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -80,9 +82,9 @@ func TestGrep(t *testing.T) {
 	files := []string{
 		"Shall I compare thee to a summer's day?",
 		"Thou art more lovely and more temperate:",
-		"Rough winds do shake the darling buds of May,",
 		"And summer's lease hath all too short a date:",
 		"Sometime too hot the eye of heaven shines,",
+		"line with -hyphen",
 	}
 
 	if got, want := len(projects), len(files); got != want {
@@ -98,11 +100,42 @@ func TestGrep(t *testing.T) {
 		git := gitutil.New(fake.X, gitutil.RootDirOpt(project.Path))
 		git.Add(path)
 	}
+}
+func TestGrep(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
 
+	setup(t, fake)
+	setDefaultGrepFlags()
 	expectGrep(t, fake, []string{"too"}, []string{
-		"sub/r.t1/file.txt:And summer's lease hath all too short a date:",
-		"sub/sub2/r.t2/file.txt:Sometime too hot the eye of heaven shines,",
+		"r.c/file.txt:And summer's lease hath all too short a date:",
+		"sub/r.t1/file.txt:Sometime too hot the eye of heaven shines,",
 	})
 
 	expectGrep(t, fake, []string{"supercalifragilisticexpialidocious"}, []string{})
+}
+
+func TestNFlagGrep(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	setup(t, fake)
+	setDefaultGrepFlags()
+	grepFlags.n = true
+	expectGrep(t, fake, []string{"too"}, []string{
+		"r.c/file.txt:1:And summer's lease hath all too short a date:",
+		"sub/r.t1/file.txt:1:Sometime too hot the eye of heaven shines,",
+	})
+}
+
+func TestEFlagGrep(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	setup(t, fake)
+	setDefaultGrepFlags()
+	grepFlags.e = "-hyp"
+	expectGrep(t, fake, []string{}, []string{
+		"sub/sub2/r.t2/file.txt:line with -hyphen",
+	})
 }

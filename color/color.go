@@ -41,6 +41,7 @@ type Color interface {
 	Cyan(format string, a ...interface{}) string
 	White(format string, a ...interface{}) string
 	DefaultColor(format string, a ...interface{}) string
+	Enabled() bool
 }
 
 type color struct{}
@@ -59,6 +60,9 @@ func (color) Cyan(format string, a ...interface{}) string  { return colorString(
 func (color) White(format string, a ...interface{}) string { return colorString(WhiteFg, format, a...) }
 func (color) DefaultColor(format string, a ...interface{}) string {
 	return colorString(DefaultFg, format, a...)
+}
+func (color) Enabled() bool {
+	return true
 }
 
 func colorString(c ColorCode, format string, a ...interface{}) string {
@@ -80,6 +84,9 @@ func (monochrome) Cyan(format string, a ...interface{}) string    { return fmt.S
 func (monochrome) White(format string, a ...interface{}) string   { return fmt.Sprintf(format, a...) }
 func (monochrome) DefaultColor(format string, a ...interface{}) string {
 	return fmt.Sprintf(format, a...)
+}
+func (monochrome) Enabled() bool {
+	return false
 }
 
 func NewColor(enableColor bool) Color {

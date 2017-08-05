@@ -24,10 +24,37 @@ Run git grep across all projects.
 	ArgsName: "<query>",
 }
 
+var grepFlags struct {
+	n bool
+	h bool
+	e string
+}
+
+func init() {
+	flags := &cmdGrep.Flags
+	flags.BoolVar(&grepFlags.n, "n", false, "Prefix the line number to matching lines")
+	flags.StringVar(&grepFlags.e, "e", "", "The next parameter is the pattern. This option has to be used for patterns starting with -")
+	flags.BoolVar(&grepFlags.h, "H", true, "Does nothing. Just makes this git grep compatible")
+}
+
+func buildFlags() []string {
+	var args []string
+	if grepFlags.n {
+		args = append(args, "-n")
+	}
+	if grepFlags.e != "" {
+		args = append(args, "-e", grepFlags.e)
+	}
+	return args
+}
+
 func doGrep(jirix *jiri.X, args []string) ([]string, error) {
-	if len(args) != 1 {
+	if grepFlags.e != "" && len(args) > 0 {
+		return nil, jirix.UsageErrorf("No additional argument allowed with flag -e")
+	} else if grepFlags.e == "" && len(args) != 1 {
 		return nil, jirix.UsageErrorf("grep requires one argument")
 	}
+
 	projects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return nil, err
@@ -36,14 +63,21 @@ func doGrep(jirix *jiri.X, args []string) ([]string, error) {
 	// TODO(ianloic): run in parallel rather than serially.
 	// TODO(ianloic): only run grep on projects under the cwd.
 	var results []string
+	flags := buildFlags()
+	if jirix.Color.Enabled() {
+		flags = append(flags, "--color=always")
+	}
+	query := ""
+	if len(args) == 1 {
+		query = args[0]
+	}
 	for _, project := range projects {
 		relpath, err := filepath.Rel(jirix.Root, project.Path)
 		if err != nil {
 			return nil, err
 		}
 		git := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
-		// TODO(ianloic): allow args to be passed to `git grep`.
-		lines, err := git.Grep(args[0])
+		lines, err := git.Grep(query, flags...)
 		if err != nil {
 			continue
 		}

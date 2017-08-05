@@ -585,11 +585,15 @@ func (g *Git) ListBranchesContainingRef(commit string) (map[string]bool, error) 
 
 // Grep searches for matching text and returns a list of lines from
 // `git grep`.
-func (g *Git) Grep(query string) ([]string, error) {
+func (g *Git) Grep(query string, flags ...string) ([]string, error) {
+	args := append([]string{"grep"}, flags...)
+	if query != "" {
+		args = append(args, query)
+	}
 	// TODO(ianloic): handle patterns that start with "-"
 	// TODO(ianloic): handle different pattern types (-i, -P, -E, etc)
 	// TODO(ianloic): handle different response types (--full-name, -v, --name-only, etc)
-	return g.runOutput("grep", query)
+	return g.runOutput(args...)
 }
 
 // Init initializes a new git repository.
