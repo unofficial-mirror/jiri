@@ -111,11 +111,29 @@ var (
 	progessWindowSizeFlag uint
 )
 
+// showRootFlag implements a flag that dumps the root dir and exits the
+// program when it is set.
+type showRootFlag struct{}
+
+func (showRootFlag) IsBoolFlag() bool { return true }
+func (showRootFlag) String() string   { return "<just specify -show-root to activate>" }
+func (showRootFlag) Set(string) error {
+	if root, err := findJiriRoot(nil); err != nil {
+		fmt.Printf("Error: %s\n", err)
+		os.Exit(1)
+	} else {
+		fmt.Println(root)
+		os.Exit(0)
+	}
+	return nil
+}
+
 func init() {
 	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
 	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
 	flag.BoolVar(&colorFlag, "color", true, "Use color to format output.")
 	flag.BoolVar(&showProgressFlag, "show-progress", true, "Show progress.")
+	flag.Var(showRootFlag{}, "show-root", "Displays jiri root and exits.")
 	flag.UintVar(&progessWindowSizeFlag, "progress-window", 5, "Number of progress messages to show simultaneously. Should be between 1 and 10")
 	flag.BoolVar(&quietVerboseFlag, "quiet", false, "Only print user actionable messages.")
 	flag.BoolVar(&quietVerboseFlag, "q", false, "Same as -quiet")
