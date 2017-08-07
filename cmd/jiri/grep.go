@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"fuchsia.googlesource.com/jiri"
@@ -21,7 +22,7 @@ var cmdGrep = &cmdline.Command{
 	Long: `
 Run git grep across all projects.
 `,
-	ArgsName: "<query>",
+	ArgsName: "<query> [--] [<pathspec>...]",
 }
 
 var grepFlags struct {
@@ -49,9 +50,32 @@ func buildFlags() []string {
 }
 
 func doGrep(jirix *jiri.X, args []string) ([]string, error) {
-	if grepFlags.e != "" && len(args) > 0 {
+	var pathSpecs []string
+	lenArgs := len(args)
+	if lenArgs > 0 {
+		for i, a := range os.Args {
+			if a == "--" {
+				pathSpecs = os.Args[i+1:]
+				break
+			}
+		}
+		// we will not find -- if user uses something like jiri grep -- a b,
+		// as flag.Parse() removes '--' in that case, so set args length
+		lenArgs = len(args) - len(pathSpecs)
+		for i, a := range args {
+
+			if a == "--" {
+				args = args[0:i]
+				// reset length
+				lenArgs = len(args)
+				break
+			}
+		}
+	}
+
+	if grepFlags.e != "" && lenArgs > 0 {
 		return nil, jirix.UsageErrorf("No additional argument allowed with flag -e")
-	} else if grepFlags.e == "" && len(args) != 1 {
+	} else if grepFlags.e == "" && lenArgs != 1 {
 		return nil, jirix.UsageErrorf("grep requires one argument")
 	}
 
@@ -68,7 +92,7 @@ func doGrep(jirix *jiri.X, args []string) ([]string, error) {
 		flags = append(flags, "--color=always")
 	}
 	query := ""
-	if len(args) == 1 {
+	if lenArgs == 1 {
 		query = args[0]
 	}
 	for _, project := range projects {
@@ -77,7 +101,7 @@ func doGrep(jirix *jiri.X, args []string) ([]string, error) {
 			return nil, err
 		}
 		git := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
-		lines, err := git.Grep(query, flags...)
+		lines, err := git.Grep(query, pathSpecs, flags...)
 		if err != nil {
 			continue
 		}
