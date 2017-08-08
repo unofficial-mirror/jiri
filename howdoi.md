@@ -54,7 +54,7 @@ Run `jiri branch -d [branch_name]`, this will run `git branch -d [branch_name]` 
 `jiri branch -delete-merged`
 
 ### delete merged branches with different commits
-Run `jiri branch -delete-merged-cl`. This will check gerrit and delete all those branches those commits have been submitted, by matching gerrit change list ID. **Use this with caution**.
+Run `jiri branch -delete-merged-cl`. This will check gerrit and delete all those branches whose commits have been submitted, by matching gerrit change list ID. **Use this with caution**.
 
 ### get projects and branches other than master
 
