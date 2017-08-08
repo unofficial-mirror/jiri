@@ -176,10 +176,10 @@ func TestSourceManifestSnapshot(t *testing.T) {
 	for i := 0; i < numProjects; i++ {
 		paths = append(paths, localProjectName(i))
 	}
-	revMap := make(map[string]string)
+	revMap := make(map[string][]byte)
 	for _, path := range paths {
 		g := git.NewGit(filepath.Join(fake.X.Root, path))
-		if rev, err := g.CurrentRevision(); err != nil {
+		if rev, err := g.CurrentRevisionRaw(); err != nil {
 			t.Fatal(err)
 		} else {
 			revMap[path] = rev
@@ -211,22 +211,27 @@ func TestSourceManifestSnapshot(t *testing.T) {
 	sm := &project.SourceManifest{
 		Version: project.SourceManifestVersion,
 	}
-	sm.Checkouts = append(sm.Checkouts, project.SourceCheckout{
-		LocalPath: "manifest",
-		RepoURL:   fake.Projects["manifest"],
-		SCMType:   project.GIT,
-		Revision:  revMap["manifest"],
-	})
-	for i := 0; i < numProjects; i++ {
-		sc := project.SourceCheckout{
-			SCMType:   project.GIT,
-			LocalPath: localProjectName(i),
-			RepoURL:   fake.Projects[remoteProjectName(i)],
-			Revision:  revMap[localProjectName(i)],
-		}
-		sm.Checkouts = append(sm.Checkouts, sc)
+	sm.Directories = make(map[string]*project.SourceManifest_Directory)
+	sm.Directories["manifest"] = &project.SourceManifest_Directory{
+		GitCheckout: &project.SourceManifest_GitCheckout{
+			RepoUrl:     fake.Projects["manifest"],
+			Revision:    revMap["manifest"],
+			TrackingRef: "refs/heads/master",
+		},
 	}
-	sm.Checkouts[3].TrackingRef = "refs/heads/test-branch"
+	for i := 0; i < numProjects; i++ {
+		ref := "refs/heads/master"
+		if i == 2 {
+			ref = "refs/heads/test-branch"
+		}
+		sm.Directories[localProjectName(i)] = &project.SourceManifest_Directory{
+			GitCheckout: &project.SourceManifest_GitCheckout{
+				RepoUrl:     fake.Projects[remoteProjectName(i)],
+				Revision:    revMap[localProjectName(i)],
+				TrackingRef: ref,
+			},
+		}
+	}
 
 	want, err := json.MarshalIndent(sm, "", "  ")
 	if err != nil {

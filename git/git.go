@@ -6,6 +6,7 @@ package git
 
 import (
 	"fmt"
+
 	git2go "github.com/libgit2/git2go"
 )
 
@@ -17,6 +18,20 @@ func NewGit(path string) *Git {
 	return &Git{
 		rootDir: path,
 	}
+}
+
+func (g *Git) CurrentRevisionRaw() ([]byte, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return nil, err
+	}
+	defer repo.Free()
+	head, err := repo.Head()
+	if err != nil {
+		return nil, err
+	}
+	defer head.Free()
+	return head.Target()[:], nil
 }
 
 func (g *Git) CurrentRevision() (string, error) {

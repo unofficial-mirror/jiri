@@ -13,26 +13,67 @@ import (
 	"sort"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/git"
 )
-
-type SCMType int16
 
 const (
-	GIT                   = SCMType(0)
-	SourceManifestVersion = 1
+	SourceManifestVersion = int32(0)
 )
 
-type SourceCheckout struct {
-	SCMType     SCMType `json:"scm_type"`
-	RepoURL     string  `json:"repo_url"`
-	Revision    string  `json:"revision"`
-	LocalPath   string  `json:"local_path"`
-	TrackingRef string  `json:"tracking_ref,omitempty"`
+type SourceManifest_GitCheckout struct {
+	// The canonicalized URL of the original repo that is considered the “source
+	// of truth” for the source code. Ex.
+	//   https://chromium.googlesource.com/chromium/tools/build.git
+	//   https://github.com/luci/recipes-py
+	RepoUrl string `json:"repo_url,omitempty"`
+
+	// If different from repo_url, this can be the URL of the repo that the source
+	// was actually fetched from (i.e. a mirror). Ex.
+	//   https://chromium.googlesource.com/external/github.com/luci/recipes-py
+	//
+	// If this is empty, it's presumed to be equal to repo_url.
+	FetchUrl string `json:"fetch_url,omitempty"`
+
+	// The fully resolved revision (commit hash) of the source. Ex.
+	//   3617b0eea7ec74b8e731a23fed2f4070cbc284c4
+	//
+	// Note that this is the raw revision bytes, not their hex-encoded form.
+	Revision []byte `json:"revision,omitempty"`
+
+	// The ref that the task used to resolve the revision of the source (if any). Ex.
+	//   refs/heads/master
+	//   refs/changes/04/511804/4
+	//
+	// This should always be a ref on the hosted repo (not any local alias
+	// like 'refs/remotes/...').
+	//
+	// This should always be an absolute ref (i.e. starts with 'refs/'). An
+	// example of a non-absolute ref would be 'master'.
+	TrackingRef string `json:"tracking_ref,omitempty"`
+}
+
+type SourceManifest_Directory struct {
+	GitCheckout *SourceManifest_GitCheckout `json:"git_checkout,omitempty"`
 }
 
 type SourceManifest struct {
-	Version   int              `json:"version"`
-	Checkouts []SourceCheckout `json:"checkouts"`
+	// Version will increment on backwards-incompatible changes only. Backwards
+	// compatible changes will not alter this version number.
+	//
+	// Currently, the only valid version number is 0.
+	Version int32 `json:"version"`
+
+	// Map of local file system directory path (with forward slashes) to
+	// a Directory message containing one or more deployments.
+	//
+	// The local path is relative to some job-specific root. This should be used
+	// for informational/display/organization purposes, and should not be used as
+	// a global primary key. i.e. if you depend on chromium/src.git being in
+	// a folder called “src”, I will find you and make really angry faces at you
+	// until you change it...（╬ಠ益ಠ). Instead, implementations should consider
+	// indexing by e.g. git repository URL or cipd package name as more better
+	// primary keys.
+	Directories map[string]*SourceManifest_Directory `json:"directories"`
 }
 
 func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, error) {
@@ -46,21 +87,25 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, error
 		i++
 	}
 	sm := &SourceManifest{
-		Version:   SourceManifestVersion,
-		Checkouts: make([]SourceCheckout, len(p)),
+		Version:     SourceManifestVersion,
+		Directories: make(map[string]*SourceManifest_Directory),
 	}
 	sort.Sort(ProjectsByPath(p))
-	for i, proj := range p {
-		sc := SourceCheckout{
-			SCMType:   GIT,
-			RepoURL:   proj.Remote,
-			Revision:  proj.Revision,
-			LocalPath: proj.Path,
+	for _, proj := range p {
+		gc := &SourceManifest_GitCheckout{
+			RepoUrl: proj.Remote,
 		}
-		if proj.RemoteBranch != "" && proj.RemoteBranch != "master" {
-			sc.TrackingRef = "refs/heads/" + proj.RemoteBranch
+		g := git.NewGit(filepath.Join(jirix.Root, proj.Path))
+		if rev, err := g.CurrentRevisionRaw(); err != nil {
+			return nil, err
+		} else {
+			gc.Revision = rev
 		}
-		sm.Checkouts[i] = sc
+		if proj.RemoteBranch == "" {
+			proj.RemoteBranch = "master"
+		}
+		gc.TrackingRef = "refs/heads/" + proj.RemoteBranch
+		sm.Directories[proj.Path] = &SourceManifest_Directory{GitCheckout: gc}
 	}
 	return sm, nil
 }
