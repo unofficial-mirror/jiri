@@ -4,9 +4,9 @@
 
 ## How Do I
 
-### rebase current branch instead of fast-forwarding it
+### rebase current tracked branch instead of fast-forwarding it
 
-`jiri update -rebase-current`
+`jiri update -rebase-tracked`
 
 ### rebase all my branches
 
@@ -50,9 +50,18 @@ jiri status -changes=false -commits=false
 
 Run `jiri branch -d [branch_name]`, this will run `git branch -d [branch_name]` in all the projects. `-D` can also be used to replicate functionality of `git branch -D`.
 
+### delete merged branches
+`jiri branch -delete-merged`
+
+### delete merged branches with different commits
+Run `jiri branch -delete-merged-cl`. This will check gerrit and delete all those branches those commits have been submitted, by matching gerrit change list ID. **Use this with caution**.
+
 ### get projects and branches other than master
 
 `jiri branch`
+
+### find difference between two snapshots
+Run `jiri diff <old_snapshot> <new_snapshot>`. *old_snapshot* and *new_snapshot* can be file paths or urls.
 
 ### download whole gerrit topic
 
