@@ -2426,26 +2426,27 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 			err = fmt.Errorf("Hooks execution failed")
 			continue
 		}
+		var outBuf bytes.Buffer
 		if out.outFile != nil {
 			out.outFile.Sync()
 			out.outFile.Seek(0, 0)
-			var buf bytes.Buffer
-			io.Copy(&buf, out.outFile)
-			if buf.String() != "" {
-				jirix.Logger.Debugf("%s\n", buf.String())
-			}
+			io.Copy(&outBuf, out.outFile)
 		}
 		if out.err != nil {
 			var buf bytes.Buffer
 			if out.errFile != nil {
 				out.errFile.Sync()
 				out.errFile.Seek(0, 0)
-				var buf bytes.Buffer
 				io.Copy(&buf, out.errFile)
 			}
-			jirix.Logger.Errorf("%s\n%s\n", out.err, buf.String())
+			jirix.Logger.Errorf("%s\n%s\n%s\n", out.err, buf.String(), outBuf.String())
 			err = fmt.Errorf("Hooks execution failed")
+		} else {
+			if outBuf.String() != "" {
+				jirix.Logger.Debugf("%s\n", outBuf.String())
+			}
 		}
+
 	}
 	return err
 }
