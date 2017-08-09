@@ -2443,7 +2443,7 @@ func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) 
 				var buf bytes.Buffer
 				io.Copy(&buf, out.errFile)
 			}
-			jirix.Logger.Errorf("%s\n%s\n", err, buf.String())
+			jirix.Logger.Errorf("%s\n%s\n", out.err, buf.String())
 			err = fmt.Errorf("Hooks execution failed")
 		}
 	}
