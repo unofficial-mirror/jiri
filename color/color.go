@@ -7,6 +7,8 @@ package color
 import (
 	"fmt"
 	"os"
+
+	"fuchsia.googlesource.com/jiri/isatty"
 )
 
 type Colorfn func(format string, a ...interface{}) string
@@ -89,6 +91,9 @@ func (monochrome) Enabled() bool {
 	return false
 }
 
+// for test cases
+var checkIsTerminal = true
+
 func NewColor(enableColor bool) Color {
 	if enableColor {
 		term := os.Getenv("TERM")
@@ -96,6 +101,9 @@ func NewColor(enableColor bool) Color {
 		case "dumb", "":
 			enableColor = false
 		}
+	}
+	if enableColor && checkIsTerminal {
+		enableColor = isatty.IsTerminal()
 	}
 	if enableColor {
 		return color{}

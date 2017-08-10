@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"fuchsia.googlesource.com/jiri/color"
+	"fuchsia.googlesource.com/jiri/isatty"
 )
 
 // Logger provides for convenient logging in jiri. It supports logger
@@ -78,7 +79,9 @@ func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, pro
 	case "dumb", "":
 		enableProgress = false
 	}
-
+	if enableProgress {
+		enableProgress = isatty.IsTerminal()
+	}
 	l := &Logger{
 		LoggerLevel:          loggerLevel,
 		lock:                 &sync.Mutex{},
