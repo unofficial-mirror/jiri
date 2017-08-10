@@ -192,9 +192,9 @@ cat <<EOF > my_manifest
     <project name="Hello-World"
              remote="https://github.com/Test-Octowin/Hello-World"
              path="helloworld"/>
-    <project name="manifest"
+    <project name="my_manifest_repo"
              remote="/tmp/my_manifest_repo"
-             path="manifest"/>
+             path="my_manifest_repo"/>
   </projects>
 </manifest>
 EOF
@@ -211,13 +211,11 @@ Normally we would want to push this repo to some remote to make it accessible
 to other users who want to sync the same projects.  For now, however, we'll
 just refer to the repo by its path in the local filesystem.
 
-Now we just need to import that new manifest and `jiri update`.  Since we don't
-want the new manifest repo to conflict with the minimal manifest repo, we must
-pass the `-path` flag to the import statement.
+Now we just need to import that new manifest and `jiri update`.
 
 ```
 cd "$MY_ROOT"
-jiri import -path="my_manifest_repo" my_manifest /tmp/my_manifest_repo
+jiri import my_manifest /tmp/my_manifest_repo
 jiri update
 ```
 
