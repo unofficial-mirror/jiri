@@ -289,28 +289,49 @@ func runPatch(jirix *jiri.X, args []string) error {
 			} else {
 				ref = change.Reference()
 			}
-			projFound := false
+			var projectToPatch *project.Project
+			var projectToPatchNoGerritHost *project.Project
 			for _, p := range projects {
 				if strings.HasSuffix(p.Remote, "/"+change.Project) {
-					projFound = true
-					if ok, err := patchProject(jirix, p, ref, branch, change.Branch); err != nil {
-						return err
-					} else if ok {
-						if patchRebaseFlag {
-							if err := rebaseProject(jirix, p, change); err != nil {
-								return err
+					if p.GerritHost != host {
+
+						if p.GerritHost == "" {
+							cp := p
+							projectToPatchNoGerritHost = &cp
+							//skip for now
+							continue
+						} else {
+							u, err := url.Parse(p.GerritHost)
+							if err != nil {
+								jirix.Logger.Warningf("invalid Gerrit host %q for project %s: %s", p.GerritHost, p.Name, err)
+							}
+							if u.Host != hostUrl.Host {
+								jirix.Logger.Debugf("skipping project %s(%s) for CL %s\n\n", p.Name, p.Path, g.GetChangeURL(change.Number))
+								continue
 							}
 						}
 					}
-					fmt.Println()
+					projectToPatch = &p
+					break
 				}
 			}
-			if !projFound {
-				cl, _, err := gerrit.ParseRefString(ref)
-				if err != nil {
+			if projectToPatch == nil && projectToPatchNoGerritHost != nil {
+				// Try to patch the project with no gerrit host
+				projectToPatch = projectToPatchNoGerritHost
+			}
+			if projectToPatch != nil {
+				if ok, err := patchProject(jirix, *projectToPatch, ref, branch, change.Branch); err != nil {
 					return err
+				} else if ok {
+					if patchRebaseFlag {
+						if err := rebaseProject(jirix, *projectToPatch, change); err != nil {
+							return err
+						}
+					}
 				}
-				jirix.Logger.Errorf("Cannot find project to patch CL %s\n", g.GetChangeURL(cl))
+				fmt.Println()
+			} else {
+				jirix.Logger.Errorf("Cannot find project to patch CL %s\n", g.GetChangeURL(change.Number))
 				jirix.IncrementFailures()
 				fmt.Println()
 			}
