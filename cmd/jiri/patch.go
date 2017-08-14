@@ -80,7 +80,7 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 			}
 			branch = fmt.Sprintf("change/%v/%v", cl, ps)
 		}
-		jirix.Logger.Infof("Patching project %s(%s) on branch %q\n", local.Name, local.Path, branch)
+		jirix.Logger.Infof("Patching project %s(%s) on branch %q to ref %q\n", local.Name, local.Path, branch, ref)
 		branchExists, err := g.BranchExists(branch)
 		if err != nil {
 			return false, err
@@ -108,7 +108,7 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 			}
 		}
 	} else {
-		jirix.Logger.Infof("Patching project %s(%s)\n", local.Name, local.Path)
+		jirix.Logger.Infof("Patching project %s(%s) to ref %q\n", local.Name, local.Path, ref)
 	}
 	if err := scm.FetchRefspec("origin", ref); err != nil {
 		return false, err
@@ -265,12 +265,72 @@ func runPatch(jirix *jiri.X, args []string) error {
 		var changes gerrit.CLList
 		branch := patchBranchFlag
 		if patchTopicFlag {
-			changes, err = g.ListOpenChangesByTopic(arg)
+			temp, err := g.ListOpenChangesByTopic(arg)
 			if err != nil {
 				return err
 			}
-			if len(changes) == 0 {
+			if len(temp) == 0 {
 				return fmt.Errorf("No changes found with topic %q", arg)
+			}
+
+			projectMap := make(map[string]map[string]gerrit.Change)
+			//Handle stacked changes
+			for _, change := range temp {
+				v, ok := projectMap[change.Project]
+				if !ok {
+					v = make(map[string]gerrit.Change)
+					projectMap[change.Project] = v
+				}
+				v[change.Change_id] = change
+			}
+
+			for p, topicChanges := range projectMap {
+				// only CL in the project
+				if len(topicChanges) == 1 {
+					for _, change := range topicChanges {
+						changes = append(changes, change)
+						break
+					}
+					continue
+				}
+
+				// stacked CLs, get the top one
+				if cherryPickFlag {
+					return fmt.Errorf("Multiple CLs for projects %q. We do not support this with cherry-pick flag", p)
+				}
+				var relatedChanges *gerrit.RelatedChanges
+				relatedChangesMap := make(map[string]struct{})
+
+				// get related changes and build map.
+				// loop will only run once as we just need one change to build the map.
+				for _, change := range topicChanges {
+					relatedChanges, err = g.GetRelatedChanges(change.Number, change.Current_revision)
+					if err != nil {
+						return err
+					}
+					changeAdded := false
+					// get the top one and also build a map
+					for _, relatedChange := range relatedChanges.Changes {
+						if !changeAdded {
+							if c, ok := topicChanges[relatedChange.Change_id]; ok {
+								changes = append(changes, c)
+								changeAdded = true
+							}
+						}
+						relatedChangesMap[relatedChange.Change_id] = struct{}{}
+					}
+					break
+				}
+				// check if all the CLs contained in topic are in related CL list
+				for changeId, change := range topicChanges {
+					if _, ok := relatedChangesMap[changeId]; !ok {
+						var cn []string
+						for _, c := range topicChanges {
+							cn = append(cn, strconv.Itoa(c.Number))
+						}
+						return fmt.Errorf("Not all of the changes (%s) for project %q and topic %q are related to each other", strings.Join(cn, ","), change.Project, arg)
+					}
+				}
 			}
 			ps = -1
 			if branch == "" {

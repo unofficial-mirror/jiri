@@ -205,6 +205,14 @@ type Revision struct {
 	Commit `json:"commit"`
 	Files  `json:"files"`
 }
+
+type RelatedChange struct {
+	Change_id string
+}
+type RelatedChanges struct {
+	Changes []RelatedChange
+}
+
 type Fetch struct {
 	Http `json:"http"`
 }
@@ -327,6 +335,27 @@ func parsePresubmitTestType(match string) PresubmitTestType {
 	return ret
 }
 
+func makeRequest(method, url string, body io.Reader, cred *credentials) (*http.Response, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
+	}
+	req.Header.Add("Accept", "application/json")
+	// We ignore all errors when obtaining credentials since not every host requires them.
+	if cred != nil {
+		req.SetBasicAuth(cred.username, cred.password)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Do(%v) failed: %v", req, err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Query:Do(%v) failed: %v", req, res.StatusCode)
+	}
+	return res, nil
+}
+
 // Query returns a list of QueryResult entries matched by the given
 // Gerrit query string from the given Gerrit instance. The result is
 // sorted by the last update time, most recently updated to oldest
@@ -356,22 +385,9 @@ func (g *Gerrit) Query(query string) (_ CLList, e error) {
 
 	var body io.Reader
 	method, body := "GET", nil
-	req, err := http.NewRequest(method, url, body)
+	res, err := makeRequest(method, url, body, cred)
 	if err != nil {
-		return nil, fmt.Errorf("NewRequest(%q, %q, %v) failed: %v", method, url, body, err)
-	}
-	req.Header.Add("Accept", "application/json")
-	// We ignore all errors when obtaining credentials since not every host requires them.
-	if cred != nil {
-		req.SetBasicAuth(cred.username, cred.password)
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("Do(%v) failed: %v", req, err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Query:Do(%v) failed: %v", req, res.StatusCode)
+		return nil, err
 	}
 	defer collect.Error(func() error { return res.Body.Close() }, &e)
 	return parseQueryResults(res.Body)
@@ -400,6 +416,43 @@ func (g *Gerrit) GetChange(changeNumber int) (*Change, error) {
 		return nil, fmt.Errorf("Too many changes returned for query '%d'", changeNumber)
 	}
 	return &clList[0], nil
+}
+
+func (g *Gerrit) GetRelatedChanges(changeNumber int, revisionId string) (*RelatedChanges, error) {
+	u, err := url.Parse(g.host.String())
+	if err != nil {
+		return nil, err
+	}
+	u.Path = fmt.Sprintf("/changes/%d/revisions/%s/related", changeNumber, revisionId)
+	cred, _ := hostCredentials(g.jirix, g.host)
+	if cred != nil {
+		// Gerrit requires prefixing the endpoint URL with /a/ for authentication.
+		u.Path = "/a" + u.Path
+	}
+	url := u.String()
+
+	var body io.Reader
+	method, body := "GET", nil
+	res, err := makeRequest(method, url, body, cred)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	r := bufio.NewReader(res.Body)
+
+	// The first line of the input is the XSSI guard
+	// ")]}'". Getting rid of that.
+	if _, err := r.ReadSlice('\n'); err != nil {
+		return nil, err
+	}
+
+	// Parse the remaining input to construct a slice of Change objects
+	// to return.
+	var rc RelatedChanges
+	if err := json.NewDecoder(r).Decode(&rc); err != nil {
+		return nil, fmt.Errorf("Decode() failed: %v", err)
+	}
+	return &rc, nil
 }
 
 func (g *Gerrit) GetChangeByID(changeID string) (*Change, error) {
