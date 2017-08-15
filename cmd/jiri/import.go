@@ -86,6 +86,13 @@ func runImport(jirix *jiri.X, args []string) error {
 	if manifest == nil {
 		manifest = &project.Manifest{}
 	}
+	for _, imp := range manifest.Imports {
+		if imp.Manifest == args[0] && imp.Remote == args[1] && imp.Name == flagImportName {
+			//Already exists, skip
+			jirix.Logger.Debugf("Skip import. Duplicate entry")
+			return nil
+		}
+	}
 	// There's not much error checking when writing the .jiri_manifest file;
 	// errors will be reported when "jiri update" is run.
 	manifest.Imports = append(manifest.Imports, project.Import{

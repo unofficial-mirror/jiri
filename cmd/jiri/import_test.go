@@ -264,26 +264,36 @@ func testImport(t *testing.T, test importTestCase) error {
 		}
 	}
 
-	// Run import and check the results.
-	importCmd := func() {
-		if test.SetFlags != nil {
-			test.SetFlags()
+	run := func() error {
+		// Run import and check the results.
+		importCmd := func() {
+			if test.SetFlags != nil {
+				test.SetFlags()
+			}
+			err = runImport(jirix, test.Args)
 		}
-		err = runImport(jirix, test.Args)
+		stdout, _, runErr := runfunc(importCmd)
+		if runErr != nil {
+			return err
+		}
+		stderr := ""
+		if err != nil {
+			stderr = err.Error()
+		}
+		if got, want := stdout, test.Stdout; !strings.Contains(got, want) || (got != "" && want == "") {
+			return fmt.Errorf("stdout got %q, want substr %q", got, want)
+		}
+		if got, want := stderr, test.Stderr; !strings.Contains(got, want) || (got != "" && want == "") {
+			return fmt.Errorf("stderr got %q, want substr %q", got, want)
+		}
+		return nil
 	}
-	stdout, _, runErr := runfunc(importCmd)
-	if runErr != nil {
+	if err := run(); err != nil {
 		return err
 	}
-	stderr := ""
-	if err != nil {
-		stderr = err.Error()
-	}
-	if got, want := stdout, test.Stdout; !strings.Contains(got, want) || (got != "" && want == "") {
-		return fmt.Errorf("stdout got %q, want substr %q", got, want)
-	}
-	if got, want := stderr, test.Stderr; !strings.Contains(got, want) || (got != "" && want == "") {
-		return fmt.Errorf("stderr got %q, want substr %q", got, want)
+	// check that it is idempotent
+	if err := run(); err != nil {
+		return err
 	}
 
 	// Make sure the right file is generated.
