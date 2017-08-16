@@ -5,6 +5,8 @@
 package main
 
 import (
+	"encoding/xml"
+	"fmt"
 	"os"
 
 	"fuchsia.googlesource.com/jiri"
@@ -18,6 +20,7 @@ var (
 	// Flags for controlling the behavior of the command.
 	flagImportOverwrite bool
 	flagImportOut       string
+	flagImportDelete    bool
 )
 
 func init() {
@@ -27,6 +30,7 @@ func init() {
 
 	cmdImport.Flags.BoolVar(&flagImportOverwrite, "overwrite", false, `Write a new .jiri_manifest file with the given specification.  If it already exists, the existing content will be ignored and the file will be overwritten.`)
 	cmdImport.Flags.StringVar(&flagImportOut, "out", "", `The output file.  Uses <root>/.jiri_manifest if unspecified.  Uses stdout if set to "-".`)
+	cmdImport.Flags.BoolVar(&flagImportDelete, "delete", false, `Delete existing import. Import is matched using <manifest>, <remote> and name. <remote> is optional.`)
 }
 
 var cmdImport = &cmdline.Command{
@@ -67,9 +71,15 @@ func isFile(file string) (bool, error) {
 }
 
 func runImport(jirix *jiri.X, args []string) error {
-	if len(args) != 2 {
+	if flagImportDelete && len(args) != 1 && len(args) != 2 {
+		return jirix.UsageErrorf("wrong number of arguments with delete flag")
+	} else if !flagImportDelete && len(args) != 2 {
 		return jirix.UsageErrorf("wrong number of arguments")
 	}
+	if flagImportDelete && flagImportOverwrite {
+		return jirix.UsageErrorf("cannot use -delete and -overwrite together")
+	}
+
 	// Initialize manifest.
 	var manifest *project.Manifest
 	manifestExists, err := isFile(jirix.JiriManifestFile())
@@ -86,22 +96,59 @@ func runImport(jirix *jiri.X, args []string) error {
 	if manifest == nil {
 		manifest = &project.Manifest{}
 	}
-	for _, imp := range manifest.Imports {
-		if imp.Manifest == args[0] && imp.Remote == args[1] && imp.Name == flagImportName {
-			//Already exists, skip
-			jirix.Logger.Debugf("Skip import. Duplicate entry")
-			return nil
+
+	if flagImportDelete {
+		var tempImports []project.Import
+		deletedImports := make(map[string]project.Import)
+		for _, imp := range manifest.Imports {
+			if imp.Manifest == args[0] && imp.Name == flagImportName {
+				match := true
+				if len(args) == 2 {
+					match = false
+					if imp.Remote == args[1] {
+						match = true
+					}
+				}
+				if match {
+					deletedImports[imp.Name+"~"+imp.Manifest+"~"+imp.Remote] = imp
+					continue
+				}
+			}
+			tempImports = append(tempImports, imp)
 		}
+		if len(deletedImports) > 1 {
+			return fmt.Errorf("More than 1 import meets your criteria. Please provide remote.")
+		} else if len(deletedImports) == 1 {
+			var data []byte
+			for _, i := range deletedImports {
+				data, err = xml.Marshal(i)
+				if err != nil {
+					return err
+				}
+				break
+			}
+			jirix.Logger.Infof("Deleted one import:\n%s", string(data))
+		}
+		manifest.Imports = tempImports
+	} else {
+		for _, imp := range manifest.Imports {
+			if imp.Manifest == args[0] && imp.Remote == args[1] && imp.Name == flagImportName {
+				//Already exists, skip
+				jirix.Logger.Debugf("Skip import. Duplicate entry")
+				return nil
+			}
+		}
+		// There's not much error checking when writing the .jiri_manifest file;
+		// errors will be reported when "jiri update" is run.
+		manifest.Imports = append(manifest.Imports, project.Import{
+			Manifest:     args[0],
+			Name:         flagImportName,
+			Remote:       args[1],
+			RemoteBranch: flagImportRemoteBranch,
+			Root:         flagImportRoot,
+		})
 	}
-	// There's not much error checking when writing the .jiri_manifest file;
-	// errors will be reported when "jiri update" is run.
-	manifest.Imports = append(manifest.Imports, project.Import{
-		Manifest:     args[0],
-		Name:         flagImportName,
-		Remote:       args[1],
-		RemoteBranch: flagImportRemoteBranch,
-		Root:         flagImportRoot,
-	})
+
 	// Write output to stdout or file.
 	outFile := flagImportOut
 	if outFile == "" {

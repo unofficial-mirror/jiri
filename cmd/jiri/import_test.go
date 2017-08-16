@@ -21,18 +21,21 @@ type importTestCase struct {
 	Exist, Want    string
 	Stdout, Stderr string
 	SetFlags       func()
+	runOnce        bool
+}
+
+func setDefaultImportFlags() {
+	flagImportName = "manifest"
+	flagImportRemoteBranch = "master"
+	flagImportRoot = ""
+	flagImportOverwrite = false
+	flagImportOut = ""
+	flagImportDelete = false
 }
 
 func TestImport(t *testing.T) {
 	tests := []importTestCase{
 		{
-			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
-				flagImportOverwrite = false
-				flagImportOut = ""
-			},
 			Stderr: `wrong number of arguments`,
 		},
 		{
@@ -49,8 +52,6 @@ func TestImport(t *testing.T) {
 				flagImportName = "name"
 				flagImportRemoteBranch = "remotebranch"
 				flagImportRoot = "root"
-				flagImportOverwrite = false
-				flagImportOut = ""
 			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
@@ -61,13 +62,6 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
-				flagImportOverwrite = false
-				flagImportOut = ""
-			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
@@ -78,10 +72,6 @@ func TestImport(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
-				flagImportOverwrite = false
 				flagImportOut = "file"
 			},
 			Args:     []string{"foo", "https://github.com/new.git"},
@@ -95,10 +85,6 @@ func TestImport(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
-				flagImportOverwrite = false
 				flagImportOut = "-"
 			},
 			Args: []string{"foo", "https://github.com/new.git"},
@@ -110,13 +96,6 @@ func TestImport(t *testing.T) {
 `,
 		},
 		{
-			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
-				flagImportOverwrite = false
-				flagImportOut = ""
-			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Exist: `<manifest>
   <imports>
@@ -135,11 +114,7 @@ func TestImport(t *testing.T) {
 		// Remote imports, explicit overwrite behavior
 		{
 			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
 				flagImportOverwrite = true
-				flagImportOut = ""
 			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
@@ -151,9 +126,6 @@ func TestImport(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
 				flagImportOverwrite = true
 				flagImportOut = "file"
 			},
@@ -168,9 +140,6 @@ func TestImport(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
 				flagImportOverwrite = true
 				flagImportOut = "-"
 			},
@@ -184,11 +153,7 @@ func TestImport(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagImportName = "manifest"
-				flagImportRemoteBranch = "master"
-				flagImportRoot = ""
 				flagImportOverwrite = true
-				flagImportOut = ""
 			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Exist: `<manifest>
@@ -200,6 +165,112 @@ func TestImport(t *testing.T) {
 			Want: `<manifest>
   <imports>
     <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
+  </imports>
+</manifest>
+`,
+		},
+		// test delete flag
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+			},
+			Stderr:  `wrong number of arguments`,
+			runOnce: true,
+		},
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+			},
+			Args:    []string{"a", "b", "c"},
+			Stderr:  `wrong number of arguments`,
+			runOnce: true,
+		},
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+				flagImportOverwrite = true
+			},
+			Args:    []string{"a", "b"},
+			Stderr:  `cannot use -delete and -overwrite together`,
+			runOnce: true,
+		},
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+			},
+			Args:    []string{"foo"},
+			runOnce: true,
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo1" name="manifest" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Want: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo1" name="manifest" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+			},
+			Args:    []string{"foo"},
+			runOnce: true,
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github1.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Stderr: `More than 1 import meets your criteria. Please provide remote.`,
+		},
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+			},
+			Args:    []string{"foo"},
+			runOnce: true,
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Want: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+		},
+		{
+			SetFlags: func() {
+				flagImportDelete = true
+			},
+			Args:    []string{"foo", "https://github2.com/orig.git"},
+			runOnce: true,
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github2.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Want: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+    <import manifest="foo" name="manifest" remote="https://github.com/orig.git"/>
   </imports>
 </manifest>
 `,
@@ -267,6 +338,7 @@ func testImport(t *testing.T, test importTestCase) error {
 	run := func() error {
 		// Run import and check the results.
 		importCmd := func() {
+			setDefaultImportFlags()
 			if test.SetFlags != nil {
 				test.SetFlags()
 			}
@@ -291,9 +363,12 @@ func testImport(t *testing.T, test importTestCase) error {
 	if err := run(); err != nil {
 		return err
 	}
+
 	// check that it is idempotent
-	if err := run(); err != nil {
-		return err
+	if !test.runOnce {
+		if err := run(); err != nil {
+			return err
+		}
 	}
 
 	// Make sure the right file is generated.
