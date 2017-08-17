@@ -50,18 +50,18 @@ func setDefaultSnapshotFlag() {
 func writeReadme(t *testing.T, jirix *jiri.X, projectDir, message string) {
 	path, perm := filepath.Join(projectDir, "README"), os.FileMode(0644)
 	if err := ioutil.WriteFile(path, []byte(message), perm); err != nil {
-		t.Fatalf("%v", err)
+		t.Fatalf("%s", err)
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatalf("%s", err)
 	}
 	defer os.Chdir(cwd)
 	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("%v", err)
+		t.Fatalf("%s", err)
 	}
 	if err := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com")).CommitFile(path, "creating README"); err != nil {
-		t.Fatalf("%v", err)
+		t.Fatalf("%s", err)
 	}
 }
 
@@ -139,10 +139,10 @@ func TestSourceManifestSnapshot(t *testing.T) {
 	defer cleanup()
 
 	// Setup the initial remote and local projects.
-	numProjects := 3
+	numProjects := 4
 	for i := 0; i < numProjects; i++ {
 		if err := fake.CreateRemoteProject(remoteProjectName(i)); err != nil {
-			t.Fatalf("%v", err)
+			t.Fatalf("%s", err)
 		}
 		rb := ""
 		if i == 2 {
@@ -165,11 +165,14 @@ func TestSourceManifestSnapshot(t *testing.T) {
 	// Create initial commits in the remote projects and use UpdateUniverse()
 	// to mirror them locally.
 	for i := 0; i < numProjects; i++ {
-		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], "revision 1")
+		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], fmt.Sprintf("proj %d", i))
 	}
 	if err := project.UpdateUniverse(fake.X, true, false, false, false, false, project.DefaultHookTimeout); err != nil {
 		t.Fatalf("%s", err)
 	}
+
+	// test when current revision is not in any branch
+	writeReadme(t, fake.X, filepath.Join(fake.X.Root, localProjectName(3)), "file")
 
 	// Get local revision
 	paths := []string{"manifest"}
@@ -214,21 +217,23 @@ func TestSourceManifestSnapshot(t *testing.T) {
 	sm.Directories = make(map[string]*project.SourceManifest_Directory)
 	sm.Directories["manifest"] = &project.SourceManifest_Directory{
 		GitCheckout: &project.SourceManifest_GitCheckout{
-			RepoUrl:     fake.Projects["manifest"],
-			Revision:    revMap["manifest"],
-			TrackingRef: "refs/heads/master",
+			RepoUrl:  fake.Projects["manifest"],
+			Revision: revMap["manifest"],
+			FetchRef: "refs/heads/master",
 		},
 	}
 	for i := 0; i < numProjects; i++ {
 		ref := "refs/heads/master"
 		if i == 2 {
 			ref = "refs/heads/test-branch"
+		} else if i == 3 {
+			ref = ""
 		}
 		sm.Directories[localProjectName(i)] = &project.SourceManifest_Directory{
 			GitCheckout: &project.SourceManifest_GitCheckout{
-				RepoUrl:     fake.Projects[remoteProjectName(i)],
-				Revision:    revMap[localProjectName(i)],
-				TrackingRef: ref,
+				RepoUrl:  fake.Projects[remoteProjectName(i)],
+				Revision: revMap[localProjectName(i)],
+				FetchRef: ref,
 			},
 		}
 	}
@@ -240,6 +245,6 @@ func TestSourceManifestSnapshot(t *testing.T) {
 
 	got, _ := ioutil.ReadFile(smTmpfile.Name())
 	if string(got) != string(want) {
-		t.Fatalf("%s, \n%s", (string(got)), string(want))
+		t.Fatalf("GOT:\n%s, \nWANT:\n%s", (string(got)), string(want))
 	}
 }

@@ -555,6 +555,20 @@ func (g *Git) GetBranches(args ...string) ([]string, string, error) {
 	return branches, current, nil
 }
 
+// ListRemoteBranchesContainingRef returns a slice of the remote branches
+// which contains the given commit
+func (g *Git) ListRemoteBranchesContainingRef(commit string) (map[string]bool, error) {
+	branches, _, err := g.GetBranches("-r", "--contains", commit)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]bool)
+	for _, branch := range branches {
+		m[branch] = true
+	}
+	return m, nil
+}
+
 // ListBranchesContainingRef returns a slice of the local branches
 // which contains the given commit
 func (g *Git) ListBranchesContainingRef(commit string) (map[string]bool, error) {

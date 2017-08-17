@@ -5,15 +5,20 @@
 package project
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
+	"sync"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/git"
+	"fuchsia.googlesource.com/jiri/gitutil"
 )
 
 const (
@@ -40,7 +45,8 @@ type SourceManifest_GitCheckout struct {
 	// Note that this is the raw revision bytes, not their hex-encoded form.
 	Revision []byte `json:"revision,omitempty"`
 
-	// The ref that the task used to resolve the revision of the source (if any). Ex.
+	// The ref that the task used to resolve/fetch the revision of the source
+	// (if any). Ex.
 	//   refs/heads/master
 	//   refs/changes/04/511804/4
 	//
@@ -49,7 +55,7 @@ type SourceManifest_GitCheckout struct {
 	//
 	// This should always be an absolute ref (i.e. starts with 'refs/'). An
 	// example of a non-absolute ref would be 'master'.
-	TrackingRef string `json:"tracking_ref,omitempty"`
+	FetchRef string `json:"fetch_ref,omitempty"`
 }
 
 type SourceManifest_Directory struct {
@@ -76,38 +82,111 @@ type SourceManifest struct {
 	Directories map[string]*SourceManifest_Directory `json:"directories"`
 }
 
-func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, error) {
-	p := make([]Project, len(projects))
-	i := 0
+func getCLRefByCommit(jirix *jiri.X, gerritHost, revision string) (string, error) {
+	hostUrl, err := url.Parse(gerritHost)
+	if err != nil {
+		return "", fmt.Errorf("invalid gerrit host %q: %s", gerritHost, err)
+	}
+	g := gerrit.New(jirix, hostUrl)
+	cls, err := g.ListChangesByCommit(revision)
+	if err != nil {
+		return "", fmt.Errorf("not able to get CL for revision %s: %s", revision, err)
+	}
+	for _, c := range cls {
+		if v, ok := c.Revisions[revision]; ok {
+			return v.Fetch.Ref, nil
+		}
+	}
+	return "", nil
+}
+
+func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, MultiError) {
+	jirix.TimerPush("create source manifest")
+	defer jirix.TimerPop()
+
+	workQueue := make(chan Project, len(projects))
 	for _, proj := range projects {
 		if err := proj.relativizePaths(jirix.Root); err != nil {
-			return nil, err
+			return nil, MultiError{err}
 		}
-		p[i] = proj
-		i++
+		workQueue <- proj
 	}
+	close(workQueue)
+	errs := make(chan error, len(projects))
 	sm := &SourceManifest{
 		Version:     SourceManifestVersion,
 		Directories: make(map[string]*SourceManifest_Directory),
 	}
-	sort.Sort(ProjectsByPath(p))
-	for _, proj := range p {
+	var mux sync.Mutex
+	processProject := func(proj Project) error {
 		gc := &SourceManifest_GitCheckout{
 			RepoUrl: proj.Remote,
 		}
 		g := git.NewGit(filepath.Join(jirix.Root, proj.Path))
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(filepath.Join(jirix.Root, proj.Path)))
 		if rev, err := g.CurrentRevisionRaw(); err != nil {
-			return nil, err
+			return err
 		} else {
 			gc.Revision = rev
 		}
 		if proj.RemoteBranch == "" {
 			proj.RemoteBranch = "master"
 		}
-		gc.TrackingRef = "refs/heads/" + proj.RemoteBranch
+		revision := hex.EncodeToString(gc.Revision)
+		branchMap, err := scm.ListRemoteBranchesContainingRef(revision)
+		if err != nil {
+			return err
+		}
+		if branchMap["origin/"+proj.RemoteBranch] {
+			gc.FetchRef = "refs/heads/" + proj.RemoteBranch
+		} else {
+			for b, _ := range branchMap {
+				if strings.HasPrefix(b, "origin/HEAD ") {
+					continue
+				}
+				if strings.HasPrefix(b, "origin") {
+					gc.FetchRef = "refs/heads/" + strings.TrimLeft(b, "origin/")
+					break
+				}
+			}
+
+			// Try getting from gerrit
+			if gc.FetchRef == "" && proj.GerritHost != "" {
+				if ref, err := getCLRefByCommit(jirix, proj.GerritHost, revision); err != nil {
+					// Don't fail
+					jirix.Logger.Debugf("Error while fetching from gerrit for project %q: %s", proj.Name, err)
+				} else if ref == "" {
+					jirix.Logger.Debugf("Cannot get ref for project: %q, revision: %q", proj.Name, revision)
+				} else {
+					gc.FetchRef = ref
+				}
+			}
+		}
+		mux.Lock()
 		sm.Directories[proj.Path] = &SourceManifest_Directory{GitCheckout: gc}
+		mux.Unlock()
+		return nil
 	}
-	return sm, nil
+
+	var wg sync.WaitGroup
+	for i := uint(0); i < jirix.Jobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for p := range workQueue {
+				if err := processProject(p); err != nil {
+					errs <- err
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	var multiErr MultiError
+	for err := range errs {
+		multiErr = append(multiErr, err)
+	}
+	return sm, multiErr
 }
 
 func (sm *SourceManifest) ToFile(jirix *jiri.X, filename string) error {
