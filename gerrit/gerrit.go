@@ -77,6 +77,8 @@ type CLOpts struct {
 	Topic string
 	// Verify controls whether git pre-push hooks should be run before uploading.
 	Verify bool
+	//Ref to upload. Default is HEAD
+	RefToUpload string
 }
 
 // Gerrit records a hostname of a Gerrit instance.
@@ -523,7 +525,11 @@ func (ge PushError) Error() string {
 
 // Push pushes the current branch to Gerrit.
 func Push(jirix *jiri.X, dir string, clOpts CLOpts) error {
-	refspec := "HEAD:" + Reference(clOpts)
+	refToUpload := "HEAD"
+	if clOpts.RefToUpload != "" {
+		refToUpload = clOpts.RefToUpload
+	}
+	refspec := refToUpload + ":" + Reference(clOpts)
 	args := []string{"push", clOpts.Remote, refspec}
 	// TODO(jamesr): This should really reuse gitutil/git.go's Push which knows
 	// how to set this option but doesn't yet know how to pipe stdout/stderr the way

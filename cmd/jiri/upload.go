@@ -42,10 +42,15 @@ func (e uploadError) Error() string {
 }
 
 var cmdUpload = &cmdline.Command{
-	Runner: jiri.RunnerFunc(runUpload),
-	Name:   "upload",
-	Short:  "Upload a changelist for review",
-	Long:   `Command "upload" uploads all commits of a local branch to Gerrit.`,
+	Runner:   jiri.RunnerFunc(runUpload),
+	Name:     "upload",
+	Short:    "Upload a changelist for review",
+	Long:     `Command "upload" uploads commits of a local branch to Gerrit.`,
+	ArgsName: "<ref>",
+	ArgsLong: `
+<ref> is the valid git ref to upload. It is optional and HEAD is used by
+default. This cannot be used with -multipart flag.
+`,
 }
 
 func init() {
@@ -65,7 +70,16 @@ change would be uploaded to branch in project manifest`)
 }
 
 // runUpload is a wrapper that pushes the changes to gerrit for review.
-func runUpload(jirix *jiri.X, _ []string) error {
+func runUpload(jirix *jiri.X, args []string) error {
+	refToUpload := "HEAD"
+	if len(args) == 1 {
+		refToUpload = args[0]
+	} else if len(args) > 1 {
+		return jirix.UsageErrorf("wrong number of arguments")
+	}
+	if uploadMultipartFlag && refToUpload != "HEAD" {
+		return jirix.UsageErrorf("can only use HEAD as <ref> when using -multipart flag.")
+	}
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("os.Getwd() failed: %s", err)
@@ -207,6 +221,7 @@ func runUpload(jirix *jiri.X, _ []string) error {
 			Verify:       uploadVerifyFlag,
 			Topic:        topic,
 			Branch:       currentBranch,
+			RefToUpload:  refToUpload,
 		}
 
 		if opts.Presubmit == gerrit.PresubmitTestType("") {

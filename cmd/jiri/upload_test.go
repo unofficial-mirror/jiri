@@ -92,6 +92,25 @@ func assertUploadPushedFilesToRef(t *testing.T, jirix *jiri.X, gerritPath, pushe
 	assertFilesCommitted(t, jirix, files)
 }
 
+func assertUploadFilesNotPushedToRef(t *testing.T, jirix *jiri.X, gerritPath, pushedRef string, files []string) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	if err := os.Chdir(gerritPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := gitutil.New(jirix).CheckoutBranch(pushedRef); err != nil {
+		t.Fatal(err)
+	}
+	assertFilesNotExist(t, jirix, files)
+}
+
 func resetFlags() {
 	uploadCcsFlag = ""
 	uploadHostFlag = ""
@@ -149,6 +168,45 @@ func TestUpload(t *testing.T) {
 	expectedRef = fmt.Sprintf("refs/for/%s%%topic=%s", uploadRemoteBranchFlag, topic)
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
+}
+
+func TestUploadRef(t *testing.T) {
+	defer resetFlags()
+	fake, localProjects, cleanup := setupUploadTest(t)
+	defer cleanup()
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	if err := os.Chdir(localProjects[1].Path); err != nil {
+		t.Fatal(err)
+	}
+	branch := "my-branch"
+	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
+	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := git.CheckoutBranch(branch); err != nil {
+		t.Fatal(err)
+	}
+	files := []string{"file1", "file2"}
+	commitFiles(t, fake.X, files)
+
+	gerritPath := fake.Projects[localProjects[1].Name]
+	uploadHostFlag = gerritPath
+	if err := runUpload(fake.X, []string{"HEAD~1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
+	expectedRef := "refs/for/master%topic=" + topic
+	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files[0:1])
+	assertUploadFilesNotPushedToRef(t, fake.X, gerritPath, expectedRef, files[1:])
 }
 
 func TestUploadMultipart(t *testing.T) {
@@ -482,6 +540,19 @@ func assertFilesCommitted(t *testing.T, jirix *jiri.X, files []string) {
 	for _, file := range files {
 		if !gitutil.New(jirix).IsFileCommitted(file) {
 			t.Fatalf("expected file %v to be committed but it is not", file)
+		}
+	}
+}
+
+// assertFilesNotExist asserts that the files do not exist.
+func assertFilesNotExist(t *testing.T, jirix *jiri.X, files []string) {
+	for _, file := range files {
+		if _, err := os.Stat(file); err != nil {
+			if !os.IsNotExist(err) {
+				t.Fatalf("%s", err)
+			}
+		} else {
+			t.Fatalf("expected file %v to not exist but it did", file)
 		}
 	}
 }
