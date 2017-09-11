@@ -113,7 +113,6 @@ func assertUploadFilesNotPushedToRef(t *testing.T, jirix *jiri.X, gerritPath, pu
 
 func resetFlags() {
 	uploadCcsFlag = ""
-	uploadHostFlag = ""
 	uploadPresubmitFlag = string(gerrit.PresubmitTestTypeAll)
 	uploadReviewersFlag = ""
 	uploadTopicFlag = ""
@@ -152,7 +151,6 @@ func TestUpload(t *testing.T) {
 	commitFiles(t, fake.X, files)
 
 	gerritPath := fake.Projects[localProjects[1].Name]
-	uploadHostFlag = gerritPath
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +196,6 @@ func TestUploadRef(t *testing.T) {
 	commitFiles(t, fake.X, files)
 
 	gerritPath := fake.Projects[localProjects[1].Name]
-	uploadHostFlag = gerritPath
 	if err := runUpload(fake.X, []string{"HEAD~1"}); err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +238,6 @@ func TestUploadMultipart(t *testing.T) {
 	}
 
 	gerritPath := fake.Projects[localProjects[0].Name]
-	uploadHostFlag = gerritPath
 	uploadMultipartFlag = true
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
@@ -296,7 +292,6 @@ func TestUploadMultipartWithBranchFlagSimple(t *testing.T) {
 	}
 
 	gerritPath := fake.Projects[localProjects[0].Name]
-	uploadHostFlag = gerritPath
 	uploadMultipartFlag = true
 	uploadBranchFlag = branch
 	if err := runUpload(fake.X, []string{}); err != nil {
@@ -353,7 +348,6 @@ func TestUploadRebase(t *testing.T) {
 	}
 
 	gerritPath := fake.Projects[localProjects[1].Name]
-	uploadHostFlag = gerritPath
 	uploadRebaseFlag = true
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
@@ -396,7 +390,6 @@ func TestUploadMultipleCommits(t *testing.T) {
 	commitFiles(t, fake.X, files2)
 
 	gerritPath := fake.Projects[localProjects[1].Name]
-	uploadHostFlag = gerritPath
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
@@ -436,40 +429,6 @@ func TestUploadThrowsErrorWhenNotOnBranch(t *testing.T) {
 	}
 }
 
-func TestUploadFailsWhenNoGerritHost(t *testing.T) {
-	defer resetFlags()
-	fake, localProjects, cleanup := setupUploadTest(t)
-	defer cleanup()
-	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(currentDir); err != nil {
-			t.Fatal(err)
-		}
-	}()
-	if err := os.Chdir(localProjects[1].Path); err != nil {
-		t.Fatal(err)
-	}
-	branch := "my-branch"
-	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
-	if err := git.CreateBranchWithUpstream(branch, "origin/master"); err != nil {
-		t.Fatal(err)
-	}
-	if err := git.CheckoutBranch(branch); err != nil {
-		t.Fatal(err)
-	}
-	files := []string{"file1"}
-	commitFiles(t, fake.X, files)
-
-	if err := runUpload(fake.X, []string{}); err == nil {
-		t.Fatalf("Should have got a error here.")
-	} else if !strings.Contains(err.Error(), "Please use the '--host' flag") {
-		t.Fatalf("Wrong error: %s", err)
-	}
-}
-
 func TestUploadUntrackedBranch(t *testing.T) {
 	defer resetFlags()
 	fake, localProjects, cleanup := setupUploadTest(t)
@@ -495,7 +454,6 @@ func TestUploadUntrackedBranch(t *testing.T) {
 	commitFiles(t, fake.X, files)
 
 	gerritPath := fake.Projects[localProjects[1].Name]
-	uploadHostFlag = gerritPath
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}

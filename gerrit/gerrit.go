@@ -65,8 +65,6 @@ type CLOpts struct {
 	Edit bool
 	// Remote identifies the Gerrit remote that this CL will be pushed to
 	Remote string
-	// Host identifies the Gerrit host.
-	Host *url.URL
 	// Presubmit determines what presubmit tests to run.
 	Presubmit PresubmitTestType
 	// RemoteBranch identifies the remote branch the CL pertains to.

@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +20,6 @@ import (
 
 var (
 	uploadCcsFlag          string
-	uploadHostFlag         string
 	uploadPresubmitFlag    string
 	uploadReviewersFlag    string
 	uploadTopicFlag        string
@@ -55,7 +53,6 @@ default. This cannot be used with -multipart flag.
 
 func init() {
 	cmdUpload.Flags.StringVar(&uploadCcsFlag, "cc", "", `Comma-separated list of emails or LDAPs to cc.`)
-	cmdUpload.Flags.StringVar(&uploadHostFlag, "host", "", `Gerrit host to use.  Defaults to gerrit host specified in manifest.`)
 	cmdUpload.Flags.StringVar(&uploadPresubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdUpload.Flags.StringVar(&uploadReviewersFlag, "r", "", `Comma-separated list of emails or LDAPs to request review.`)
@@ -194,29 +191,11 @@ func runUpload(jirix *jiri.X, args []string) error {
 			}
 		}
 
-		host := uploadHostFlag
-		if host == "" {
-			if project.GerritHost == "" {
-				return fmt.Errorf("No gerrit host found.  Please use the '--host' flag, or add a 'gerrithost' attribute for project %s(%s).", project.Name, relativePath)
-			}
-			host = project.GerritHost
-		}
-		hostUrl, err := url.Parse(host)
-		if err != nil {
-			return fmt.Errorf("invalid Gerrit host for project %s(%s) %q: %s", project.Name, relativePath, host, err)
-		}
-		projectRemoteUrl, err := url.Parse(project.Remote)
-		if err != nil {
-			return fmt.Errorf("invalid project remote for project %s(%s): %s", project.Name, relativePath, project.Remote, err)
-		}
-		gerritRemote := *hostUrl
-		gerritRemote.Path = projectRemoteUrl.Path
 		opts := gerrit.CLOpts{
 			Ccs:          parseEmails(uploadCcsFlag),
-			Host:         hostUrl,
 			Presubmit:    gerrit.PresubmitTestType(uploadPresubmitFlag),
 			RemoteBranch: remoteBranch,
-			Remote:       gerritRemote.String(),
+			Remote:       "origin",
 			Reviewers:    parseEmails(uploadReviewersFlag),
 			Verify:       uploadVerifyFlag,
 			Topic:        topic,
