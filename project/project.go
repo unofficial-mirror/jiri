@@ -806,7 +806,7 @@ func CreateSnapshot(jirix *jiri.X, file string, sourceManifestFile string, local
 
 // CheckoutSnapshot updates project state to the state specified in the given
 // snapshot file.  Note that the snapshot file must not contain remote imports.
-func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool, runHookTimeout uint) error {
+func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks bool, runHookTimeout uint) error {
 	// Find all local projects.
 	scanMode := FastScan
 	if gc {
@@ -820,7 +820,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc bool, runHookTimeout ui
 	if err != nil {
 		return err
 	}
-	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/); err != nil {
+	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/, runHooks); err != nil {
 		return err
 	}
 	return WriteUpdateHistorySnapshot(jirix, snapshot, false)
@@ -1050,7 +1050,7 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 // counterparts identified in the manifest. Optionally, the 'gc' flag can be
 // used to indicate that local projects that no longer exist remotely should be
 // removed.
-func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bool, rebaseUntracked bool, rebaseAll bool, runHookTimeout uint) (e error) {
+func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bool, rebaseUntracked bool, rebaseAll bool, runHooks bool, runHookTimeout uint) (e error) {
 	jirix.Logger.Infof("Updating all projects")
 
 	updateFn := func(scanMode ScanMode) error {
@@ -1077,7 +1077,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 		}
 
 		// Actually update the projects.
-		return updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, rebaseTracked, rebaseUntracked, rebaseAll, false /*snapshot*/)
+		return updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, rebaseTracked, rebaseUntracked, rebaseAll, false /*snapshot*/, runHooks)
 	}
 
 	// Specifying gc should always force a full filesystem scan.
@@ -2201,7 +2201,7 @@ func runCommonOperations(jirix *jiri.X, ops operations) error {
 	return nil
 }
 
-func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, runHookTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot bool) error {
+func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, runHookTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot, shouldRunHooks bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
@@ -2291,8 +2291,10 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		jirix.Logger.Warningf("%s\n\n", msg)
 	}
 
-	if err := runHooks(jirix, ops, hooks, runHookTimeout); err != nil {
-		return err
+	if shouldRunHooks {
+		if err := runHooks(jirix, ops, hooks, runHookTimeout); err != nil {
+			return err
+		}
 	}
 	return applyGitHooks(jirix, ops)
 }

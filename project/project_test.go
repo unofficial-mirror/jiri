@@ -337,7 +337,7 @@ func TestUpdateUniverseWhenLocalTracksLocal(t *testing.T) {
 	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
 	gitRemote := git.NewGit(fake.Projects[localProjects[1].Name])
 	remoteRev, _ := gitRemote.CurrentRevision()
-	if err := project.UpdateUniverse(fake.X, false, false, false, false, true /*rebase-all*/, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, false, false, false, false, true /*rebase-all*/, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
 		t.Fatal(err)
 	}
 	projects, err := project.LocalProjects(fake.X, project.FastScan)
@@ -377,7 +377,7 @@ func TestUpdateUniverseWhenLocalTracksEachOther(t *testing.T) {
 	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
 	remoteRev, _ := gitRemote.CurrentRevision()
 
-	if err := project.UpdateUniverse(fake.X, false, false, false, false, true /*rebase-all*/, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, false, false, false, false, true /*rebase-all*/, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
 		t.Fatal(err)
 	}
 	projects, err := project.LocalProjects(fake.X, project.FastScan)
@@ -631,6 +631,22 @@ func TestHookLoadSimple(t *testing.T) {
 	err = fake.UpdateUniverse(false)
 	if err == nil {
 		t.Fatal("run hook should throw error as there is no action.sh script")
+	}
+}
+
+// TestRunHookFlag tests that hook is not executed when flag is false
+func TestRunHookFlag(t *testing.T) {
+	p, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	err := fake.AddHook(project.Hook{Name: "hook1",
+		Action:      "action.sh",
+		ProjectName: p[0].Name})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := project.UpdateUniverse(fake.X, false, false, true /*rebaseTracked*/, false, false, false /*run-hooks*/, project.DefaultHookTimeout); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -1207,7 +1223,7 @@ func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := project.UpdateUniverse(fake.X, false, false, true /*rebaseTracked*/, false, false, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, false, false, true /*rebaseTracked*/, false, false, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1347,9 +1363,9 @@ func testCheckoutSnapshot(t *testing.T, testURL bool) {
 		}))
 		defer server.Close()
 
-		project.CheckoutSnapshot(fake.X, server.URL, false, project.DefaultHookTimeout)
+		project.CheckoutSnapshot(fake.X, server.URL, false, true /*run-hooks*/, project.DefaultHookTimeout)
 	} else {
-		project.CheckoutSnapshot(fake.X, snapshotFile, false, project.DefaultHookTimeout)
+		project.CheckoutSnapshot(fake.X, snapshotFile, false, true /*run-hooks*/, project.DefaultHookTimeout)
 	}
 	sort.Sort(project.ProjectsByPath(localProjects))
 	for i, localProject := range localProjects {
@@ -1400,7 +1416,7 @@ func testLocalBranchesAreUpdated(t *testing.T, shouldLocalBeOnABranch, rebaseAll
 		}
 	}
 
-	if err := project.UpdateUniverse(fake.X, false, false, false, false, rebaseAll, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, false, false, false, false, rebaseAll, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1503,7 +1519,7 @@ func TestFileImportCycle(t *testing.T) {
 	}
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(jirix, false, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(jirix, false, false, false, false, false, true /*run-hooks*/, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in local manifest files"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1554,7 +1570,7 @@ func TestRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote2, fileB, "commit B")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, false, false, true /*run-hooks*/, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected in remote manifest imports"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
@@ -1624,7 +1640,7 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 	commitFile(t, fake.X, remote1, fileD, "commit D")
 
 	// The update should complain about the cycle.
-	err := project.UpdateUniverse(fake.X, false, false, false, false, false, project.DefaultHookTimeout)
+	err := project.UpdateUniverse(fake.X, false, false, false, false, false, true /*run-hooks*/, project.DefaultHookTimeout)
 	if got, want := fmt.Sprint(err), "import cycle detected"; !strings.Contains(got, want) {
 		t.Errorf("got error %v, want substr %v", got, want)
 	}
