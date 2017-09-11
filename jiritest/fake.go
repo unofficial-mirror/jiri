@@ -24,10 +24,12 @@ type FakeJiriRoot struct {
 }
 
 const (
+	ManifestFileName    = "public"
+	ManifestProjectPath = "manifest"
+)
+const (
 	defaultDataDir      = "data"
-	manifestFileName    = "public"
 	manifestProjectName = "manifest"
-	manifestProjectPath = "manifest"
 )
 
 // NewFakeJiriRoot returns a new FakeJiriRoot and a cleanup closure.  The
@@ -46,11 +48,11 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		t.Fatalf("TempDir() failed: %v", err)
 	}
 	fake.remote = remoteDir
-	if err := fake.CreateRemoteProject(manifestProjectPath); err != nil {
+	if err := fake.CreateRemoteProject(ManifestProjectPath); err != nil {
 		t.Fatal(err)
 	}
 	// Create a fake manifest.
-	manifestDir := filepath.Join(remoteDir, manifestProjectPath)
+	manifestDir := filepath.Join(remoteDir, ManifestProjectPath)
 	if err := os.MkdirAll(manifestDir, os.FileMode(0700)); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +62,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	// Add the "manifest" project to the manifest.
 	if err := fake.AddProject(project.Project{
 		Name:   manifestProjectName,
-		Path:   manifestProjectPath,
+		Path:   ManifestProjectPath,
 		Remote: fake.Projects[manifestProjectName],
 	}); err != nil {
 		t.Fatal(err)
@@ -69,9 +71,9 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	if err := fake.WriteJiriManifest(&project.Manifest{
 		Imports: []project.Import{
 			project.Import{
-				Manifest: manifestFileName,
+				Manifest: ManifestFileName,
 				Name:     manifestProjectName,
-				Remote:   filepath.Join(fake.remote, manifestProjectPath),
+				Remote:   filepath.Join(fake.remote, ManifestProjectPath),
 			},
 		},
 	}); err != nil {
@@ -121,7 +123,7 @@ func (fake FakeJiriRoot) AddHook(hook project.Hook) error {
 // DisableRemoteManifestPush disables pushes to the remote manifest
 // repository.
 func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
-	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, manifestProjectPath))
+	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, ManifestProjectPath))
 	if err := gitutil.New(fake.X, dir).CheckoutBranch("master"); err != nil {
 		return err
 	}
@@ -131,7 +133,7 @@ func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 // EnableRemoteManifestPush enables pushes to the remote manifest
 // repository.
 func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
-	dir := filepath.Join(fake.remote, manifestProjectPath)
+	dir := filepath.Join(fake.remote, ManifestProjectPath)
 	scm := gitutil.New(fake.X, gitutil.RootDirOpt(dir))
 	if ok, err := git.NewGit(dir).BranchExists("non-master"); ok && err == nil {
 		if err := scm.CreateBranch("non-master"); err != nil {
@@ -172,7 +174,7 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 
 // ReadRemoteManifest read a manifest from the remote manifest project.
 func (fake FakeJiriRoot) ReadRemoteManifest() (*project.Manifest, error) {
-	path := filepath.Join(fake.remote, manifestProjectPath, manifestFileName)
+	path := filepath.Join(fake.remote, ManifestProjectPath, ManifestFileName)
 	return project.ManifestFromFile(fake.X, path)
 }
 
@@ -198,8 +200,8 @@ func (fake FakeJiriRoot) WriteJiriManifest(manifest *project.Manifest) error {
 // WriteRemoteManifest writes the given manifest to the remote
 // manifest project.
 func (fake FakeJiriRoot) WriteRemoteManifest(manifest *project.Manifest) error {
-	dir := filepath.Join(fake.remote, manifestProjectPath)
-	path := filepath.Join(dir, manifestFileName)
+	dir := filepath.Join(fake.remote, ManifestProjectPath)
+	path := filepath.Join(dir, ManifestFileName)
 	return fake.writeManifest(manifest, dir, path)
 }
 

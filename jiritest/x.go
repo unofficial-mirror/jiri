@@ -22,7 +22,7 @@ import (
 func NewX(t *testing.T) (*jiri.X, func()) {
 	ctx := tool.NewContextFromEnv(cmdline.EnvFromOS())
 	color := color.NewColor(false)
-	logger := log.NewLogger(log.InfoLevel, color, false, 0)
+	logger := log.NewLogger(log.InfoLevel, color, false, 0, nil, nil)
 	root, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)

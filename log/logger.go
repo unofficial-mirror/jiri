@@ -7,6 +7,7 @@ package log
 import (
 	"container/list"
 	"fmt"
+	"io"
 	glog "log"
 	"os"
 	"sync"
@@ -64,17 +65,25 @@ const (
 	TraceLevel
 )
 
-func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, progressWindowSize uint) *Logger {
+func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, progressWindowSize uint, outWriter, errWriter io.Writer) *Logger {
+	if outWriter == nil {
+		outWriter = os.Stdout
+	}
+	if errWriter == nil {
+		errWriter = os.Stderr
+	}
+
 	term := os.Getenv("TERM")
 	switch term {
 	case "dumb", "":
 		enableProgress = false
 	}
+
 	l := &Logger{
 		LoggerLevel:          loggerLevel,
 		lock:                 &sync.Mutex{},
-		goLogger:             glog.New(os.Stdout, "", 0),
-		goErrorLogger:        glog.New(os.Stderr, "", 0),
+		goLogger:             glog.New(outWriter, "", 0),
+		goErrorLogger:        glog.New(errWriter, "", 0),
 		color:                color,
 		progressLines:        0,
 		enableProgress:       0,

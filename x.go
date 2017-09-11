@@ -159,7 +159,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if progessWindowSizeFlag > 10 {
 		progessWindowSizeFlag = 10
 	}
-	logger := log.NewLogger(loggerLevel, color, showProgressFlag, progessWindowSizeFlag)
+	logger := log.NewLogger(loggerLevel, color, showProgressFlag, progessWindowSizeFlag, nil, nil)
 
 	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())

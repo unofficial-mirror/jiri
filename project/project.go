@@ -2292,7 +2292,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	}
 
 	if shouldRunHooks {
-		if err := runHooks(jirix, ops, hooks, runHookTimeout); err != nil {
+		if err := RunHooks(jirix, hooks, runHookTimeout); err != nil {
 			return err
 		}
 	}
@@ -2357,8 +2357,8 @@ func getProjectStatus(jirix *jiri.X, ps Projects) ([]ProjectStatus, MultiError) 
 	return psa, multiErr
 }
 
-// runHooks runs all hooks for the given operations.
-func runHooks(jirix *jiri.X, ops []operation, hooks Hooks, runHookTimeout uint) error {
+// RunHooks runs all given hooks.
+func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 	jirix.TimerPush("run hooks")
 	defer jirix.TimerPop()
 	type result struct {
