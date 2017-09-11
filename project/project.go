@@ -768,7 +768,7 @@ type Update map[string][]CL
 
 // CreateSnapshot creates a manifest that encodes the current state of
 // HEAD of all projects and writes this snapshot out to the given file.
-func CreateSnapshot(jirix *jiri.X, file string, sourceManifestFile string, localManifest bool) error {
+func CreateSnapshot(jirix *jiri.X, file string, localManifest bool) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
@@ -779,6 +779,7 @@ func CreateSnapshot(jirix *jiri.X, file string, sourceManifestFile string, local
 	if err != nil {
 		return err
 	}
+
 	for _, project := range localProjects {
 		manifest.Projects = append(manifest.Projects, project)
 	}
@@ -789,16 +790,6 @@ func CreateSnapshot(jirix *jiri.X, file string, sourceManifestFile string, local
 	}
 	for _, hook := range hooks {
 		manifest.Hooks = append(manifest.Hooks, hook)
-	}
-
-	if sourceManifestFile != "" {
-		sm, err := NewSourceManifest(jirix, localProjects)
-		if err != nil {
-			return err
-		}
-		if err := sm.ToFile(jirix, sourceManifestFile); err != nil {
-			return err
-		}
 	}
 
 	return manifest.ToFile(jirix, file)
@@ -1105,7 +1096,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 // projects and writes it to the update history directory.
 func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifest bool) error {
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile, "", localManifest); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile, localManifest); err != nil {
 		return err
 	}
 

@@ -233,23 +233,24 @@ To find documentation about a specific topic or subcommand, run `jiri help
 
 ### Main commands are:
 ```
-   branch         Show or delete branches
-   diff           Prints diff between two snapshots
-   grep           Search across projects.
-   import         Adds imports to .jiri_manifest file
-   init           Create a new jiri root
-   patch          Patch in the existing change
-   project        Manage the jiri projects
-   project-config Prints/sets project's local config
-   runhooks       Run hooks using local manifest
-   runp           Run a command in parallel across jiri projects
-   selfupdate     Update jiri tool
-   snapshot       Create a new project snapshot
-   status         Prints status of all the projects
-   update         Update all jiri projects
-   upload         Upload a changelist for review
-   version        Print the jiri version
-   help           Display help for commands or topics
+   branch          Show or delete branches
+   diff            Prints diff between two snapshots
+   grep            Search across projects.
+   import          Adds imports to .jiri_manifest file
+   init            Create a new jiri root
+   patch           Patch in the existing change
+   project         Manage the jiri projects
+   project-config  Prints/sets project's local config
+   runhooks        Run hooks using local manifest
+   runp            Run a command in parallel across jiri projects
+   selfupdate      Update jiri tool
+   snapshot        Create a new project snapshot
+   source-manifest Create a new source-manifest from current checkout
+   status          Prints status of all the projects
+   update          Update all jiri projects
+   upload          Upload a changelist for review
+   version         Print the jiri version
+   help            Display help for commands or topics
 ```
 Run `jiri help [command]` for command usage.
 
