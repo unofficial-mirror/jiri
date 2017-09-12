@@ -18,7 +18,7 @@ var runHooksFlags struct {
 
 var cmdRunHooks = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runHooks),
-	Name:   "runhooks",
+	Name:   "run-hooks",
 	Short:  "Run hooks using local manifest",
 	Long: `
 Run hooks using local manifest JIRI_HEAD version if -local-manifest flag is
