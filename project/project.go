@@ -1339,10 +1339,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 		return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true),
 			gitutil.DepthOpt(project.HistoryDepth), gitutil.UpdateShallowOpt(true))
 	} else {
-		if strings.HasPrefix(project.Remote, "sso://") {
-			return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
-		}
-		return g.Fetch("origin", git.PruneOpt(true))
+		return gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Fetch("origin", gitutil.PruneOpt(true))
 	}
 }
 
@@ -1911,16 +1908,15 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 					// TODO : update this after implementing FetchAll using g
 					task := jirix.Logger.AddTaskMsg("Updating cache: %q", dir)
 					defer task.Done()
-					g := git.NewGit(dir)
 					if _, err := os.Stat(filepath.Join(dir, "shallow")); err == nil {
 						// Shallow cache, fetch only manifest tracked remote branch
 						refspec := fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
-						if err := g.FetchRefspec("origin", refspec, git.PruneOpt(true)); err != nil {
+						if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true)); err != nil {
 							errs <- err
 						}
 						return
 					}
-					if err := g.Fetch("origin", git.PruneOpt(true)); err != nil {
+					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("origin", gitutil.PruneOpt(true)); err != nil {
 						errs <- err
 					}
 					return
