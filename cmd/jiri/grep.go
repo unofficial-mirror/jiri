@@ -28,6 +28,7 @@ Run git grep across all projects.
 var grepFlags struct {
 	n bool
 	h bool
+	i bool
 	e string
 }
 
@@ -36,6 +37,7 @@ func init() {
 	flags.BoolVar(&grepFlags.n, "n", false, "Prefix the line number to matching lines")
 	flags.StringVar(&grepFlags.e, "e", "", "The next parameter is the pattern. This option has to be used for patterns starting with -")
 	flags.BoolVar(&grepFlags.h, "H", true, "Does nothing. Just makes this git grep compatible")
+	flags.BoolVar(&grepFlags.i, "i", false, "Ignore case differences between the patterns and the files")
 }
 
 func buildFlags() []string {
@@ -45,6 +47,9 @@ func buildFlags() []string {
 	}
 	if grepFlags.e != "" {
 		args = append(args, "-e", grepFlags.e)
+	}
+	if grepFlags.i {
+		args = append(args, "-i")
 	}
 	return args
 }

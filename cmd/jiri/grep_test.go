@@ -20,6 +20,7 @@ func setDefaultGrepFlags() {
 	grepFlags.n = false
 	grepFlags.e = ""
 	grepFlags.h = true
+	grepFlags.i = false
 }
 
 func makeProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
@@ -137,5 +138,22 @@ func TestEFlagGrep(t *testing.T) {
 	grepFlags.e = "-hyp"
 	expectGrep(t, fake, []string{}, []string{
 		"sub/sub2/r.t2/file.txt:line with -hyphen",
+	})
+}
+
+func TestIFlagGrep(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	setup(t, fake)
+	setDefaultGrepFlags()
+	expectGrep(t, fake, []string{"and"}, []string{
+		"r.b/file.txt:Thou art more lovely and more temperate:",
+	})
+
+	grepFlags.i = true
+	expectGrep(t, fake, []string{"and"}, []string{
+		"r.b/file.txt:Thou art more lovely and more temperate:",
+		"r.c/file.txt:And summer's lease hath all too short a date:",
 	})
 }
