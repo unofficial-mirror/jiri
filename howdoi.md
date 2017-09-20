@@ -44,7 +44,13 @@ jiri status -changes=false -commits=false
 
 ### grep across projects
 
-`jiri grep [text]`
+Run `jiri grep [text]`. Run `jiri help grep` to see supported flags.
+
+### Run hooks without updating sources
+`jiri run-hooks`
+
+### Set hook timeout
+`jiri update -hook-timeout=<minutes>` or `jiri run-hooks -hook-timeout=<minutes>`
 
 ### delete branch across projects
 
