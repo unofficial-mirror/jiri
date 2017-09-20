@@ -2400,6 +2400,7 @@ func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 	}
 
 	err = nil
+	timeout := false
 	for range hooks {
 		out := <-ch
 		defer func() {
@@ -2411,12 +2412,13 @@ func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 			}
 		}()
 		if out.err == context.DeadlineExceeded {
+			timeout = true
 			out.outFile.Sync()
 			out.outFile.Seek(0, 0)
 			var buf bytes.Buffer
 			io.Copy(&buf, out.outFile)
 			jirix.Logger.Errorf("Timeout while executing hook\n%s\n\n", buf.String())
-			err = fmt.Errorf("Hooks execution failed")
+			err = fmt.Errorf("Hooks execution failed.")
 			continue
 		}
 		var outBuf bytes.Buffer
@@ -2433,13 +2435,15 @@ func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 				io.Copy(&buf, out.errFile)
 			}
 			jirix.Logger.Errorf("%s\n%s\n%s\n", out.err, buf.String(), outBuf.String())
-			err = fmt.Errorf("Hooks execution failed")
+			err = fmt.Errorf("Hooks execution failed.")
 		} else {
 			if outBuf.String() != "" {
 				jirix.Logger.Debugf("%s\n", outBuf.String())
 			}
 		}
-
+	}
+	if timeout {
+		err = fmt.Errorf("%s Use %s flag to set timeout.", err, jirix.Color.Yellow("-hook-timeout"))
 	}
 	return err
 }
