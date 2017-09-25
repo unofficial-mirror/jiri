@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"text/template"
@@ -100,8 +101,11 @@ func runProjectClean(jirix *jiri.X, args []string) (e error) {
 
 // infoOutput defines JSON format for 'project info' output.
 type infoOutput struct {
-	Name          string   `json:"name"`
-	Path          string   `json:"path"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+
+	// Relative path w.r.t to root
+	RelativePath  string   `json:"relativePath"`
 	Remote        string   `json:"remote"`
 	Revision      string   `json:"revision"`
 	CurrentBranch string   `json:"current_branch,omitempty"`
@@ -191,9 +195,15 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 	info := make([]infoOutput, len(keys))
 	for i, key := range keys {
 		state := states[key]
+		rp, err := filepath.Rel(jirix.Root, state.Project.Path)
+		if err != nil {
+			// should not happen
+			panic(err)
+		}
 		info[i] = infoOutput{
 			Name:          state.Project.Name,
 			Path:          state.Project.Path,
+			RelativePath:  rp,
 			Remote:        state.Project.Remote,
 			Revision:      state.Project.Revision,
 			CurrentBranch: state.CurrentBranch.Name,
