@@ -34,6 +34,7 @@ var runpFlags struct {
 	untracked      bool
 	noUntracked    bool
 	showNamePrefix bool
+	showPathPrefix bool
 	showKeyPrefix  bool
 	exitOnError    bool
 	collateOutput  bool
@@ -64,8 +65,9 @@ func init() {
 	cmdRunP.Flags.BoolVar(&runpFlags.untracked, "untracked", false, "Match projects that have untracked files")
 	cmdRunP.Flags.BoolVar(&runpFlags.noUntracked, "no-untracked", false, "Match projects that have no untracked files")
 	cmdRunP.Flags.BoolVar(&runpFlags.interactive, "interactive", false, "If set, the command to be run is interactive and should not have its stdout/stderr manipulated. This flag cannot be used with -show-name-prefix, -show-key-prefix or -collate-stdout.")
-	cmdRunP.Flags.BoolVar(&runpFlags.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-key-prefix or -collate-stdout.")
-	cmdRunP.Flags.BoolVar(&runpFlags.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix or -collate-stdout")
+	cmdRunP.Flags.BoolVar(&runpFlags.showNamePrefix, "show-name-prefix", false, "If set, each line of output from each project will begin with the name of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-path-prefix, -show-key-prefix or -collate-stdout.")
+	cmdRunP.Flags.BoolVar(&runpFlags.showPathPrefix, "show-path-prefix", false, "If set, each line of output from each project will begin with the path of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix, -show-key-prefix or -collate-stdout.")
+	cmdRunP.Flags.BoolVar(&runpFlags.showKeyPrefix, "show-key-prefix", false, "If set, each line of output from each project will begin with the key of the project followed by a colon. This is intended for use with long running commands where the output needs to be streamed. Stdout and stderr are spliced apart. This flag cannot be used with -interactive, -show-name-prefix, -show-path-prefix or -collate-stdout")
 	cmdRunP.Flags.BoolVar(&runpFlags.collateOutput, "collate-stdout", true, "Collate all stdout output from each parallel invocation and display it as if had been generated sequentially. This flag cannot be used with -show-name-prefix, -show-key-prefix or -interactive.")
 	cmdRunP.Flags.BoolVar(&runpFlags.exitOnError, "exit-on-error", false, "If set, all commands will killed as soon as one reports an error, otherwise, each will run to completion.")
 	cmdRunP.Flags.StringVar(&runpFlags.branch, "branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
@@ -192,7 +194,7 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 			stdout = r.serializedWriter(os.Stdout)
 			cleanup = func() {}
 		}
-		if !runpFlags.showNamePrefix && !runpFlags.showKeyPrefix {
+		if !runpFlags.showNamePrefix && !runpFlags.showKeyPrefix && !runpFlags.showPathPrefix {
 			// write directly to stdout, stderr if there's no prefix
 			cmd.Stdout = stdout
 			cmd.Stderr = stderr
@@ -219,6 +221,9 @@ func (r *runner) Map(mr *simplemr.MR, key string, val interface{}) error {
 			prefix := key
 			if runpFlags.showNamePrefix {
 				prefix = mi.Project.Name
+			}
+			if runpFlags.showPathPrefix {
+				prefix = mi.Project.Path
 			}
 			wg.Add(2)
 			go func() { copyWithPrefix(prefix, stdout, stdoutReader); wg.Done() }()
@@ -301,8 +306,8 @@ func runRunp(jirix *jiri.X, args []string) error {
 		}
 	}
 
-	if (runpFlags.showKeyPrefix || runpFlags.showNamePrefix) && runpFlags.interactive {
-		fmt.Fprintf(jirix.Stderr(), "WARNING: interactive mode being disabled because show-key-prefix or show-name-prefix was set\n")
+	if (runpFlags.showKeyPrefix || runpFlags.showNamePrefix || runpFlags.showPathPrefix) && runpFlags.interactive {
+		fmt.Fprintf(jirix.Stderr(), "WARNING: interactive mode being disabled because show-key-prefix or show-name-prefix or show-path-prefix was set\n")
 		runpFlags.interactive = false
 		runpFlags.collateOutput = true
 	}

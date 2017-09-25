@@ -25,6 +25,7 @@ func setDefaultRunpFlags() {
 	runpFlags.noUncommitted = false
 	runpFlags.noUntracked = false
 	runpFlags.showNamePrefix = false
+	runpFlags.showPathPrefix = false
 	runpFlags.showKeyPrefix = false
 	runpFlags.exitOnError = false
 	runpFlags.collateOutput = true
@@ -97,9 +98,12 @@ func TestRunP(t *testing.T) {
 	}
 
 	manifestKey := strings.Replace(string(projects[0].Key()), "r.a", "manifest", -1)
+	manifestPath := strings.Replace(projects[0].Path, "r.a", "manifest", -1)
 	keys := []string{manifestKey}
+	paths := []string{manifestPath}
 	for _, p := range projects {
 		keys = append(keys, string(p.Key()))
+		paths = append(paths, p.Path)
 	}
 
 	chdir(projects[0].Path)
@@ -138,6 +142,13 @@ func TestRunP(t *testing.T) {
 	sort.Strings(split)
 	got = strings.TrimSpace(strings.Join(split, "\n"))
 	if want := "manifest: HEAD\nr.a: HEAD\nr.b: HEAD\nr.c: HEAD\nsub/r.t1: HEAD\nsub/sub2/r.t2: HEAD"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	setDefaultRunpFlags()
+	runpFlags.showPathPrefix = true
+	got = executeRunp(t, fake, "git", "rev-parse", "--abbrev-ref", "HEAD")
+	if want := strings.Join(paths, ": HEAD\n") + ": HEAD"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
