@@ -54,8 +54,6 @@ type CLOpts struct {
 	// Autosubmit determines if the CL should be auto-submitted when it
 	// meets the submission rules.
 	Autosubmit bool
-	// Branch identifies the local branch that contains the CL.
-	Branch string
 	// Ccs records a list of email addresses to cc on the CL.
 	Ccs []string
 	// Draft determines if this CL is a draft.

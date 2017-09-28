@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
@@ -121,6 +120,7 @@ func resetFlags() {
 	uploadMultipartFlag = false
 	uploadBranchFlag = ""
 	uploadRemoteBranchFlag = ""
+	uploadSetTopicFlag = true
 }
 
 func TestUpload(t *testing.T) {
@@ -244,6 +244,52 @@ func TestUploadWithOldMetadata(t *testing.T) {
 	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
 	expectedRef := "refs/for/master%topic=" + topic
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
+}
+
+func TestUploadFromDetachedHead(t *testing.T) {
+	defer resetFlags()
+	fake, localProjects, cleanup := setupUploadTest(t)
+	defer cleanup()
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	if err := os.Chdir(localProjects[1].Path); err != nil {
+		t.Fatal(err)
+	}
+
+	//	gerritPath := fake.Projects[localProjects[0].Name]
+	// uploadMultipartFlag = true
+	expectedErr := "Current project is not on any branch. Either provide a topic or set flag \"-set-topic\" to false."
+	if err := runUpload(fake.X, []string{}); err == nil {
+		t.Fatalf("expected error: %s", expectedErr)
+	} else if err.Error() != expectedErr {
+		t.Fatalf("expected error: %s\ngot error: %s", expectedErr, err)
+	}
+
+	uploadMultipartFlag = true
+	expectedErr = "Current project is not on any branch. Multipart uploads require project to be on a branch."
+	if err := runUpload(fake.X, []string{}); err == nil {
+		t.Fatalf("expected a error: %s", expectedErr)
+	} else if err.Error() != expectedErr {
+		t.Fatalf("expected a error: %s\ngot error: %s", expectedErr, err)
+	}
+	resetFlags()
+	uploadSetTopicFlag = false
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Fatal(err)
+	}
+
+	resetFlags()
+	uploadTopicFlag = "topic"
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestUploadMultipart(t *testing.T) {
@@ -437,36 +483,6 @@ func TestUploadMultipleCommits(t *testing.T) {
 	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
 	expectedRef := "refs/for/master%topic=" + topic
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, append(files1, files2...))
-}
-
-func TestUploadThrowsErrorWhenNotOnBranch(t *testing.T) {
-	defer resetFlags()
-	fake, localProjects, cleanup := setupUploadTest(t)
-	defer cleanup()
-	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(currentDir); err != nil {
-			t.Fatal(err)
-		}
-	}()
-	if err := os.Chdir(localProjects[1].Path); err != nil {
-		t.Fatal(err)
-	}
-	git := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"))
-	if err := git.CheckoutBranch("HEAD", gitutil.DetachOpt(true)); err != nil {
-		t.Fatal(err)
-	}
-	files := []string{"file1"}
-	commitFiles(t, fake.X, files)
-
-	if err := runUpload(fake.X, []string{}); err == nil {
-		t.Fatalf("Should have got a error here.")
-	} else if !strings.Contains(err.Error(), "project is not on any branch") {
-		t.Fatalf("Wrong error: %s", err)
-	}
 }
 
 func TestUploadUntrackedBranch(t *testing.T) {

@@ -110,11 +110,17 @@ func runUpload(jirix *jiri.X, args []string) error {
 	} else {
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
 		if !scm.IsOnBranch() {
-			return fmt.Errorf("Current project is not on any branch.")
-		}
-		currentBranch, err = scm.CurrentBranchName()
-		if err != nil {
-			return err
+			if uploadMultipartFlag {
+				return fmt.Errorf("Current project is not on any branch. Multipart uploads require project to be on a branch.")
+			}
+			if uploadTopicFlag == "" && uploadSetTopicFlag {
+				return fmt.Errorf("Current project is not on any branch. Either provide a topic or set flag \"-set-topic\" to false.")
+			}
+		} else {
+			currentBranch, err = scm.CurrentBranchName()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	var projectsToProcess []project.Project
@@ -177,7 +183,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 			}
 		}
 		remoteBranch := uploadRemoteBranchFlag
-		if remoteBranch == "" {
+		if remoteBranch == "" && currentBranch != "" {
 			remoteBranch, err = scm.RemoteBranchName()
 			if err != nil {
 				return err
@@ -200,7 +206,6 @@ func runUpload(jirix *jiri.X, args []string) error {
 			Reviewers:    parseEmails(uploadReviewersFlag),
 			Verify:       uploadVerifyFlag,
 			Topic:        topic,
-			Branch:       currentBranch,
 			RefToUpload:  refToUpload,
 		}
 
