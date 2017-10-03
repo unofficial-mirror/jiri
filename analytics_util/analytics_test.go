@@ -89,7 +89,7 @@ func TestSendCommand(t *testing.T) {
 	}
 
 	serverCalled = false
-	expectedVals["cd2"] = "v:true,multipart:false"
+	expectedVals["cd2"] = "multipart:false,v:true"
 	expectedVals["el"] = ""
 	expectedVals["ev"] = ""
 	version.GitCommit = "test-commit"

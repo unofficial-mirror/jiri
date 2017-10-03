@@ -5,6 +5,7 @@
 package analytics_util
 
 import (
+	"sort"
 	"strings"
 	"time"
 )
@@ -32,7 +33,13 @@ func (c *Command) AnalyticsObject() AnayticsObject {
 	}
 	value := ""
 	if len(c.flags) > 0 {
-		for k, v := range c.flags {
+		keys := []string{}
+		for k, _ := range c.flags {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := c.flags[k]
 			value = value + k + ":" + v + ","
 		}
 		value = strings.TrimRight(value, ",")
