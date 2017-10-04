@@ -385,7 +385,7 @@ by running `jiri help upload`.
    can be submitted.  To do so, rebase your changes then upload the updated CL
    to Gerrit.
   ```
-  jiri cl upload
+  jiri upload
   ```
 2. Once a CL meets the conditions for being submitted, it can be merged into
    the remote master branch by clicking the "Submit" button on the Gerrit web
