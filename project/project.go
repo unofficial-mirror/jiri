@@ -386,6 +386,9 @@ type Import struct {
 	Name string `xml:"name,attr,omitempty"`
 	// Remote is the remote manifest project to import.
 	Remote string `xml:"remote,attr,omitempty"`
+	// Revision is the revison to checkout,
+	// this takes precedence over RemoteBranch
+	Revision string `xml:"revision,attr,omitempty"`
 	// RemoteBranch is the name of the remote branch to track.
 	RemoteBranch string `xml:"remotebranch,attr,omitempty"`
 	// Root path, prepended to all project paths specified in the manifest file.
@@ -397,12 +400,18 @@ func (i *Import) fillDefaults() error {
 	if i.RemoteBranch == "" {
 		i.RemoteBranch = "master"
 	}
+	if i.Revision == "" {
+		i.Revision = "HEAD"
+	}
 	return i.validate()
 }
 
 func (i *Import) unfillDefaults() error {
 	if i.RemoteBranch == "master" {
 		i.RemoteBranch = ""
+	}
+	if i.Revision == "HEAD" {
+		i.Revision = ""
 	}
 	return i.validate()
 }
@@ -419,6 +428,7 @@ func (i *Import) toProject(path string) (Project, error) {
 		Name:         i.Name,
 		Path:         path,
 		Remote:       i.Remote,
+		Revision:     i.Revision,
 		RemoteBranch: i.RemoteBranch,
 	}
 	err := p.fillDefaults()
@@ -1594,22 +1604,24 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 // directories, and added to localProjects.
 func newManifestLoader(localProjects Projects, update bool) *loader {
 	return &loader{
-		Projects:      make(Projects),
-		Hooks:         make(Hooks),
-		localProjects: localProjects,
-		update:        update,
-		manifests:     make(map[string]bool),
+		Projects:       make(Projects),
+		Hooks:          make(Hooks),
+		localProjects:  localProjects,
+		importProjects: make(Projects),
+		update:         update,
+		manifests:      make(map[string]bool),
 	}
 }
 
 type loader struct {
-	Projects      Projects
-	Hooks         Hooks
-	TmpDir        string
-	localProjects Projects
-	update        bool
-	cycleStack    []cycleInfo
-	manifests     map[string]bool
+	Projects       Projects
+	Hooks          Hooks
+	TmpDir         string
+	localProjects  Projects
+	importProjects Projects
+	update         bool
+	cycleStack     []cycleInfo
+	manifests      map[string]bool
 }
 
 type cycleInfo struct {
@@ -1714,7 +1726,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 			if err := gitutil.New(jirix).Clone(p.Remote, path, gitutil.NoCheckoutOpt(true)); err != nil {
 				return err
 			}
-			p.Revision = "HEAD"
+			p.Revision = remote.Revision
 			p.RemoteBranch = remote.RemoteBranch
 			if err := checkoutHeadRevision(jirix, p, false); err != nil {
 				return fmt.Errorf("Not able to checkout head for %s(%s): %v", p.Name, p.Path, err)
@@ -1724,8 +1736,9 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 		// Reset the project to its specified branch and load the next file.  Note
 		// that we call load() recursively, so multiple files may be loaded by
 		// resetAndLoad.
-		p.Revision = "HEAD"
+		p.Revision = remote.Revision
 		p.RemoteBranch = remote.RemoteBranch
+		ld.importProjects[key] = p
 		nextFile := filepath.Join(p.Path, remote.Manifest)
 		if err := ld.resetAndLoad(jirix, nextRoot, nextFile, remote.cycleKey(), p, localManifest); err != nil {
 			return err
@@ -1765,10 +1778,23 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 		// Prepend the root to the project name.  This will be a noop if the import is not rooted.
 		project.Name = filepath.Join(root, project.Name)
 		key := project.Key()
+
+		if r, ok := ld.importProjects[key]; ok {
+			// update revision for this project
+			if r.Revision != "" && r.Revision != "HEAD" {
+				if project.Revision == "" || project.Revision == "HEAD" {
+					project.Revision = r.Revision
+				} else {
+					return fmt.Errorf("project %q found in %q defines different revision than its corresponding import tag.", key, shortFileName(jirix.Root, file))
+				}
+			}
+		}
+
 		if dup, ok := ld.Projects[key]; ok && dup != project {
 			// TODO(toddw): Tell the user the other conflicting file.
-			return fmt.Errorf("duplicate project %q found in %v", key, shortFileName(jirix.Root, file))
+			return fmt.Errorf("duplicate project %q found in %q", key, shortFileName(jirix.Root, file))
 		}
+
 		ld.Projects[key] = project
 	}
 
@@ -1784,7 +1810,8 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 
 func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, project Project, localManifest bool) (e error) {
 	if localManifest {
-		return ld.Load(jirix, root, file, cycleKey, localManifest)
+		// local manifest should not work on recursive imports, only top level import
+		return ld.Load(jirix, root, file, cycleKey, false)
 	}
 
 	// Reset the local branch to what's specified on the project.  We only
