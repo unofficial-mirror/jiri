@@ -397,11 +397,10 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 	userId := ""
 	analyticsCommandMsg := fmt.Sprintf("To check what data we collect run '%s'\n"+
 		"To opt-in run '%s'\n"+
-		"To opt-out run '%s'\n"+
-		"Above commands should be executed from jiri root folder '%s'",
+		"To opt-out run '%s'",
 		x.Color.Yellow("jiri init -show-analytics-data"),
-		x.Color.Yellow("jiri init -analytics-opt=true"),
-		x.Color.Yellow("jiri init -analytics-opt=false"), x.Color.Yellow(x.Root))
+		x.Color.Yellow("jiri init -analytics-opt=true %q", x.Root),
+		x.Color.Yellow("jiri init -analytics-opt=false %q", x.Root))
 	if x.config == nil || x.config.AnalyticsOptIn == "" {
 		x.Logger.Warningf("Please opt in or out of analytics collection. You will receive this warning until an option is selected.\n%s\n\n", analyticsCommandMsg)
 	} else if x.config.AnalyticsOptIn == "yes" {
