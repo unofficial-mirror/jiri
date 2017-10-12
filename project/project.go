@@ -894,6 +894,16 @@ func setProjectRevisions(jirix *jiri.X, projects Projects) (Projects, error) {
 	return projects, nil
 }
 
+func rewriteRemote(jirix *jiri.X, remote string) string {
+	if !jirix.RewriteSsoToHttps {
+		return remote
+	}
+	if strings.HasPrefix(remote, "sso://") {
+		return strings.Replace(remote, "sso://", "https://", 1)
+	}
+	return remote
+}
+
 // LocalProjects returns projects on the local filesystem.  If all projects in
 // the manifest exist locally and scanMode is set to FastScan, then only the
 // projects in the manifest that exist locally will be returned.  Otherwise, a
@@ -1355,7 +1365,8 @@ func fetchAll(jirix *jiri.X, project Project) error {
 		return fmt.Errorf("project %q does not have a remote", project.Name)
 	}
 	g := git.NewGit(project.Path)
-	if err := g.SetRemoteUrl("origin", project.Remote); err != nil {
+	remote := rewriteRemote(jirix, project.Remote)
+	if err := g.SetRemoteUrl("origin", remote); err != nil {
 		return err
 	}
 	if project.HistoryDepth > 0 {
@@ -1723,7 +1734,8 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 			if err := os.MkdirAll(path, 0755); err != nil {
 				return fmtError(err)
 			}
-			if err := gitutil.New(jirix).Clone(p.Remote, path, gitutil.NoCheckoutOpt(true)); err != nil {
+			remoteUrl := rewriteRemote(jirix, p.Remote)
+			if err := gitutil.New(jirix).Clone(remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
 				return err
 			}
 			p.Revision = remote.Revision
@@ -1942,8 +1954,13 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			go func(dir, remote string, depth int, branch string) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
-
+				remote = rewriteRemote(jirix, remote)
 				if isPathDir(dir) {
+					if err := git.NewGit(dir).SetRemoteUrl("origin", remote); err != nil {
+						errs <- err
+						return
+					}
+
 					// Cache already present, update it
 					// TODO : update this after implementing FetchAll using g
 					task := jirix.Logger.AddTaskMsg("Updating cache: %q", dir)
@@ -2712,7 +2729,8 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 		if op.project.HistoryDepth > 0 {
 			ref = ""
 		}
-		if err := gitutil.New(jirix).Clone(op.project.Remote, tmpDir,
+		remote := rewriteRemote(jirix, op.project.Remote)
+		if err := gitutil.New(jirix).Clone(remote, tmpDir,
 			gitutil.ReferenceOpt(ref),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
 			return err

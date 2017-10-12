@@ -44,10 +44,11 @@ const (
 
 // Config represents jiri global config
 type Config struct {
-	CachePath       string `xml:"cache>path,omitempty"`
-	Shared          bool   `xml:"cache>shared,omitempty"`
-	AnalyticsOptIn  string `xml:"analytics>optin,omitempty"`
-	AnalyticsUserId string `xml:"analytics>userId,omitempty"`
+	CachePath         string `xml:"cache>path,omitempty"`
+	Shared            bool   `xml:"cache>shared,omitempty"`
+	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
+	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
+	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	// version user has opted-in to
 	AnalyticsVersion string `xml:"analytics>version,omitempty"`
 
@@ -88,15 +89,16 @@ func ConfigFromFile(filename string) (*Config, error) {
 // including the manifest and related operations.
 type X struct {
 	*tool.Context
-	Root     string
-	Usage    func(format string, args ...interface{}) error
-	config   *Config
-	Cache    string
-	Shared   bool
-	Jobs     uint
-	Color    color.Color
-	Logger   *log.Logger
-	failures uint32
+	Root              string
+	Usage             func(format string, args ...interface{}) error
+	config            *Config
+	Cache             string
+	Shared            bool
+	Jobs              uint
+	RewriteSsoToHttps bool
+	Color             color.Color
+	Logger            *log.Logger
+	failures          uint32
 }
 
 func (jirix *X) IncrementFailures() {
@@ -195,6 +197,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
+	x.RewriteSsoToHttps = x.config.RewriteSsoToHttps
 	x.Cache, err = findCache(root, x.config)
 	if x.config != nil {
 		x.Shared = x.config.Shared
@@ -321,14 +324,15 @@ func FindRoot() string {
 // Clone returns a clone of the environment.
 func (x *X) Clone(opts tool.ContextOpts) *X {
 	return &X{
-		Context:  x.Context.Clone(opts),
-		Root:     x.Root,
-		Usage:    x.Usage,
-		Jobs:     x.Jobs,
-		Cache:    x.Cache,
-		Color:    x.Color,
-		Logger:   x.Logger,
-		failures: x.failures,
+		Context:           x.Context.Clone(opts),
+		Root:              x.Root,
+		Usage:             x.Usage,
+		Jobs:              x.Jobs,
+		Cache:             x.Cache,
+		Color:             x.Color,
+		RewriteSsoToHttps: x.RewriteSsoToHttps,
+		Logger:            x.Logger,
+		failures:          x.failures,
 	}
 }
 
