@@ -197,7 +197,9 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
-	x.RewriteSsoToHttps = x.config.RewriteSsoToHttps
+	if x.config != nil {
+		x.RewriteSsoToHttps = x.config.RewriteSsoToHttps
+	}
 	x.Cache, err = findCache(root, x.config)
 	if x.config != nil {
 		x.Shared = x.config.Shared
