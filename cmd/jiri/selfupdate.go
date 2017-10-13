@@ -13,16 +13,16 @@ import (
 
 // cmdSelfUpdate represents the "jiri update" command.
 var cmdSelfUpdate = &cmdline.Command{
-	Runner: jiri.RunnerFunc(runSelfUpdate),
+	Runner: cmdline.RunnerFunc(runSelfUpdate),
 	Name:   "selfupdate",
 	Short:  "Update jiri tool",
 	Long: `
 Updates jiri tool and replaces current one with the latest`,
 }
 
-func runSelfUpdate(jirix *jiri.X, args []string) error {
+func runSelfUpdate(env *cmdline.Env, args []string) error {
 	if len(args) > 0 {
-		return jirix.UsageErrorf("unexpected number of arguments")
+		return fmt.Errorf("unexpected number of arguments")
 	}
 
 	if err := jiri.Update(true); err != nil {
