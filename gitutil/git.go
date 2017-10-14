@@ -326,6 +326,19 @@ func (g *Git) SetUpstream(branch, upstream string) error {
 	return g.run("branch", "-u", upstream, branch)
 }
 
+func (g *Git) LsRemote(args ...string) (string, error) {
+	a := []string{"ls-remote"}
+	a = append(a, args...)
+	out, err := g.runOutput(a...)
+	if err != nil {
+		return "", err
+	}
+	if got, want := len(out), 1; got != want {
+		return "", fmt.Errorf("git ls-remote %s: unexpected length of %s: got %s, want %s", strings.Join(args, " "), out, got, want)
+	}
+	return out[0], nil
+}
+
 // CreateBranchWithUpstream creates a new branch and sets the upstream
 // repository to the given upstream.
 func (g *Git) CreateBranchWithUpstream(branch, upstream string) error {

@@ -56,6 +56,7 @@ Command jiri is a multi-purpose tool for multi-repo development.
 		Children: []*cmdline.Command{
 			cmdBranch,
 			cmdDiff,
+			cmdEdit,
 			cmdGrep,
 			cmdImport,
 			cmdInit,
