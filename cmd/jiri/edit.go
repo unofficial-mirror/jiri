@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"fuchsia.googlesource.com/jiri"
@@ -74,22 +75,33 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects map[string]stru
 	manifestContent := string(content)
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(filepath.Dir(manifestPath)))
 	for _, p := range m.Projects {
-
 		if _, ok := projects[p.Name]; !ok {
 			continue
 		}
-
-		if p.Revision != "" {
-			branch := "master"
-			if p.RemoteBranch != "" {
-				branch = p.RemoteBranch
-			}
-			out, err := scm.LsRemote(p.Remote, fmt.Sprintf("refs/heads/%s", branch))
+		branch := "master"
+		if p.RemoteBranch != "" {
+			branch = p.RemoteBranch
+		}
+		out, err := scm.LsRemote(p.Remote, fmt.Sprintf("refs/heads/%s", branch))
+		if err != nil {
+			return err
+		}
+		latestRevision := strings.Fields(string(out))[0]
+		if p.Revision != "" && p.Revision != "HEAD" {
+			manifestContent = strings.Replace(manifestContent, p.Revision, latestRevision, 1)
+		} else {
+			r, err := regexp.Compile(fmt.Sprintf("( *?)<project (.|\\n)*?name=%q(.|\\n)*?\\/>", p.Name))
 			if err != nil {
 				return err
 			}
-			latestRevision := strings.Fields(string(out))[0]
-			manifestContent = strings.Replace(manifestContent, p.Revision, latestRevision, 1)
+			t := r.FindStringSubmatch(manifestContent)
+			if t == nil {
+				return fmt.Errorf("Not able to match project %q", p.Name)
+			}
+			s := t[0]
+			spaces := t[1]
+			us := strings.Replace(s, "/>", fmt.Sprintf("\n%s         revision=%q/>", spaces, latestRevision), 1)
+			manifestContent = strings.Replace(manifestContent, s, us, 1)
 		}
 	}
 
