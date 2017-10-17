@@ -1735,8 +1735,30 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 				return fmtError(err)
 			}
 			remoteUrl := rewriteRemote(jirix, p.Remote)
-			if err := gitutil.New(jirix).Clone(remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
-				return err
+			if jirix.Cache != "" {
+				cacheDirPath, err := p.CacheDirPath(jirix)
+				if err != nil {
+					return err
+				}
+				if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, remote.RemoteBranch, 0); err != nil {
+					return err
+				}
+				if jirix.Shared {
+					if err := gitutil.New(jirix).Clone(cacheDirPath, path,
+						gitutil.SharedOpt(true), gitutil.NoCheckoutOpt(true)); err != nil {
+						return err
+					}
+				} else {
+					if err := gitutil.New(jirix).Clone(remoteUrl, path,
+						gitutil.ReferenceOpt(cacheDirPath), gitutil.NoCheckoutOpt(true)); err != nil {
+						return err
+					}
+				}
+
+			} else {
+				if err := gitutil.New(jirix).Clone(remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
+					return err
+				}
 			}
 			p.Revision = remote.Revision
 			p.RemoteBranch = remote.RemoteBranch
@@ -1927,6 +1949,40 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 	return multiErr
 }
 
+func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) error {
+	if isPathDir(dir) {
+		if err := git.NewGit(dir).SetRemoteUrl("origin", remote); err != nil {
+			return err
+		}
+
+		// Cache already present, update it
+		// TODO : update this after implementing FetchAll using g
+		task := jirix.Logger.AddTaskMsg("Updating cache: %q", dir)
+		defer task.Done()
+		if _, err := os.Stat(filepath.Join(dir, "shallow")); err == nil {
+			// Shallow cache, fetch only manifest tracked remote branch
+			refspec := fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
+			if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true)); err != nil {
+				return err
+			}
+		} else {
+			if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("origin", gitutil.PruneOpt(true)); err != nil {
+				return err
+			}
+		}
+	} else {
+		// Create cache
+		// TODO : If we in future need to support two projects with same remote url,
+		// one with shallow checkout and one with full, we should create two caches
+		task := jirix.Logger.AddTaskMsg("Creating cache: %q", dir)
+		defer task.Done()
+		if err := gitutil.New(jirix).CloneMirror(remote, dir, depth); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // updateCache creates the cache or updates it if already present.
 func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 	jirix.TimerPush("update cache")
@@ -1955,39 +2011,9 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				remote = rewriteRemote(jirix, remote)
-				if isPathDir(dir) {
-					if err := git.NewGit(dir).SetRemoteUrl("origin", remote); err != nil {
-						errs <- err
-						return
-					}
-
-					// Cache already present, update it
-					// TODO : update this after implementing FetchAll using g
-					task := jirix.Logger.AddTaskMsg("Updating cache: %q", dir)
-					defer task.Done()
-					if _, err := os.Stat(filepath.Join(dir, "shallow")); err == nil {
-						// Shallow cache, fetch only manifest tracked remote branch
-						refspec := fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
-						if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true)); err != nil {
-							errs <- err
-						}
-						return
-					}
-					if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Fetch("origin", gitutil.PruneOpt(true)); err != nil {
-						errs <- err
-					}
+				if err := updateOrCreateCache(jirix, dir, remote, branch, depth); err != nil {
+					errs <- err
 					return
-				} else {
-					// Create cache
-					// TODO : If we in future need to support two projects with same remote url,
-					// one with shallow checkout and one with full, we should create two caches
-					task := jirix.Logger.AddTaskMsg("Creating cache: %q", dir)
-					defer task.Done()
-					if err := gitutil.New(jirix).CloneMirror(remote, dir, depth); err != nil {
-						errs <- err
-					}
-					return
-
 				}
 			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch)
 		} else {
