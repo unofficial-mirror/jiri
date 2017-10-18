@@ -86,7 +86,7 @@ func updateRevision(manifestContent, tag, currentRevision, newRevision, name str
 	if currentRevision != "" && currentRevision != "HEAD" {
 		return strings.Replace(manifestContent, currentRevision, newRevision, 1), nil
 	}
-	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s (.|\\n)*?name=%q(.|\\n)*?\\/>", tag, name))
+	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s [^<]*?name=%q(.|\\n)*?\\/>", tag, name))
 	if err != nil {
 		return "", err
 	}
