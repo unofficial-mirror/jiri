@@ -76,7 +76,7 @@ func TestSendCommand(t *testing.T) {
 	expectedVals["ec"] = "Command"
 	expectedVals["ea"] = "action"
 	expectedVals["el"] = "Complete"
-	expectedVals["cd2"] = ""
+	expectedVals["cd2"] = "()"
 	expectedVals["an"] = "jiri"
 	expectedVals["av"] = "test"
 	expectedVals["cd1"] = fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)

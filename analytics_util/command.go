@@ -43,6 +43,9 @@ func (c *Command) AnalyticsObject() AnayticsObject {
 			value = value + k + ":" + v + ","
 		}
 		value = strings.TrimRight(value, ",")
+	} else {
+		// track no flag
+		value = "()"
 	}
 	e.CustomDimension = make(map[string]string)
 	e.CustomDimension["flags"] = value
