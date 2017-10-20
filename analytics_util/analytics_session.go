@@ -174,9 +174,11 @@ func (as *AnalyticsSession) SendAllAndWaitToFinish() {
 	if !as.enabled {
 		return
 	}
+	as.lock.Lock()
 	for k, _ := range as.objects {
 		as.Send(k)
 	}
+	as.lock.Unlock()
 	for {
 		as.slock.RLock()
 		l := len(as.sending)
@@ -186,6 +188,5 @@ func (as *AnalyticsSession) SendAllAndWaitToFinish() {
 		} else {
 			break
 		}
-
 	}
 }
