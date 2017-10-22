@@ -12,7 +12,7 @@ readonly PKG_PATH="fuchsia.googlesource.com/jiri"
 
 # These are embedded directly into jiri itself and are available through `jiri version`.
 readonly GIT_COMMIT=$(git --git-dir="${GIT_DIR}/.git" --work-tree="${GIT_DIR}" rev-parse HEAD)
-readonly BUILD_TIME=$(python -c "import datetime; print datetime.datetime.utcnow().isoformat()")
+readonly BUILD_TIME=$(python -c "import datetime; print(datetime.datetime.utcnow().isoformat())")
 
 readonly CMAKE_PROGRAM=${CMAKE_PROGRAM:-cmake}
 readonly NINJA_PROGRAM=${NINJA_PROGRAM:-ninja}
