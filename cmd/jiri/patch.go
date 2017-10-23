@@ -367,7 +367,7 @@ func runPatch(jirix *jiri.X, args []string) error {
 					jirix.Logger.Warningf("invalid remote %q for project %s: %s", p.Remote, p.Name, err)
 					continue
 				}
-				if strings.HasSuffix(u.EscapedPath(), "/"+change.Project) {
+				if u.EscapedPath() == "/"+change.Project {
 					if p.GerritHost != host {
 
 						if p.GerritHost == "" {
