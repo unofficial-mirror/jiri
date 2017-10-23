@@ -362,7 +362,12 @@ func runPatch(jirix *jiri.X, args []string) error {
 			var projectToPatch *project.Project
 			var projectToPatchNoGerritHost *project.Project
 			for _, p := range projects {
-				if strings.HasSuffix(p.Remote, "/"+change.Project) {
+				u, err := url.Parse(strings.Trim(p.Remote, "/"))
+				if err != nil {
+					jirix.Logger.Warningf("invalid remote %q for project %s: %s", p.Remote, p.Name, err)
+					continue
+				}
+				if strings.HasSuffix(u.EscapedPath(), "/"+change.Project) {
 					if p.GerritHost != host {
 
 						if p.GerritHost == "" {
