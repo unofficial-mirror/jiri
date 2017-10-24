@@ -1615,24 +1615,26 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 // directories, and added to localProjects.
 func newManifestLoader(localProjects Projects, update bool) *loader {
 	return &loader{
-		Projects:       make(Projects),
-		Hooks:          make(Hooks),
-		localProjects:  localProjects,
-		importProjects: make(Projects),
-		update:         update,
-		manifests:      make(map[string]bool),
+		Projects:         make(Projects),
+		Hooks:            make(Hooks),
+		localProjects:    localProjects,
+		importProjects:   make(Projects),
+		update:           update,
+		localManifestMap: make(map[string]bool),
+		manifests:        make(map[string]bool),
 	}
 }
 
 type loader struct {
-	Projects       Projects
-	Hooks          Hooks
-	TmpDir         string
-	localProjects  Projects
-	importProjects Projects
-	update         bool
-	cycleStack     []cycleInfo
-	manifests      map[string]bool
+	Projects         Projects
+	Hooks            Hooks
+	TmpDir           string
+	localProjects    Projects
+	importProjects   Projects
+	localManifestMap map[string]bool
+	update           bool
+	cycleStack       []cycleInfo
+	manifests        map[string]bool
 }
 
 type cycleInfo struct {
@@ -1710,6 +1712,7 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 	if err != nil {
 		return err
 	}
+
 	// Process remote imports.
 	for _, remote := range m.Imports {
 		nextRoot := filepath.Join(root, remote.Root)
@@ -1773,11 +1776,20 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 		p.Revision = remote.Revision
 		p.RemoteBranch = remote.RemoteBranch
 		ld.importProjects[key] = p
+
+		lm := localManifest
+		// Store if current manifest should be picked from local or from server
+		if v, ok := ld.localManifestMap[strings.Trim(remote.Remote, "/")]; ok {
+			lm = v
+		} else {
+			ld.localManifestMap[strings.Trim(remote.Remote, "/")] = lm
+		}
 		nextFile := filepath.Join(p.Path, remote.Manifest)
-		if err := ld.resetAndLoad(jirix, nextRoot, nextFile, remote.cycleKey(), p, localManifest); err != nil {
+		if err := ld.resetAndLoad(jirix, nextRoot, nextFile, remote.cycleKey(), p, lm); err != nil {
 			return err
 		}
 	}
+
 	// Process local imports.
 	for _, local := range m.LocalImports {
 		// TODO(toddw): Add our invariant check that the file is in the same

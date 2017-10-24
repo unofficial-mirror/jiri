@@ -29,7 +29,7 @@ const (
 )
 const (
 	defaultDataDir      = "data"
-	manifestProjectName = "manifest"
+	ManifestProjectName = "manifest"
 )
 
 // NewFakeJiriRoot returns a new FakeJiriRoot and a cleanup closure.  The
@@ -61,9 +61,9 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	}
 	// Add the "manifest" project to the manifest.
 	if err := fake.AddProject(project.Project{
-		Name:   manifestProjectName,
+		Name:   ManifestProjectName,
 		Path:   ManifestProjectPath,
-		Remote: fake.Projects[manifestProjectName],
+		Remote: fake.Projects[ManifestProjectName],
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 		Imports: []project.Import{
 			project.Import{
 				Manifest: ManifestFileName,
-				Name:     manifestProjectName,
+				Name:     ManifestProjectName,
 				Remote:   filepath.Join(fake.remote, ManifestProjectPath),
 			},
 		},

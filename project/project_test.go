@@ -635,7 +635,7 @@ func TestRecursiveImportWithLocalImport(t *testing.T) {
 	if err := fake.CreateRemoteProject(remoteManifestStr); err != nil {
 		t.Fatal(err)
 	}
-	// Fix last projet rev
+	// Fix last project rev
 	lastPRev, _ := git.NewGit(fake.Projects[lastProject.Name]).CurrentRevision()
 	lastProject.Revision = lastPRev
 	remoteManifest := &project.Manifest{
@@ -690,6 +690,82 @@ func TestRecursiveImportWithLocalImport(t *testing.T) {
 	}
 	// check last project revision
 	currentRev, _ = git.NewGit(filepath.Join(fake.X.Root, lastProject.Path)).CurrentRevision()
+	if currentRev != lastPRev {
+		t.Fatalf("For project %q expected rev to be %q got %q", lastProject.Name, lastPRev, currentRev)
+	}
+}
+
+func TestRecursiveImportWhenOriginalManifestIsImportedAgain(t *testing.T) {
+	_, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	manifest, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove last project from manifest and add it to local import
+	lastProject := manifest.Projects[len(manifest.Projects)-1]
+	manifest.Projects = manifest.Projects[:len(manifest.Projects)-1]
+	manifest.LocalImports = []project.LocalImport{project.LocalImport{
+		File: "localmanifest",
+	}}
+	localManifest := project.Manifest{
+		Projects: []project.Project{lastProject},
+	}
+	localManifestFile := filepath.Join(fake.Projects[jiritest.ManifestProjectName], "localmanifest")
+	if err := localManifest.ToFile(fake.X, localManifestFile); err != nil {
+		t.Fatal(err)
+	}
+	commitFile(t, fake.X, fake.Projects[jiritest.ManifestProjectName], "localmanifest", "1")
+
+	remoteManifestStr := "remotemanifest"
+	if err := fake.CreateRemoteProject(remoteManifestStr); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Imports = []project.Import{project.Import{
+		Name:     remoteManifestStr,
+		Remote:   fake.Projects[remoteManifestStr],
+		Manifest: "manifest",
+	}}
+	fake.WriteRemoteManifest(manifest)
+
+	// Fix last project rev
+	remoteManifest := &project.Manifest{
+		Projects: []project.Project{project.Project{
+			Name:   remoteManifestStr,
+			Path:   remoteManifestStr,
+			Remote: fake.Projects[remoteManifestStr],
+		}},
+		Imports: []project.Import{project.Import{
+			Name:     jiritest.ManifestProjectName,
+			Remote:   fake.Projects[jiritest.ManifestProjectName],
+			Manifest: "localmanifest",
+		}},
+	}
+	remoteManifestFile := filepath.Join(fake.Projects[remoteManifestStr], "manifest")
+	if err := remoteManifest.ToFile(fake.X, remoteManifestFile); err != nil {
+		t.Fatal(err)
+	}
+	commitFile(t, fake.X, fake.Projects[remoteManifestStr], "manifest", "1")
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	//pin last project and don't commit
+	lastPRev, _ := git.NewGit(fake.Projects[lastProject.Name]).CurrentRevision()
+	localManifest.Projects[0].Revision = lastPRev
+	if err := localManifest.ToFile(fake.X, filepath.Join(fake.X.Root, jiritest.ManifestProjectPath, "localmanifest")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add new commit to last project
+	writeFile(t, fake.X, fake.Projects[lastProject.Name], "file1", "file1")
+	if err := project.UpdateUniverse(fake.X, false, true /* localManifest */, false, false, false, false, project.DefaultHookTimeout); err != nil {
+		t.Fatal(err)
+	}
+	// check last project revision
+	currentRev, _ := git.NewGit(filepath.Join(fake.X.Root, lastProject.Path)).CurrentRevision()
 	if currentRev != lastPRev {
 		t.Fatalf("For project %q expected rev to be %q got %q", lastProject.Name, lastPRev, currentRev)
 	}
