@@ -182,6 +182,33 @@ func TestStatus(t *testing.T) {
 	}
 }
 
+func TestStatusWhenUserUpdatesGitTree(t *testing.T) {
+	setDefaultStatusFlags()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Add projects
+	numProjects := 1
+	localProjects := createProjects(t, fake, numProjects)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// write to remote
+	writeFile(t, fake.X, fake.Projects[localProjects[0].Name], "file", "file")
+	// git fetch
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[0].Path))
+	if err := gitLocal.Fetch("origin"); err != nil {
+		t.Fatal(err)
+	}
+
+	got := executeStatus(t, fake, "")
+	want := "" // no change
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
 func statusFlagsTest(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()

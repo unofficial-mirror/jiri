@@ -1007,7 +1007,7 @@ func LoadManifest(jirix *jiri.X) (Projects, Hooks, error) {
 // LoadManifestFile in parallel.
 func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
 	ld := newManifestLoader(localProjects, false)
-	if err := ld.Load(jirix, "", file, "", localManifest); err != nil {
+	if err := ld.Load(jirix, "", "", file, "", "", localManifest); err != nil {
 		return nil, nil, err
 	}
 	return ld.Projects, ld.Hooks, nil
@@ -1017,7 +1017,7 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
 	ld := newManifestLoader(localProjects, true)
-	if err := ld.Load(jirix, "", jirix.JiriManifestFile(), "", localManifest); err != nil {
+	if err := ld.Load(jirix, "", "", jirix.JiriManifestFile(), "", "", localManifest); err != nil {
 		return nil, nil, ld.TmpDir, err
 	}
 	return ld.Projects, ld.Hooks, ld.TmpDir, nil
@@ -1615,26 +1615,31 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 // directories, and added to localProjects.
 func newManifestLoader(localProjects Projects, update bool) *loader {
 	return &loader{
-		Projects:         make(Projects),
-		Hooks:            make(Hooks),
-		localProjects:    localProjects,
-		importProjects:   make(Projects),
-		update:           update,
-		localManifestMap: make(map[string]bool),
-		manifests:        make(map[string]bool),
+		Projects:       make(Projects),
+		Hooks:          make(Hooks),
+		localProjects:  localProjects,
+		importProjects: make(Projects),
+		update:         update,
+		importCacheMap: make(map[string]importCache),
+		manifests:      make(map[string]bool),
 	}
 }
 
+type importCache struct {
+	localManifest bool
+	ref           string
+}
+
 type loader struct {
-	Projects         Projects
-	Hooks            Hooks
-	TmpDir           string
-	localProjects    Projects
-	importProjects   Projects
-	localManifestMap map[string]bool
-	update           bool
-	cycleStack       []cycleInfo
-	manifests        map[string]bool
+	Projects       Projects
+	Hooks          Hooks
+	TmpDir         string
+	localProjects  Projects
+	importProjects Projects
+	importCacheMap map[string]importCache
+	update         bool
+	cycleStack     []cycleInfo
+	manifests      map[string]bool
 }
 
 type cycleInfo struct {
@@ -1670,18 +1675,22 @@ type cycleInfo struct {
 // A more complex case would involve a combination of local and remote imports,
 // using the "root" attribute to change paths on the local filesystem.  In this
 // case the key will eventually expose the cycle.
-func (ld *loader) loadNoCycles(jirix *jiri.X, root, file, cycleKey string, localManifest bool) error {
-	info := cycleInfo{file, cycleKey}
+func (ld *loader) loadNoCycles(jirix *jiri.X, root, repoPath, file, ref, cycleKey string, localManifest bool) error {
+	f := file
+	if repoPath != "" {
+		f = filepath.Join(repoPath, file)
+	}
+	info := cycleInfo{f, cycleKey}
 	for _, c := range ld.cycleStack {
 		switch {
-		case file == c.file:
+		case f == c.file:
 			return fmt.Errorf("import cycle detected in local manifest files: %q", append(ld.cycleStack, info))
 		case cycleKey == c.key && cycleKey != "":
 			return fmt.Errorf("import cycle detected in remote manifest imports: %q", append(ld.cycleStack, info))
 		}
 	}
 	ld.cycleStack = append(ld.cycleStack, info)
-	if err := ld.load(jirix, root, file, localManifest); err != nil {
+	if err := ld.load(jirix, root, repoPath, file, ref, localManifest); err != nil {
 		return err
 	}
 	ld.cycleStack = ld.cycleStack[:len(ld.cycleStack)-1]
@@ -1690,25 +1699,42 @@ func (ld *loader) loadNoCycles(jirix *jiri.X, root, file, cycleKey string, local
 
 // shortFileName returns the relative path if file is relative to root,
 // otherwise returns the file name unchanged.
-func shortFileName(root, file string) string {
+func shortFileName(root, repoPath, file, ref string) string {
+	if repoPath != "" {
+		return fmt.Sprintf("%s %s:%s", shortFileName(root, "", repoPath, ""), ref, file)
+	}
 	if p := root + string(filepath.Separator); strings.HasPrefix(file, p) {
 		return file[len(p):]
 	}
 	return file
 }
 
-func (ld *loader) Load(jirix *jiri.X, root, file, cycleKey string, localManifest bool) error {
-	jirix.TimerPush("load " + shortFileName(jirix.Root, file))
+func (ld *loader) Load(jirix *jiri.X, root, repoPath, file, ref, cycleKey string, localManifest bool) error {
+	jirix.TimerPush("load " + shortFileName(jirix.Root, repoPath, file, ref))
 	defer jirix.TimerPop()
-	return ld.loadNoCycles(jirix, root, file, cycleKey, localManifest)
+	return ld.loadNoCycles(jirix, root, repoPath, file, ref, cycleKey, localManifest)
 }
 
-func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) error {
-	if ld.manifests[file] {
+func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localManifest bool) error {
+	f := file
+	if repoPath != "" {
+		f = filepath.Join(repoPath, file)
+	}
+	if ld.manifests[f] {
 		return nil
 	}
-	ld.manifests[file] = true
-	m, err := ManifestFromFile(jirix, file)
+	ld.manifests[f] = true
+	var m *Manifest
+	var err error
+	if repoPath == "" {
+		m, err = ManifestFromFile(jirix, file)
+	} else {
+		if s, err2 := gitutil.New(jirix, gitutil.RootDirOpt(repoPath)).Show(ref, file); err2 != nil {
+			return fmt.Errorf("Unable to get manifest file for %s %s:%s, %s", repoPath, ref, file, err2)
+		} else {
+			m, err = ManifestFromBytes([]byte(s))
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -1772,30 +1798,20 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 		}
 		// Reset the project to its specified branch and load the next file.  Note
 		// that we call load() recursively, so multiple files may be loaded by
-		// resetAndLoad.
+		// loadImport.
 		p.Revision = remote.Revision
 		p.RemoteBranch = remote.RemoteBranch
 		ld.importProjects[key] = p
 
-		lm := localManifest
-		// Store if current manifest should be picked from local or from server
-		if v, ok := ld.localManifestMap[strings.Trim(remote.Remote, "/")]; ok {
-			lm = v
-		} else {
-			ld.localManifestMap[strings.Trim(remote.Remote, "/")] = lm
-		}
-		nextFile := filepath.Join(p.Path, remote.Manifest)
-		if err := ld.resetAndLoad(jirix, nextRoot, nextFile, remote.cycleKey(), p, lm); err != nil {
+		if err := ld.loadImport(jirix, nextRoot, remote.Manifest, remote.cycleKey(), p, localManifest); err != nil {
 			return err
 		}
 	}
 
 	// Process local imports.
 	for _, local := range m.LocalImports {
-		// TODO(toddw): Add our invariant check that the file is in the same
-		// repository as the current remote import repository.
 		nextFile := filepath.Join(filepath.Dir(file), local.File)
-		if err := ld.Load(jirix, root, nextFile, "", localManifest); err != nil {
+		if err := ld.Load(jirix, root, repoPath, nextFile, ref, "", localManifest); err != nil {
 			return err
 		}
 	}
@@ -1831,14 +1847,14 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 				if project.Revision == "" || project.Revision == "HEAD" {
 					project.Revision = r.Revision
 				} else {
-					return fmt.Errorf("project %q found in %q defines different revision than its corresponding import tag.", key, shortFileName(jirix.Root, file))
+					return fmt.Errorf("project %q found in %q defines different revision than its corresponding import tag.", key, shortFileName(jirix.Root, repoPath, file, ref))
 				}
 			}
 		}
 
 		if dup, ok := ld.Projects[key]; ok && dup != project {
 			// TODO(toddw): Tell the user the other conflicting file.
-			return fmt.Errorf("duplicate project %q found in %q", key, shortFileName(jirix.Root, file))
+			return fmt.Errorf("duplicate project %q found in %q", key, shortFileName(jirix.Root, repoPath, file, ref))
 		}
 
 		ld.Projects[key] = project
@@ -1854,51 +1870,54 @@ func (ld *loader) load(jirix *jiri.X, root, file string, localManifest bool) err
 	return nil
 }
 
-func (ld *loader) resetAndLoad(jirix *jiri.X, root, file, cycleKey string, project Project, localManifest bool) (e error) {
-	if localManifest {
-		// local manifest should not work on recursive imports, only top level import
-		return ld.Load(jirix, root, file, cycleKey, false)
-	}
+func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey string, project Project, localManifest bool) (e error) {
+	lm := localManifest
+	ref := ""
 
-	// Reset the local branch to what's specified on the project.  We only
-	// fetch on updates; non-updates just perform the reset.
-	if ld.update {
-		if err := fetchAll(jirix, project); err != nil {
-			return fmt.Errorf("Fetch failed for project(%v), %v", project.Path, err)
+	if v, ok := ld.importCacheMap[strings.Trim(project.Remote, "/")]; ok {
+		// local manifest in cache takes precedence as this might be manifest mentioned in .jiri_manifest
+		lm = v.localManifest
+		ref = v.ref
+		// check conflicting imports
+		if !lm && ref != "JIRI_HEAD" {
+			if tref, err := GetHeadRevision(jirix, project); err != nil {
+				return err
+			} else if tref != ref {
+				return fmt.Errorf("Conflicting ref for import %s - %q and %q", project.Remote, tref, ref)
+			}
 		}
-	}
-
-	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
-	g := git.NewGit(project.Path)
-	var currentRevision string
-	var err error
-	if scm.IsOnBranch() {
-		currentRevision, err = scm.CurrentBranchName()
 	} else {
-		currentRevision, err = g.CurrentRevision()
-	}
-	if err != nil {
-		return err
-	}
-	stashed, err := scm.Stash()
-	if err != nil {
-		return err
-	}
-	// After running the function, checkout the original branch,
-	// and stash pop if necessary.
-	defer collect.Error(func() error {
-		if err := scm.CheckoutBranch(currentRevision); err != nil {
-			return err
+		// We don't need to fetch or find ref for local manifest changes
+		if !lm {
+			// We only fetch on updates.
+			if ld.update {
+				if err := fetchAll(jirix, project); err != nil {
+					return fmt.Errorf("Fetch failed for project(%s), %s", project.Path, err)
+				}
+			} else {
+				// If not updating then try to get file from JIRI_HEAD
+				if _, err := gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Show("JIRI_HEAD", ""); err == nil {
+					// JIRI_HEAD available, set ref
+					ref = "JIRI_HEAD"
+				}
+			}
+			if ref == "" {
+				var err error
+				if ref, err = GetHeadRevision(jirix, project); err != nil {
+					return err
+				}
+			}
 		}
-		if stashed {
-			return scm.StashPop()
+		ld.importCacheMap[strings.Trim(project.Remote, "/")] = importCache{
+			localManifest: lm,
+			ref:           ref,
 		}
-		return nil
-	}, &e)
-	if err := checkoutHeadRevision(jirix, project, false); err != nil {
-		return fmt.Errorf("Not able to checkout head for %s(%s): %v", project.Name, project.Path, err)
 	}
-	return ld.Load(jirix, root, file, cycleKey, localManifest)
+	if lm {
+		// load from local checked out file
+		return ld.Load(jirix, root, "", filepath.Join(project.Path, file), "", cycleKey, false)
+	}
+	return ld.Load(jirix, root, project.Path, file, ref, cycleKey, false)
 }
 
 // setRemoteHeadRevisions set the repo statuses from remote for

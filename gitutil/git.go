@@ -19,13 +19,15 @@ import (
 )
 
 type GitError struct {
+	Root        string
 	Args        []string
 	Output      string
 	ErrorOutput string
 }
 
-func Error(output, errorOutput string, args ...string) GitError {
+func Error(output, errorOutput, root string, args ...string) GitError {
 	return GitError{
+		Root:        root,
 		Args:        args,
 		Output:      output,
 		ErrorOutput: errorOutput,
@@ -33,7 +35,8 @@ func Error(output, errorOutput string, args ...string) GitError {
 }
 
 func (ge GitError) Error() string {
-	result := "'git "
+	result := fmt.Sprintf("(%s)", ge.Root)
+	result = "'git "
 	result += strings.Join(ge.Args, " ")
 	result += "' failed:\n"
 	result += ge.ErrorOutput
@@ -930,6 +933,16 @@ func (g *Git) TrackedFiles() ([]string, error) {
 	return out, nil
 }
 
+func (g *Git) Show(ref, file string) (string, error) {
+	arg := ref
+	arg = fmt.Sprintf("%s:%s", arg, file)
+	out, err := g.runOutput("show", arg)
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(out, "\n"), nil
+}
+
 // Version returns the major and minor git version.
 func (g *Git) Version() (int, int, error) {
 	out, err := g.runOutput("version")
@@ -961,7 +974,7 @@ func (g *Git) Version() (int, int, error) {
 func (g *Git) run(args ...string) error {
 	var stdout, stderr bytes.Buffer
 	if err := g.runGit(&stdout, &stderr, args...); err != nil {
-		return Error(stdout.String(), stderr.String(), args...)
+		return Error(stdout.String(), stderr.String(), g.rootDir, args...)
 	}
 	return nil
 }
@@ -977,7 +990,7 @@ func trimOutput(o string) []string {
 func (g *Git) runOutput(args ...string) ([]string, error) {
 	var stdout, stderr bytes.Buffer
 	if err := g.runGit(&stdout, &stderr, args...); err != nil {
-		return nil, Error(stdout.String(), stderr.String(), args...)
+		return nil, Error(stdout.String(), stderr.String(), g.rootDir, args...)
 	}
 	return trimOutput(stdout.String()), nil
 }
@@ -987,7 +1000,7 @@ func (g *Git) runInteractive(args ...string) error {
 	// In order for the editing to work correctly with
 	// terminal-based editors, notably "vim", use os.Stdout.
 	if err := g.runGit(os.Stdout, &stderr, args...); err != nil {
-		return Error("", stderr.String(), args...)
+		return Error("", stderr.String(), g.rootDir, args...)
 	}
 	return nil
 }

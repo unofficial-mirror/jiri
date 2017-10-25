@@ -619,6 +619,66 @@ func TestRecursiveImport(t *testing.T) {
 	}
 }
 
+func TestLoadManifestFileRecursiveImport(t *testing.T) {
+	_, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	manifest, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove last project from manifest
+	lastProject := manifest.Projects[len(manifest.Projects)-1]
+	manifest.Projects = manifest.Projects[:len(manifest.Projects)-1]
+	remoteManifestStr := "remotemanifest"
+	if err := fake.CreateRemoteProject(remoteManifestStr); err != nil {
+		t.Fatal(err)
+	}
+
+	remoteManifest := &project.Manifest{
+		Projects: []project.Project{lastProject, project.Project{
+			Name:   remoteManifestStr,
+			Path:   remoteManifestStr,
+			Remote: fake.Projects[remoteManifestStr],
+		}},
+	}
+	remoteManifestFile := filepath.Join(fake.Projects[remoteManifestStr], "manifest")
+	if err := remoteManifest.ToFile(fake.X, remoteManifestFile); err != nil {
+		t.Fatal(err)
+	}
+	commitFile(t, fake.X, fake.Projects[remoteManifestStr], "manifest", "1")
+	rev, _ := git.NewGit(fake.Projects[remoteManifestStr]).CurrentRevision()
+
+	manifest.Imports = []project.Import{project.Import{
+		Name:     remoteManifestStr,
+		Remote:   fake.Projects[remoteManifestStr],
+		Manifest: "manifest",
+		Revision: rev,
+	}}
+	fake.WriteRemoteManifest(manifest)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write arbitrary revision
+	manifest.Imports[0].Revision = "AB"
+	fake.WriteRemoteManifest(manifest)
+
+	// local fetch on manifest project
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(filepath.Join(fake.X.Root, jiritest.ManifestProjectPath)))
+	if err := gitLocal.Fetch("origin"); err != nil {
+		t.Fatal(err)
+	}
+	localProjects, err := project.LocalProjects(fake.X, project.FastScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := project.LoadManifestFile(fake.X, fake.X.JiriManifestFile(), localProjects, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRecursiveImportWithLocalImport(t *testing.T) {
 	_, fake, cleanup := setupUniverse(t)
 	defer cleanup()
