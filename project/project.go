@@ -901,7 +901,7 @@ func rewriteRemote(jirix *jiri.X, remote string) string {
 		return remote
 	}
 	if strings.HasPrefix(remote, "sso://") {
-		return ssoRe.ReplaceAllString(remote, "https://$1.googlesource.com/a/")
+		return ssoRe.ReplaceAllString(remote, "https://$1.googlesource.com/")
 	}
 	return remote
 }
