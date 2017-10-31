@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -35,6 +36,7 @@ var (
 	JiriProject = "release.go.jiri"
 	JiriName    = "jiri"
 	JiriPackage = "fuchsia.googlesource.com/jiri"
+	ssoRe       = regexp.MustCompile("^sso://(.*?)/")
 )
 
 var (
@@ -899,7 +901,7 @@ func rewriteRemote(jirix *jiri.X, remote string) string {
 		return remote
 	}
 	if strings.HasPrefix(remote, "sso://") {
-		return strings.Replace(remote, "sso://", "https://", 1)
+		return ssoRe.ReplaceAllString(remote, "https://$1.googlesource.com/")
 	}
 	return remote
 }
