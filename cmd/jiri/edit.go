@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -30,8 +31,46 @@ func (i *arrayFlag) Set(value string) error {
 }
 
 var editFlags struct {
-	projects arrayFlag
-	imports  arrayFlag
+	projects   arrayFlag
+	imports    arrayFlag
+	jsonOutput string
+}
+
+type projectChanges struct {
+	Name   string `json:"name"`
+	Remote string `json:"remote"`
+	Path   string `json:"path"`
+	OldRev string `json:"old_revision"`
+	NewRev string `json:"new_revision"`
+}
+
+type importChanges struct {
+	Name   string `json:"name"`
+	Remote string `json:"remote"`
+	OldRev string `json:"old_revision"`
+	NewRev string `json:"new_revision"`
+}
+
+type editChanges struct {
+	Projects []projectChanges `json:"projects"`
+	Imports  []importChanges  `json:"imports"`
+}
+
+func (ec *editChanges) toFile(filename string) error {
+	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+		return err
+	}
+	out, err := json.MarshalIndent(ec, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize JSON output: %s\n", err)
+	}
+
+	err = ioutil.WriteFile(filename, out, 0600)
+	if err != nil {
+		return fmt.Errorf("failed write JSON output to %s: %s\n", filename, err)
+	}
+
+	return nil
 }
 
 var cmdEdit = &cmdline.Command{
@@ -47,6 +86,7 @@ func init() {
 	flags := &cmdEdit.Flags
 	flags.Var(&editFlags.projects, "project", "List of projects to update. It is of form <project-name>=<newRef> where newRef is optional. It can be specified multiple times.")
 	flags.Var(&editFlags.imports, "import", "List of imports to update. It is of form <import-name>=<newRef> where newRef is optional. It can be specified multiple times.")
+	flags.StringVar(&editFlags.jsonOutput, "json-output", "", "File to print changes to, in json format.")
 }
 
 func runEdit(jirix *jiri.X, args []string) error {
@@ -104,6 +144,11 @@ func updateRevision(manifestContent, tag, currentRevision, newRevision, name str
 }
 
 func updateManifest(jirix *jiri.X, manifestPath string, projects, imports map[string]string) error {
+	ec := &editChanges{
+		Projects: []projectChanges{},
+		Imports:  []importChanges{},
+	}
+
 	m, err := project.ManifestFromFile(jirix, manifestPath)
 	if err != nil {
 		return err
@@ -132,10 +177,20 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports map[st
 			}
 			newRevision = strings.Fields(string(out))[0]
 		}
+		if p.Revision == newRevision {
+			continue
+		}
 		manifestContent, err = updateRevision(manifestContent, "project", p.Revision, newRevision, p.Name)
 		if err != nil {
 			return err
 		}
+		ec.Projects = append(ec.Projects, projectChanges{
+			Name:   p.Name,
+			Remote: p.Remote,
+			Path:   p.Path,
+			OldRev: p.Revision,
+			NewRev: newRevision,
+		})
 	}
 
 	for _, i := range m.Imports {
@@ -156,8 +211,22 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports map[st
 			}
 			newRevision = strings.Fields(string(out))[0]
 		}
+		if i.Revision == newRevision {
+			continue
+		}
 		manifestContent, err = updateRevision(manifestContent, "import", i.Revision, newRevision, i.Name)
 		if err != nil {
+			return err
+		}
+		ec.Imports = append(ec.Imports, importChanges{
+			Name:   i.Name,
+			Remote: i.Remote,
+			OldRev: i.Revision,
+			NewRev: newRevision,
+		})
+	}
+	if editFlags.jsonOutput != "" {
+		if err := ec.toFile(editFlags.jsonOutput); err != nil {
 			return err
 		}
 	}
