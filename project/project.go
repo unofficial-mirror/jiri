@@ -1717,6 +1717,63 @@ func (ld *loader) Load(jirix *jiri.X, root, repoPath, file, ref, cycleKey string
 	return ld.loadNoCycles(jirix, root, repoPath, file, ref, cycleKey, localManifest)
 }
 
+func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, localManifest bool) error {
+	if !ld.update || localManifest {
+		jirix.Logger.Warningf("import %q not found locally, getting from server.\n\n", remote.Name)
+	}
+	// The remote manifest project doesn't exist locally.  Clone it into a
+	// temp directory, and add it to ld.localProjects.
+	if ld.TmpDir == "" {
+		var err error
+		if ld.TmpDir, err = ioutil.TempDir("", "jiri-load"); err != nil {
+			return fmt.Errorf("TempDir() failed: %v", err)
+		}
+	}
+	path := filepath.Join(ld.TmpDir, remote.projectKeyFileName())
+	p, err := remote.toProject(path)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmtError(err)
+	}
+	remoteUrl := rewriteRemote(jirix, p.Remote)
+	task := jirix.Logger.AddTaskMsg("Creating manifest: %s", remote.Name)
+	defer task.Done()
+	if jirix.Cache != "" {
+		cacheDirPath, err := p.CacheDirPath(jirix)
+		if err != nil {
+			return err
+		}
+		if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, remote.RemoteBranch, 0); err != nil {
+			return err
+		}
+		if jirix.Shared {
+			if err := gitutil.New(jirix).Clone(cacheDirPath, path,
+				gitutil.SharedOpt(true), gitutil.NoCheckoutOpt(true)); err != nil {
+				return err
+			}
+		} else {
+			if err := gitutil.New(jirix).Clone(remoteUrl, path,
+				gitutil.ReferenceOpt(cacheDirPath), gitutil.NoCheckoutOpt(true)); err != nil {
+				return err
+			}
+		}
+
+	} else {
+		if err := gitutil.New(jirix).Clone(remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
+			return err
+		}
+	}
+	p.Revision = remote.Revision
+	p.RemoteBranch = remote.RemoteBranch
+	if err := checkoutHeadRevision(jirix, p, false); err != nil {
+		return fmt.Errorf("Not able to checkout head for %s(%s): %v", p.Name, p.Path, err)
+	}
+	ld.localProjects[remote.ProjectKey()] = p
+	return nil
+}
+
 func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localManifest bool) error {
 	f := file
 	if repoPath != "" {
@@ -1748,55 +1805,10 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localMan
 		key := remote.ProjectKey()
 		p, ok := ld.localProjects[key]
 		if !ok {
-			if !ld.update || localManifest {
-				jirix.Logger.Warningf("import %q not found locally, getting from server.\n\n", remote.Name)
-			}
-			// The remote manifest project doesn't exist locally.  Clone it into a
-			// temp directory, and add it to ld.localProjects.
-			if ld.TmpDir == "" {
-				if ld.TmpDir, err = ioutil.TempDir("", "jiri-load"); err != nil {
-					return fmt.Errorf("TempDir() failed: %v", err)
-				}
-			}
-			path := filepath.Join(ld.TmpDir, remote.projectKeyFileName())
-			if p, err = remote.toProject(path); err != nil {
+			if err := ld.cloneManifestRepo(jirix, &remote, localManifest); err != nil {
 				return err
 			}
-			if err := os.MkdirAll(path, 0755); err != nil {
-				return fmtError(err)
-			}
-			remoteUrl := rewriteRemote(jirix, p.Remote)
-			if jirix.Cache != "" {
-				cacheDirPath, err := p.CacheDirPath(jirix)
-				if err != nil {
-					return err
-				}
-				if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, remote.RemoteBranch, 0); err != nil {
-					return err
-				}
-				if jirix.Shared {
-					if err := gitutil.New(jirix).Clone(cacheDirPath, path,
-						gitutil.SharedOpt(true), gitutil.NoCheckoutOpt(true)); err != nil {
-						return err
-					}
-				} else {
-					if err := gitutil.New(jirix).Clone(remoteUrl, path,
-						gitutil.ReferenceOpt(cacheDirPath), gitutil.NoCheckoutOpt(true)); err != nil {
-						return err
-					}
-				}
-
-			} else {
-				if err := gitutil.New(jirix).Clone(remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
-					return err
-				}
-			}
-			p.Revision = remote.Revision
-			p.RemoteBranch = remote.RemoteBranch
-			if err := checkoutHeadRevision(jirix, p, false); err != nil {
-				return fmt.Errorf("Not able to checkout head for %s(%s): %v", p.Name, p.Path, err)
-			}
-			ld.localProjects[key] = p
+			p = ld.localProjects[key]
 		}
 		// Reset the project to its specified branch and load the next file.  Note
 		// that we call load() recursively, so multiple files may be loaded by
