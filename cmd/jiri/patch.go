@@ -28,6 +28,7 @@ var (
 	patchForceFlag   bool
 	cherryPickFlag   bool
 	detachedHeadFlag bool
+	patchProjectFlag string
 )
 
 func init() {
@@ -36,6 +37,7 @@ func init() {
 	cmdPatch.Flags.BoolVar(&patchForceFlag, "force", false, "Use force when deleting the existing branch")
 	cmdPatch.Flags.BoolVar(&patchRebaseFlag, "rebase", false, "Rebase the change after downloading")
 	cmdPatch.Flags.StringVar(&patchHostFlag, "host", "", `Gerrit host to use. Defaults to gerrit host specified in manifest.`)
+	cmdPatch.Flags.StringVar(&patchProjectFlag, "project", "", `Project to apply patch to. This cannot be passed with topic flag.`)
 	cmdPatch.Flags.BoolVar(&patchTopicFlag, "topic", false, `Patch whole topic.`)
 	cmdPatch.Flags.BoolVar(&cherryPickFlag, "cherry-pick", false, `Cherry-pick patches instead of checking out.`)
 	cmdPatch.Flags.BoolVar(&detachedHeadFlag, "no-branch", false, `Don't create the branch for the patch.`)
@@ -170,17 +172,22 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 }
 
 // rebaseProject rebases the current branch on top of a given branch.
-func rebaseProject(jirix *jiri.X, project project.Project, change gerrit.Change) error {
+func rebaseProject(jirix *jiri.X, project project.Project, remoteBranch string) error {
 	jirix.Logger.Infof("Rebasing project %s(%s)\n", project.Name, project.Path)
-	scm := gitutil.New(jirix, gitutil.UserNameOpt(change.Owner.Name), gitutil.UserEmailOpt(change.Owner.Email), gitutil.RootDirOpt(project.Path))
-	if err := scm.FetchRefspec("origin", change.Branch); err != nil {
-		jirix.Logger.Errorf("Not able to fetch branch %q: %s", change.Branch, err)
+	g := git.NewGit(project.Path)
+	name, email, err := g.UserInfoForCommit("HEAD")
+	if err != nil {
+		return fmt.Errorf("Rebase: cannot get user info for HEAD: %s", err)
+	}
+	scm := gitutil.New(jirix, gitutil.UserNameOpt(name), gitutil.UserEmailOpt(email), gitutil.RootDirOpt(project.Path))
+	if err := scm.FetchRefspec("origin", remoteBranch); err != nil {
+		jirix.Logger.Errorf("Not able to fetch branch %q: %s", remoteBranch, err)
 		jirix.IncrementFailures()
 		return nil
 	}
-	if err := scm.Rebase("origin/" + change.Branch); err != nil {
-		if err := scm.RebaseAbort(); err != nil {
-			return err
+	if err := scm.Rebase("origin/" + remoteBranch); err != nil {
+		if err2 := scm.RebaseAbort(); err2 != nil {
+			return err2
 		}
 		jirix.Logger.Errorf("Cannot rebase the change: %s", err)
 		jirix.IncrementFailures()
@@ -190,71 +197,137 @@ func rebaseProject(jirix *jiri.X, project project.Project, change gerrit.Change)
 	return nil
 }
 
+func findProject(jirix *jiri.X, projectName string, projects project.Projects, host string, hostUrl *url.URL, ref string) *project.Project {
+	var projectToPatch *project.Project
+	var projectToPatchNoGerritHost *project.Project
+	for _, p := range projects {
+		u, err := url.Parse(strings.Trim(p.Remote, "/"))
+		if err != nil {
+			jirix.Logger.Warningf("invalid remote %q for project %s: %s", p.Remote, p.Name, err)
+			continue
+		}
+		if u.EscapedPath() == "/"+projectName {
+			if host != "" && p.GerritHost != host {
+				if p.GerritHost == "" {
+					cp := p
+					projectToPatchNoGerritHost = &cp
+					//skip for now
+					continue
+				} else {
+					u, err := url.Parse(p.GerritHost)
+					if err != nil {
+						jirix.Logger.Warningf("invalid Gerrit host %q for project %s: %s", p.GerritHost, p.Name, err)
+					}
+					if u.Host != hostUrl.Host {
+						jirix.Logger.Debugf("skipping project %s(%s) for CL %s\n\n", p.Name, p.Path, ref)
+						continue
+					}
+				}
+			}
+			projectToPatch = &p
+			break
+		}
+	}
+	if projectToPatch == nil && projectToPatchNoGerritHost != nil {
+		// Try to patch the project with no gerrit host
+		projectToPatch = projectToPatchNoGerritHost
+	}
+	return projectToPatch
+}
+
 func runPatch(jirix *jiri.X, args []string) error {
 	if expected, got := 1, len(args); expected != got {
 		return jirix.UsageErrorf("unexpected number of arguments: expected %v, got %v", expected, got)
 	}
 	arg := args[0]
 
+	if patchProjectFlag != "" && patchTopicFlag {
+		return jirix.UsageErrorf("-topic and -project flags cannot be used together")
+	}
+
 	var cl int
 	var ps int
 	var err error
+	changeRef := ""
+	remoteBranch := ""
 	if !patchTopicFlag {
 		cl, ps, err = gerrit.ParseRefString(arg)
 		if err != nil {
+			if patchProjectFlag != "" {
+				return fmt.Errorf("Please pass change ref with -project flag (refs/changes/<ps>/<cl>/<patch-set>)")
+			}
 			cl, err = strconv.Atoi(arg)
 			if err != nil {
 				return fmt.Errorf("invalid argument: %v", arg)
 			}
+		} else {
+			changeRef = arg
 		}
 	}
 
-	p, perr := currentProject(jirix)
-	if !patchTopicFlag && perr == nil {
-		host := patchHostFlag
+	var p *project.Project
+	host := patchHostFlag
+	if patchProjectFlag != "" {
+		// TODO: TO-592 - remove this hardcode
+		remoteBranch = "master"
+		projects, err := project.LocalProjects(jirix, project.FastScan)
+		if err != nil {
+			return err
+		}
+		var hostUrl *url.URL
+		if host != "" {
+			hostUrl, err = url.Parse(host)
+			if err != nil {
+				return fmt.Errorf("invalid Gerrit host %q: %s", host, err)
+			}
+		}
+		p = findProject(jirix, patchProjectFlag, projects, host, hostUrl, changeRef)
+		if p == nil {
+			return fmt.Errorf("Cannot find project for %q", patchProjectFlag)
+		}
+	} else if project, perr := currentProject(jirix); perr == nil {
+		p = &project
 		if host == "" {
 			if p.GerritHost == "" {
 				return fmt.Errorf("no Gerrit host; use the '--host' flag, or add a 'gerrithost' attribute for project %q", p.Name)
 			}
 			host = p.GerritHost
 		}
-		hostUrl, err := url.Parse(host)
-		if err != nil {
-			return fmt.Errorf("invalid Gerrit host %q: %v", host, err)
-		}
-		g := gerrit.New(jirix, hostUrl)
+	}
+	if !patchTopicFlag && p != nil {
+		if remoteBranch == "" || changeRef == "" {
+			hostUrl, err := url.Parse(host)
+			if err != nil {
+				return fmt.Errorf("invalid Gerrit host %q: %s", host, err)
+			}
+			g := gerrit.New(jirix, hostUrl)
 
-		change, err := g.GetChange(cl)
-		if err != nil {
-			return err
+			change, err := g.GetChange(cl)
+			if err != nil {
+				return err
+			}
+			remoteBranch = change.Branch
+			changeRef = change.Reference()
 		}
 		branch := patchBranchFlag
 		ok := false
 		if ps != -1 {
-			if ok, err = patchProject(jirix, p, arg, branch, change.Branch); err != nil {
+			if ok, err = patchProject(jirix, *p, arg, branch, remoteBranch); err != nil {
 				return err
 			}
 		} else {
-			if ok, err = patchProject(jirix, p, change.Reference(), branch, change.Branch); err != nil {
+			if ok, err = patchProject(jirix, *p, changeRef, branch, remoteBranch); err != nil {
 				return err
 			}
 		}
 		if ok && patchRebaseFlag {
-			if err := rebaseProject(jirix, p, *change); err != nil {
+			if err := rebaseProject(jirix, *p, remoteBranch); err != nil {
 				return err
 			}
 		}
 	} else {
-		host := patchHostFlag
-		if host == "" && patchTopicFlag {
-			if perr == nil {
-				host = p.GerritHost
-			}
-			if host == "" {
-				return fmt.Errorf("no Gerrit host; use the '--host' flag or run from inside a project with gerrit host")
-			}
-		} else if host == "" {
-			return fmt.Errorf("no Gerrit host; use the '--host' flag")
+		if host == "" {
+			return fmt.Errorf("no Gerrit host; use the '--host' flag or run this from inside a project")
 		}
 		hostUrl, err := url.Parse(host)
 		if err != nil {
@@ -359,47 +432,12 @@ func runPatch(jirix *jiri.X, args []string) error {
 			} else {
 				ref = change.Reference()
 			}
-			var projectToPatch *project.Project
-			var projectToPatchNoGerritHost *project.Project
-			for _, p := range projects {
-				u, err := url.Parse(strings.Trim(p.Remote, "/"))
-				if err != nil {
-					jirix.Logger.Warningf("invalid remote %q for project %s: %s", p.Remote, p.Name, err)
-					continue
-				}
-				if u.EscapedPath() == "/"+change.Project {
-					if p.GerritHost != host {
-
-						if p.GerritHost == "" {
-							cp := p
-							projectToPatchNoGerritHost = &cp
-							//skip for now
-							continue
-						} else {
-							u, err := url.Parse(p.GerritHost)
-							if err != nil {
-								jirix.Logger.Warningf("invalid Gerrit host %q for project %s: %s", p.GerritHost, p.Name, err)
-							}
-							if u.Host != hostUrl.Host {
-								jirix.Logger.Debugf("skipping project %s(%s) for CL %s\n\n", p.Name, p.Path, g.GetChangeURL(change.Number))
-								continue
-							}
-						}
-					}
-					projectToPatch = &p
-					break
-				}
-			}
-			if projectToPatch == nil && projectToPatchNoGerritHost != nil {
-				// Try to patch the project with no gerrit host
-				projectToPatch = projectToPatchNoGerritHost
-			}
-			if projectToPatch != nil {
+			if projectToPatch := findProject(jirix, change.Project, projects, host, hostUrl, g.GetChangeURL(change.Number)); projectToPatch != nil {
 				if ok, err := patchProject(jirix, *projectToPatch, ref, branch, change.Branch); err != nil {
 					return err
 				} else if ok {
 					if patchRebaseFlag {
-						if err := rebaseProject(jirix, *projectToPatch, change); err != nil {
+						if err := rebaseProject(jirix, *projectToPatch, change.Branch); err != nil {
 							return err
 						}
 					}

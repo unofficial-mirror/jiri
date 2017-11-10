@@ -186,6 +186,30 @@ func (g *Git) ShortHash(ref string) (string, error) {
 	}
 }
 
+func (g *Git) UserInfoForCommit(ref string) (string, string, error) {
+	repo, err := git2go.OpenRepository(g.rootDir)
+	if err != nil {
+		return "", "", err
+	}
+	defer repo.Free()
+	obj, err := repo.RevparseSingle(ref)
+	if err != nil {
+		return "", "", err
+	}
+	defer obj.Free()
+	c, err := obj.Peel(git2go.ObjectCommit)
+	if err != nil {
+		return "", "", err
+	}
+	defer c.Free()
+	commit, err := c.AsCommit()
+	if err != nil {
+		return "", "", err
+	}
+	defer commit.Free()
+	return commit.Committer().Name, commit.Committer().Email, nil
+}
+
 // CurrentRevisionForRef gets current rev for ref/branch/tags
 func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
 	repo, err := git2go.OpenRepository(g.rootDir)
