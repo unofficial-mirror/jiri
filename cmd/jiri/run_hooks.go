@@ -14,6 +14,7 @@ import (
 var runHooksFlags struct {
 	localManifest bool
 	hookTimeout   uint
+	attempts      uint
 }
 
 var cmdRunHooks = &cmdline.Command{
@@ -30,6 +31,7 @@ func init() {
 	tool.InitializeProjectFlags(&cmdRunHooks.Flags)
 	cmdRunHooks.Flags.BoolVar(&runHooksFlags.localManifest, "local-manifest", false, "Use local checked out manifest.")
 	cmdRunHooks.Flags.UintVar(&runHooksFlags.hookTimeout, "hook-timeout", project.DefaultHookTimeout, "Timeout in minutes for running the hooks operation.")
+	cmdRunHooks.Flags.UintVar(&runHooksFlags.attempts, "attempts", 1, "Number of attempts before failing.")
 }
 
 func runHooks(jirix *jiri.X, args []string) error {
@@ -37,6 +39,10 @@ func runHooks(jirix *jiri.X, args []string) error {
 	if err != nil {
 		return err
 	}
+	if runHooksFlags.attempts < 1 {
+		return jirix.UsageErrorf("Number of attempts should be >= 1")
+	}
+	jirix.Attempts = runHooksFlags.attempts
 
 	// Get hooks.
 	_, hooks, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
