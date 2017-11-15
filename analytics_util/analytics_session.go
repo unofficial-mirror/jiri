@@ -23,7 +23,10 @@ var analyticsUrl = "https://www.google-analytics.com/collect"
 var CollectedData = `When opted in, jiri collects the following anonymized data in order to improve the user experience:
 
 1. Tracks the commands that user runs.
-2. Tracks the flags and their values passed with the commands. It does not track values for string flags unless they are true/false.
+2. Tracks the flags and their values passed with the commands. It does not track values for string flags unless they are true/false/number or following allowed values:
+	- always
+	- auto
+	- never
 3. Creates a uuid for each jiri repository and sends that to track the session and user workflow.
 4. Tracks user's operating system and its architecture.
 5. Tracks the time taken by a command to complete.

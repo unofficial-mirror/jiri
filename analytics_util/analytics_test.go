@@ -89,13 +89,13 @@ func TestSendCommand(t *testing.T) {
 	}
 
 	serverCalled = false
-	expectedVals["cd2"] = "multipart:false,v:true"
+	expectedVals["cd2"] = "flag1:always,flag2:,flag3:3,multipart:false,v:true"
 	expectedVals["el"] = ""
 	expectedVals["ev"] = ""
 	version.GitCommit = "test-commit"
 	expectedVals["av"] = version.FormattedVersion()
 	as = NewAnalyticsSession(true, expectedVals["tid"], expectedVals["cid"])
-	id = as.AddCommand(expectedVals["ea"], map[string]string{"v": "true", "multipart": "false"})
+	id = as.AddCommand(expectedVals["ea"], map[string]string{"v": "true", "multipart": "false", "flag1": "always", "flag2": "not_allowed", "flag3": "3"})
 	as.SendAllAndWaitToFinish()
 	if !serverCalled {
 		t.Fatal("Analytics should have been sent")

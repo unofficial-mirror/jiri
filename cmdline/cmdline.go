@@ -48,7 +48,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -465,20 +464,7 @@ func parseFlags(path []*Command, env *Env, args []string) ([]string, map[string]
 	env.CommandFlags = make(map[string]string)
 	flags.Visit(func(f *flag.Flag) {
 		val := f.Value.String()
-		str := true
-		if _, err := strconv.ParseBool(val); err == nil {
-			str = false
-		} else if _, err := strconv.ParseFloat(val, 10); err == nil {
-			str = false
-		} else if _, err := strconv.ParseInt(val, 10, 64); err == nil {
-			str = false
-		}
-		if str {
-			// Don't store string flag value
-			env.CommandFlags[f.Name] = ""
-		} else {
-			env.CommandFlags[f.Name] = val
-		}
+		env.CommandFlags[f.Name] = val
 	})
 	return flags.Args(), extractSetFlags(flags), nil
 }
