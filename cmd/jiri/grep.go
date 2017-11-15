@@ -32,6 +32,7 @@ var grepFlags struct {
 	e string
 	l bool
 	L bool
+	w bool
 }
 
 func init() {
@@ -41,6 +42,7 @@ func init() {
 	flags.BoolVar(&grepFlags.h, "H", true, "Does nothing. Just makes this git grep compatible")
 	flags.BoolVar(&grepFlags.i, "i", false, "Ignore case differences between the patterns and the files")
 	flags.BoolVar(&grepFlags.l, "l", false, "Instead of showing every matched line, show only the names of files that contain matches")
+	flags.BoolVar(&grepFlags.w, "w", false, "Match the pattern only at word boundary")
 	flags.BoolVar(&grepFlags.l, "name-only", false, "same as -l")
 	flags.BoolVar(&grepFlags.l, "files-with-matches", false, "same as -l")
 	flags.BoolVar(&grepFlags.L, "L", false, "Instead of showing every matched line, show only the names of files that do not contain matches")
@@ -63,6 +65,9 @@ func buildFlags() []string {
 	}
 	if grepFlags.L {
 		args = append(args, "-L")
+	}
+	if grepFlags.w {
+		args = append(args, "-w")
 	}
 	return args
 }

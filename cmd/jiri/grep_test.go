@@ -23,6 +23,7 @@ func setDefaultGrepFlags() {
 	grepFlags.i = false
 	grepFlags.l = false
 	grepFlags.L = false
+	grepFlags.w = false
 }
 
 func makeProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
@@ -128,6 +129,19 @@ func TestNFlagGrep(t *testing.T) {
 	expectGrep(t, fake, []string{"too"}, []string{
 		"r.c/file.txt:1:And summer's lease hath all too short a date:",
 		"sub/r.t1/file.txt:1:Sometime too hot the eye of heaven shines,",
+	})
+}
+
+func TestWFlagGrep(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	setup(t, fake)
+	setDefaultGrepFlags()
+	grepFlags.w = true
+	grepFlags.i = true
+	expectGrep(t, fake, []string{"i"}, []string{
+		"r.a/file.txt:Shall I compare thee to a summer's day?",
 	})
 }
 
