@@ -113,7 +113,7 @@ func (jirix *X) Failures() uint32 {
 var (
 	rootFlag              string
 	jobsFlag              uint
-	colorFlag             bool
+	colorFlag             string
 	quietVerboseFlag      bool
 	debugVerboseFlag      bool
 	traceVerboseFlag      bool
@@ -141,7 +141,7 @@ func (showRootFlag) Set(string) error {
 func init() {
 	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
 	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
-	flag.BoolVar(&colorFlag, "color", true, "Use color to format output.")
+	flag.StringVar(&colorFlag, "color", "auto", "Use color to format output. Values can be always, never and auto")
 	flag.BoolVar(&showProgressFlag, "show-progress", true, "Show progress.")
 	flag.Var(showRootFlag{}, "show-root", "Displays jiri root and exits.")
 	flag.UintVar(&progessWindowSizeFlag, "progress-window", 5, "Number of progress messages to show simultaneously. Should be between 1 and 10")
@@ -154,7 +154,11 @@ func init() {
 // NewX returns a new execution environment, given a cmdline env.
 // It also prepends .jiri_root/bin to the PATH.
 func NewX(env *cmdline.Env) (*X, error) {
-	color := color.NewColor(colorFlag)
+	cf := color.EnableColor(colorFlag)
+	if cf != color.ColorAuto && cf != color.ColorAlways && cf != color.ColorNever {
+		return nil, env.UsageErrorf("invalid value of -color flag")
+	}
+	color := color.NewColor(cf)
 
 	loggerLevel := log.InfoLevel
 	if quietVerboseFlag {
