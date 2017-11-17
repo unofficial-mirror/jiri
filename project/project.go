@@ -1028,8 +1028,8 @@ func LoadManifest(jirix *jiri.X) (Projects, Hooks, error) {
 // errors about ".git/index.lock exists", you are likely calling
 // LoadManifestFile in parallel.
 func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
-	ld := newManifestLoader(localProjects, false)
-	if err := ld.Load(jirix, "", "", file, "", "", localManifest); err != nil {
+	ld := newManifestLoader(localProjects, false, file)
+	if err := ld.Load(jirix, "", "", file, "", "", "", localManifest); err != nil {
 		return nil, nil, err
 	}
 	return ld.Projects, ld.Hooks, nil
@@ -1038,8 +1038,8 @@ func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localM
 func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, string, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
-	ld := newManifestLoader(localProjects, true)
-	if err := ld.Load(jirix, "", "", jirix.JiriManifestFile(), "", "", localManifest); err != nil {
+	ld := newManifestLoader(localProjects, true, jirix.JiriManifestFile())
+	if err := ld.Load(jirix, "", "", jirix.JiriManifestFile(), "", "", "", localManifest); err != nil {
 		return nil, nil, ld.TmpDir, err
 	}
 	return ld.Projects, ld.Hooks, ld.TmpDir, nil
@@ -1656,7 +1656,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 // If update is true, remote changes to manifest projects will be fetched, and
 // manifest projects that don't exist locally will be created in temporary
 // directories, and added to localProjects.
-func newManifestLoader(localProjects Projects, update bool) *loader {
+func newManifestLoader(localProjects Projects, update bool, file string) *loader {
 	return &loader{
 		Projects:       make(Projects),
 		Hooks:          make(Hooks),
@@ -1665,12 +1665,17 @@ func newManifestLoader(localProjects Projects, update bool) *loader {
 		update:         update,
 		importCacheMap: make(map[string]importCache),
 		manifests:      make(map[string]bool),
+		parentFile:     file,
 	}
 }
 
 type importCache struct {
 	localManifest bool
 	ref           string
+
+	// keeps track of first import tag, this is used to give helpful error
+	// message in the case of import conflict
+	parentImport string
 }
 
 type loader struct {
@@ -1683,6 +1688,7 @@ type loader struct {
 	update         bool
 	cycleStack     []cycleInfo
 	manifests      map[string]bool
+	parentFile     string
 }
 
 type cycleInfo struct {
@@ -1718,7 +1724,7 @@ type cycleInfo struct {
 // A more complex case would involve a combination of local and remote imports,
 // using the "root" attribute to change paths on the local filesystem.  In this
 // case the key will eventually expose the cycle.
-func (ld *loader) loadNoCycles(jirix *jiri.X, root, repoPath, file, ref, cycleKey string, localManifest bool) error {
+func (ld *loader) loadNoCycles(jirix *jiri.X, root, repoPath, file, ref, cycleKey, parentImport string, localManifest bool) error {
 	f := file
 	if repoPath != "" {
 		f = filepath.Join(repoPath, file)
@@ -1733,7 +1739,7 @@ func (ld *loader) loadNoCycles(jirix *jiri.X, root, repoPath, file, ref, cycleKe
 		}
 	}
 	ld.cycleStack = append(ld.cycleStack, info)
-	if err := ld.load(jirix, root, repoPath, file, ref, localManifest); err != nil {
+	if err := ld.load(jirix, root, repoPath, file, ref, parentImport, localManifest); err != nil {
 		return err
 	}
 	ld.cycleStack = ld.cycleStack[:len(ld.cycleStack)-1]
@@ -1752,10 +1758,10 @@ func shortFileName(root, repoPath, file, ref string) string {
 	return file
 }
 
-func (ld *loader) Load(jirix *jiri.X, root, repoPath, file, ref, cycleKey string, localManifest bool) error {
+func (ld *loader) Load(jirix *jiri.X, root, repoPath, file, ref, cycleKey, parentImport string, localManifest bool) error {
 	jirix.TimerPush("load " + shortFileName(jirix.Root, repoPath, file, ref))
 	defer jirix.TimerPop()
-	return ld.loadNoCycles(jirix, root, repoPath, file, ref, cycleKey, localManifest)
+	return ld.loadNoCycles(jirix, root, repoPath, file, ref, cycleKey, parentImport, localManifest)
 }
 
 func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath string, localManifest bool) error {
@@ -1811,7 +1817,7 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 	return nil
 }
 
-func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localManifest bool) error {
+func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport string, localManifest bool) error {
 	f := file
 	if repoPath != "" {
 		f = filepath.Join(repoPath, file)
@@ -1858,8 +1864,12 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localMan
 		p.Revision = remote.Revision
 		p.RemoteBranch = remote.RemoteBranch
 		ld.importProjects[key] = p
+		pi := parentImport
+		if pi == "" {
+			pi = fmt.Sprintf("import[manifest=%q, remote=%q]", remote.Manifest, remote.Remote)
+		}
 
-		if err := ld.loadImport(jirix, nextRoot, remote.Manifest, remote.cycleKey(), cacheDirPath, p, localManifest); err != nil {
+		if err := ld.loadImport(jirix, nextRoot, remote.Manifest, remote.cycleKey(), cacheDirPath, pi, p, localManifest); err != nil {
 			return err
 		}
 	}
@@ -1867,7 +1877,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localMan
 	// Process local imports.
 	for _, local := range m.LocalImports {
 		nextFile := filepath.Join(filepath.Dir(file), local.File)
-		if err := ld.Load(jirix, root, repoPath, nextFile, ref, "", localManifest); err != nil {
+		if err := ld.Load(jirix, root, repoPath, nextFile, ref, "", parentImport, localManifest); err != nil {
 			return err
 		}
 	}
@@ -1926,7 +1936,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref string, localMan
 	return nil
 }
 
-func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath string, project Project, localManifest bool) (e error) {
+func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath, parentImport string, project Project, localManifest bool) (e error) {
 	lm := localManifest
 	ref := ""
 
@@ -1939,7 +1949,9 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath s
 			if tref, err := GetHeadRevision(jirix, project); err != nil {
 				return err
 			} else if tref != ref {
-				return fmt.Errorf("Conflicting ref for import %s - %q and %q", project.Remote, tref, ref)
+				return fmt.Errorf("Conflicting ref for import %s - %q and %q. There are conflicting imports in file:\n%s:\n'%s' and '%s'",
+					jirix.Color.Red(project.Remote), ref, tref, jirix.Color.Yellow(ld.parentFile),
+					jirix.Color.Yellow(v.parentImport), jirix.Color.Yellow(parentImport))
 			}
 		}
 	} else {
@@ -1973,13 +1985,14 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath s
 		ld.importCacheMap[strings.Trim(project.Remote, "/")] = importCache{
 			localManifest: lm,
 			ref:           ref,
+			parentImport:  parentImport,
 		}
 	}
 	if lm {
 		// load from local checked out file
-		return ld.Load(jirix, root, "", filepath.Join(project.Path, file), "", cycleKey, false)
+		return ld.Load(jirix, root, "", filepath.Join(project.Path, file), "", cycleKey, parentImport, false)
 	}
-	return ld.Load(jirix, root, project.Path, file, ref, cycleKey, false)
+	return ld.Load(jirix, root, project.Path, file, ref, cycleKey, parentImport, false)
 }
 
 // setRemoteHeadRevisions set the repo statuses from remote for
