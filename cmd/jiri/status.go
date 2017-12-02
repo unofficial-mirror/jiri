@@ -41,7 +41,7 @@ func init() {
 	flags.BoolVar(&statusFlags.changes, "changes", true, "Display projects with tracked or un-tracked changes.")
 	flags.BoolVar(&statusFlags.checkHead, "check-head", true, "Display projects that are not on HEAD/pinned revisions.")
 	flags.BoolVar(&statusFlags.commits, "commits", true, "Display commits not merged with remote. This only works when project is on a local branch.")
-	flags.StringVar(&statusFlags.branch, "branch", "", "Display all projects only on this branch along with thier status.")
+	flags.StringVar(&statusFlags.branch, "branch", "", "Display all projects only on this branch along with their status.")
 }
 
 func colorFormatGitLog(jirix *jiri.X, log string) string {
