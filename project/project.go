@@ -68,8 +68,10 @@ type Manifest struct {
 // in.
 func ManifestFromBytes(data []byte) (*Manifest, error) {
 	m := new(Manifest)
-	if err := xml.Unmarshal(data, m); err != nil {
-		return nil, err
+	if len(data) > 0 {
+		if err := xml.Unmarshal(data, m); err != nil {
+			return nil, err
+		}
 	}
 	if err := m.fillDefaults(); err != nil {
 		return nil, err
@@ -111,7 +113,7 @@ func ManifestFromFile(jirix *jiri.X, filename string) (*Manifest, error) {
 	}
 	m, err := ManifestFromBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf("invalid manifest %s: %v", filename, err)
+		return nil, fmt.Errorf("invalid manifest %s: %s", filename, err)
 	}
 	return m, nil
 }
