@@ -2832,7 +2832,6 @@ func (op createOperation) Kind() string {
 
 func (op createOperation) Run(jirix *jiri.X) (e error) {
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-	tmpDirPrefix := strings.Replace(op.Project().Name, "/", ".", -1) + "-"
 
 	// Check the local file system.
 	if _, err := os.Stat(op.destination); err != nil {
@@ -2856,12 +2855,6 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	if err := os.MkdirAll(path, perm); err != nil {
 		return fmtError(err)
 	}
-	tmpDir, err := ioutil.TempDir(path, tmpDirPrefix)
-	if err != nil {
-		return fmtError(err)
-	}
-
-	defer collect.Error(func() error { return fmtError(os.RemoveAll(tmpDir)) }, &e)
 
 	cache, err := op.project.CacheDirPath(jirix)
 	if err != nil {
@@ -2872,27 +2865,30 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	}
 
 	if jirix.Shared && cache != "" {
-		if err := clone(jirix, cache, tmpDir, gitutil.SharedOpt(true),
-			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
-			return err
-		}
+		err = clone(jirix, cache, op.destination, gitutil.SharedOpt(true),
+			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
 	} else {
 		ref := cache
 		if op.project.HistoryDepth > 0 {
 			ref = ""
 		}
 		remote := rewriteRemote(jirix, op.project.Remote)
-		if err := clone(jirix, remote, tmpDir, gitutil.ReferenceOpt(ref),
-			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
-			return err
+		err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(ref),
+			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+	}
+	if err != nil {
+		if err2 := os.RemoveAll(op.destination); err2 != nil {
+			return fmt.Errorf("Not able to remove %q after clone failed: %s, original error: %s", op.destination, err2, err)
 		}
+		return err
 	}
-	if err := os.Chmod(tmpDir, os.FileMode(0755)); err != nil {
+	if err := os.Chmod(op.destination, os.FileMode(0755)); err != nil {
+		if err2 := os.RemoveAll(op.destination); err2 != nil {
+			return fmt.Errorf("Not able to remove %q after chmod failed: %s, original error: %s", op.destination, err2, fmtError(err))
+		}
 		return fmtError(err)
 	}
-	if err := osutil.Rename(tmpDir, op.destination); err != nil {
-		return fmtError(err)
-	}
+
 	if err := checkoutHeadRevision(jirix, op.project, false); err != nil {
 		return err
 	}
