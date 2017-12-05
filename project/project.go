@@ -1282,6 +1282,9 @@ func IsLocalProject(jirix *jiri.X, path string) (bool, error) {
 				return false, fmtError(err)
 			}
 			return true, nil
+		} else if os.IsPermission(err) {
+			jirix.Logger.Warningf("Directory %q doesn't have read permission, skipping it\n\n", path)
+			return false, nil
 		}
 		return false, fmtError(err)
 	}
@@ -1357,7 +1360,7 @@ func findLocalProjects(jirix *jiri.X, path string, projects Projects) MultiError
 
 		// Recurse into all the sub directories.
 		fileInfos, err := ioutil.ReadDir(path)
-		if err != nil {
+		if err != nil && !os.IsPermission(err) {
 			errs <- fmt.Errorf("cannot read dir %q: %v", path, err)
 			return
 		}
