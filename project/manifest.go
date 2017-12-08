@@ -417,17 +417,19 @@ func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localM
 	if err := ld.Load(jirix, "", "", file, "", "", "", localManifest); err != nil {
 		return nil, nil, err
 	}
+	jirix.AddCleanupFunc(ld.cleanup)
 	return ld.Projects, ld.Hooks, nil
 }
 
-func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, string, error) {
+func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
 	ld := newManifestLoader(localProjects, true, jirix.JiriManifestFile())
 	if err := ld.Load(jirix, "", "", jirix.JiriManifestFile(), "", "", "", localManifest); err != nil {
-		return nil, nil, ld.TmpDir, err
+		return nil, nil, err
 	}
-	return ld.Projects, ld.Hooks, ld.TmpDir, nil
+	jirix.AddCleanupFunc(ld.cleanup)
+	return ld.Projects, ld.Hooks, nil
 }
 
 // RunHooks runs all given hooks.

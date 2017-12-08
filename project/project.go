@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/collect"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/log"
@@ -600,13 +599,8 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 		}
 
 		// Determine the set of remote projects and match them up with the locals.
-		remoteProjects, hooks, tmpLoadDir, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
+		remoteProjects, hooks, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
 		MatchLocalWithRemote(localProjects, remoteProjects)
-
-		// Make sure we clean up the tmp dir used to load remote manifest projects.
-		if tmpLoadDir != "" {
-			defer collect.Error(func() error { return fmtError(os.RemoveAll(tmpLoadDir)) }, &e)
-		}
 
 		if err != nil {
 			return err

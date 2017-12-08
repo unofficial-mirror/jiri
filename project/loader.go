@@ -37,6 +37,13 @@ type loader struct {
 	parentFile     string
 }
 
+func (ld *loader) cleanup() {
+	if ld.TmpDir != "" {
+		os.RemoveAll(ld.TmpDir)
+		ld.TmpDir = ""
+	}
+}
+
 type cycleInfo struct {
 	file, key string
 }
@@ -133,7 +140,7 @@ func (ld *loader) Load(jirix *jiri.X, root, repoPath, file, ref, cycleKey, paren
 
 func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath string, localManifest bool) error {
 	if !ld.update || localManifest {
-		jirix.Logger.Warningf("import %q not found locally, getting from server.\n\n", remote.Name)
+		jirix.Logger.Warningf("import %q not found locally, getting from server. Please check your manifest file (default: .jiri_manifest).\nMake sure that the 'name' attributes on the 'import' and 'project' tags match and that there is a corresponding 'project' tag for every 'import' tag.\n\n", remote.Name)
 	}
 	jirix.Logger.Debugf("clone manifest project %q", remote.Name)
 	// The remote manifest project doesn't exist locally.  Clone it into a

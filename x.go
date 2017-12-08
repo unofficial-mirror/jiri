@@ -101,6 +101,7 @@ type X struct {
 	Logger            *log.Logger
 	failures          uint32
 	Attempts          uint
+	cleanupFuncs      []func()
 }
 
 func (jirix *X) IncrementFailures() {
@@ -109,6 +110,19 @@ func (jirix *X) IncrementFailures() {
 
 func (jirix *X) Failures() uint32 {
 	return atomic.LoadUint32(&jirix.failures)
+}
+
+// This is not thread safe
+func (jirix *X) AddCleanupFunc(cleanup func()) {
+	jirix.cleanupFuncs = append(jirix.cleanupFuncs, cleanup)
+}
+
+// Executes all the cleanups added in LIFO order
+func (jirix *X) RunCleanup() {
+	for _, fn := range jirix.cleanupFuncs {
+		// defer so that cleanups are executed in LIFO order
+		defer fn()
+	}
 }
 
 var (
@@ -345,6 +359,7 @@ func (x *X) Clone(opts tool.ContextOpts) *X {
 		Logger:            x.Logger,
 		failures:          x.failures,
 		Attempts:          x.Attempts,
+		cleanupFuncs:      x.cleanupFuncs,
 	}
 }
 
@@ -409,6 +424,7 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	defer x.RunCleanup()
 	enablesdAnalytics := false
 	userId := ""
 	analyticsCommandMsg := fmt.Sprintf("To check what data we collect run '%s'\n"+
