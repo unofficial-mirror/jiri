@@ -83,23 +83,24 @@ func runUpdate(jirix *jiri.X, args []string) error {
 		rebaseTrackedFlag = true
 	}
 
-	var err error
 	if len(args) > 0 {
-		err = project.CheckoutSnapshot(jirix, args[0], gcFlag, runHooksFlag, hookTimeoutFlag)
+		if err := project.CheckoutSnapshot(jirix, args[0], gcFlag, runHooksFlag, hookTimeoutFlag); err != nil {
+			return err
+		}
 	} else {
-		err = project.UpdateUniverse(jirix, gcFlag, localManifestFlag,
+		err := project.UpdateUniverse(jirix, gcFlag, localManifestFlag,
 			rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, runHooksFlag, hookTimeoutFlag)
+		if err2 := project.WriteUpdateHistorySnapshot(jirix, "", nil, localManifestFlag); err2 != nil {
+			if err != nil {
+				return fmt.Errorf("while updation: %s, while writing history: %s", err, err2)
+			}
+			return fmt.Errorf("while writing history: %s", err2)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
-	if err2 := project.WriteUpdateHistorySnapshot(jirix, "", localManifestFlag); err2 != nil {
-		if err != nil {
-			return fmt.Errorf("while updation: %s, while writing history: %s", err, err2)
-		}
-		return fmt.Errorf("while writing history: %s", err2)
-	}
-	if err != nil {
-		return err
-	}
 	if jirix.Failures() != 0 {
 		return fmt.Errorf("Project update completed with non-fatal errors")
 	}

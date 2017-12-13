@@ -345,7 +345,9 @@ func (sm ScanMode) String() string {
 
 // CreateSnapshot creates a manifest that encodes the current state of
 // HEAD of all projects and writes this snapshot out to the given file.
-func CreateSnapshot(jirix *jiri.X, file string, localManifest bool) error {
+// if hooks are not passed, jiri will read JiriManifestFile and get hooks from there,
+// so always pass hooks incase updating from a snapshot
+func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, localManifest bool) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
@@ -361,9 +363,10 @@ func CreateSnapshot(jirix *jiri.X, file string, localManifest bool) error {
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	_, hooks, err := LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest)
-	if err != nil {
-		return err
+	if hooks == nil {
+		if _, hooks, err = LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest); err != nil {
+			return err
+		}
 	}
 	for _, hook := range hooks {
 		manifest.Hooks = append(manifest.Hooks, hook)
@@ -391,7 +394,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks bool, runHook
 	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/, runHooks); err != nil {
 		return err
 	}
-	return WriteUpdateHistorySnapshot(jirix, snapshot, false)
+	return WriteUpdateHistorySnapshot(jirix, snapshot, hooks, false)
 }
 
 // LoadSnapshotFile loads the specified snapshot manifest.  If the snapshot
@@ -635,9 +638,9 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
 // projects and writes it to the update history directory.
-func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, localManifest bool) error {
+func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks, localManifest bool) error {
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile, localManifest); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile, hooks, localManifest); err != nil {
 		return err
 	}
 
