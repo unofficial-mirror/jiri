@@ -23,6 +23,7 @@ import (
 	"fuchsia.googlesource.com/jiri/collect"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/retry"
 )
 
@@ -1396,19 +1397,19 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	if err := runDeleteOperations(jirix, deleteOperations); err != nil {
 		return err
 	}
-	if err := runCommonOperations(jirix, changeRemoteOperations); err != nil {
+	if err := runCommonOperations(jirix, changeRemoteOperations, log.DebugLevel); err != nil {
 		return err
 	}
 	if err := runMoveOperations(jirix, moveOperations); err != nil {
 		return err
 	}
-	if err := runCommonOperations(jirix, updateOperations); err != nil {
+	if err := runCommonOperations(jirix, updateOperations, log.DebugLevel); err != nil {
 		return err
 	}
 	if err := runCreateOperations(jirix, createOperations); err != nil {
 		return err
 	}
-	if err := runCommonOperations(jirix, nullOperations); err != nil {
+	if err := runCommonOperations(jirix, nullOperations, log.TraceLevel); err != nil {
 		return err
 	}
 	jirix.TimerPush("jiri revision files")

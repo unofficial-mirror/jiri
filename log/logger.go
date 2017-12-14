@@ -200,6 +200,23 @@ func (l *Logger) log(prefix, format string, a ...interface{}) {
 	l.goLogger.Printf("%s%s", prefix, fmt.Sprintf(format, a...))
 }
 
+func (l *Logger) Logf(loglevel LogLevel, format string, a ...interface{}) {
+	switch loglevel {
+	case InfoLevel:
+		l.Infof(format, a...)
+	case DebugLevel:
+		l.Debugf(format, a...)
+	case TraceLevel:
+		l.Tracef(format, a...)
+	case WarningLevel:
+		l.Warningf(format, a...)
+	case ErrorLevel:
+		l.Errorf(format, a...)
+	default:
+		panic(fmt.Sprintf("Undefined loglevel: %v, log message: %s", loglevel, fmt.Sprintf(format, a...)))
+	}
+}
+
 func (l *Logger) Infof(format string, a ...interface{}) {
 	if l.LoggerLevel >= InfoLevel {
 		l.log("", format, a...)

@@ -15,6 +15,7 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
+	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/osutil"
 )
 
@@ -655,11 +656,12 @@ func runCreateOperations(jirix *jiri.X, ops []createOperation) MultiError {
 	processTree := func(tree *workTree) {
 		defer wg.Done()
 		for _, op := range tree.ops {
-			task := jirix.Logger.AddTaskMsg("Creating project %q", op.Project().Name)
+			logMsg := fmt.Sprintf("Creating project %q", op.Project().Name)
+			task := jirix.Logger.AddTaskMsg(logMsg)
 			jirix.Logger.Debugf("%v", op)
 			if err := op.Run(jirix); err != nil {
 				task.Done()
-				errs <- fmt.Errorf("Creating project %q: %v", op.Project().Name, err)
+				errs <- fmt.Errorf("%s: %s", logMsg, err)
 				return
 			}
 			task.Done()
@@ -754,11 +756,12 @@ func runDeleteOperations(jirix *jiri.X, ops []deleteOperation) error {
 			jirix.Logger.Warningf(msg)
 			continue
 		}
-		task := jirix.Logger.AddTaskMsg("Trying to delete project %q", op.Project().Name)
+		logMsg := fmt.Sprintf("Deleting project %q", op.Project().Name)
+		task := jirix.Logger.AddTaskMsg(logMsg)
 		jirix.Logger.Debugf("%s", op)
 		if err := op.Run(jirix); err != nil {
 			task.Done()
-			return fmt.Errorf("Deleting project %q: %s", op.Project().Name, err)
+			return fmt.Errorf("%s: %s", logMsg, err)
 		}
 		task.Done()
 		if _, err := os.Stat(op.source); err == nil {
@@ -781,24 +784,26 @@ func runMoveOperations(jirix *jiri.X, ops []moveOperation) error {
 			parentSrcPath = op.source
 			parentDestPath = op.destination
 		}
-		task := jirix.Logger.AddTaskMsg("Moving project %q", op.Project().Name)
+		logMsg := fmt.Sprintf("Moving and updating project %q: %s", op.Project().Name)
+		task := jirix.Logger.AddTaskMsg(logMsg)
 		jirix.Logger.Debugf("%s", op)
 		if err := op.Run(jirix); err != nil {
 			task.Done()
-			return fmt.Errorf("Moving and updating project %q: %s", op.Project().Name, err)
+			return fmt.Errorf("%s: %s", logMsg, err)
 		}
 		task.Done()
 	}
 	return nil
 }
 
-func runCommonOperations(jirix *jiri.X, ops operations) error {
+func runCommonOperations(jirix *jiri.X, ops operations, loglevel log.LogLevel) error {
 	for _, op := range ops {
-		task := jirix.Logger.AddTaskMsg("Updating project %q", op.Project().Name)
-		jirix.Logger.Debugf("%s", op)
+		logMsg := fmt.Sprintf("Updating project %q", op.Project().Name)
+		task := jirix.Logger.AddTaskMsg(logMsg)
+		jirix.Logger.Logf(loglevel, "%s", op)
 		if err := op.Run(jirix); err != nil {
 			task.Done()
-			return fmt.Errorf("Updating project %q: %s", op.Project().Name, err)
+			return fmt.Errorf("%s: %s", logMsg, err)
 		}
 		task.Done()
 	}
