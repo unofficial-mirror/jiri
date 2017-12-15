@@ -784,7 +784,7 @@ func runMoveOperations(jirix *jiri.X, ops []moveOperation) error {
 			parentSrcPath = op.source
 			parentDestPath = op.destination
 		}
-		logMsg := fmt.Sprintf("Moving and updating project %q: %s", op.Project().Name)
+		logMsg := fmt.Sprintf("Moving and updating project %q", op.Project().Name)
 		task := jirix.Logger.AddTaskMsg(logMsg)
 		jirix.Logger.Debugf("%s", op)
 		if err := op.Run(jirix); err != nil {
