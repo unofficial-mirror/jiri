@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"fuchsia.googlesource.com/jiri/analytics_util"
 	"fuchsia.googlesource.com/jiri/cmdline"
@@ -119,6 +120,7 @@ var (
 	traceVerboseFlag      bool
 	showProgressFlag      bool
 	progessWindowSizeFlag uint
+	timeLogThresholdFlag  time.Duration
 )
 
 // showRootFlag implements a flag that dumps the root dir and exits the
@@ -145,6 +147,7 @@ func init() {
 	flag.BoolVar(&showProgressFlag, "show-progress", true, "Show progress.")
 	flag.Var(showRootFlag{}, "show-root", "Displays jiri root and exits.")
 	flag.UintVar(&progessWindowSizeFlag, "progress-window", 5, "Number of progress messages to show simultaneously. Should be between 1 and 10")
+	flag.DurationVar(&timeLogThresholdFlag, "time-log-threshold", time.Second*10, "Log time taken by operations if more than the passed value (eg 5s). This only works with -v and -vv.")
 	flag.BoolVar(&quietVerboseFlag, "quiet", false, "Only print user actionable messages.")
 	flag.BoolVar(&quietVerboseFlag, "q", false, "Same as -quiet")
 	flag.BoolVar(&debugVerboseFlag, "v", false, "Print debug level output.")
@@ -173,7 +176,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	} else if progessWindowSizeFlag > 10 {
 		progessWindowSizeFlag = 10
 	}
-	logger := log.NewLogger(loggerLevel, color, showProgressFlag, progessWindowSizeFlag, nil, nil)
+	logger := log.NewLogger(loggerLevel, color, showProgressFlag, progessWindowSizeFlag, timeLogThresholdFlag, nil, nil)
 
 	ctx := tool.NewContextFromEnv(env)
 	root, err := findJiriRoot(ctx.Timer())

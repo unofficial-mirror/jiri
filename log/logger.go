@@ -52,6 +52,7 @@ type Logger struct {
 	progressWindowSize   uint
 	enableProgress       uint32
 	progressUpdateNeeded bool
+	timeLogThreshold     time.Duration
 	tasks                *list.List
 }
 
@@ -66,14 +67,13 @@ const (
 	TraceLevel
 )
 
-func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, progressWindowSize uint, outWriter, errWriter io.Writer) *Logger {
+func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, progressWindowSize uint, timeLogThreshold time.Duration, outWriter, errWriter io.Writer) *Logger {
 	if outWriter == nil {
 		outWriter = os.Stdout
 	}
 	if errWriter == nil {
 		errWriter = os.Stderr
 	}
-
 	term := os.Getenv("TERM")
 	switch term {
 	case "dumb", "":
@@ -92,6 +92,7 @@ func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, pro
 		enableProgress:       0,
 		progressWindowSize:   progressWindowSize,
 		progressUpdateNeeded: false,
+		timeLogThreshold:     timeLogThreshold,
 		tasks:                list.New(),
 	}
 	if enableProgress {
@@ -108,6 +109,10 @@ func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, pro
 
 func (l *Logger) IsProgressEnabled() bool {
 	return atomic.LoadUint32(&l.enableProgress) == 1
+}
+
+func (l *Logger) TimeLogThreshold() time.Duration {
+	return l.timeLogThreshold
 }
 
 func (l *Logger) DisableProgress() {

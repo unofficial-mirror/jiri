@@ -89,7 +89,7 @@ func TestRunHookLocalManifest(t *testing.T) {
 	manifest.ToFile(fake.X, filepath.Join(fake.X.Root, jiritest.ManifestProjectPath, jiritest.ManifestFileName))
 	runHooksFlags.localManifest = true
 	buf := bytes.NewBufferString("")
-	fake.X.Logger = log.NewLogger(fake.X.Logger.LoggerLevel, fake.X.Color, false, 0, nil, buf)
+	fake.X.Logger = log.NewLogger(fake.X.Logger.LoggerLevel, fake.X.Color, false, 0, 100, nil, buf)
 	if err := runHooks(fake.X, nil); err == nil {
 		t.Fatal("runhooks should throw error as there is no action.sh script")
 	} else if !strings.Contains(buf.String(), "action1.sh") {

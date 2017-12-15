@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
@@ -22,7 +23,7 @@ import (
 func NewX(t *testing.T) (*jiri.X, func()) {
 	ctx := tool.NewContextFromEnv(cmdline.EnvFromOS())
 	color := color.NewColor(color.ColorNever)
-	logger := log.NewLogger(log.InfoLevel, color, false, 0, nil, nil)
+	logger := log.NewLogger(log.InfoLevel, color, false, 0, time.Second*100, nil, nil)
 	root, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("TempDir() failed: %v", err)
