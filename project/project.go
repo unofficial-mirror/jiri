@@ -1224,8 +1224,11 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 
 		// Cache already present, update it
 		// TODO : update this after implementing FetchAll using g
-		task := jirix.Logger.AddTaskMsg("Updating cache: %q", dir)
+		msg := fmt.Sprintf("Updating cache: %q", dir)
+		task := jirix.Logger.AddTaskMsg(msg)
 		defer task.Done()
+		t := jirix.Logger.TrackTime(msg)
+		defer t.Done()
 		if _, err := os.Stat(filepath.Join(dir, "shallow")); err == nil {
 			// Shallow cache, fetch only manifest tracked remote branch
 			refspec := fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
@@ -1245,8 +1248,11 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		// Create cache
 		// TODO : If we in future need to support two projects with same remote url,
 		// one with shallow checkout and one with full, we should create two caches
-		task := jirix.Logger.AddTaskMsg("Creating cache: %q", dir)
+		msg := fmt.Sprintf("Creating cache: %q", dir)
+		task := jirix.Logger.AddTaskMsg(msg)
 		defer task.Done()
+		t := jirix.Logger.TrackTime(msg)
+		defer t.Done()
 		if err := gitutil.New(jirix).CloneMirror(remote, dir, depth); err != nil {
 			return err
 		}
