@@ -92,7 +92,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 			rebaseTrackedFlag, rebaseUntrackedFlag, rebaseAllFlag, runHooksFlag, hookTimeoutFlag)
 		if err2 := project.WriteUpdateHistorySnapshot(jirix, "", nil, localManifestFlag); err2 != nil {
 			if err != nil {
-				return fmt.Errorf("while updation: %s, while writing history: %s", err, err2)
+				return fmt.Errorf("while updating: %s, while writing history: %s", err, err2)
 			}
 			return fmt.Errorf("while writing history: %s", err2)
 		}
