@@ -1339,7 +1339,7 @@ func TestUpdateUniverseRenamedProject(t *testing.T) {
 
 // testUpdateUniverseDeletedProject checks that UpdateUniverse will delete a
 // project if gc=true.
-func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool) {
+func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete, testProjectWithBranch bool) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
 	if err := fake.UpdateUniverse(false); err != nil {
@@ -1354,6 +1354,12 @@ func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool)
 	projects := []project.Project{}
 	if testDirtyProjectDelete {
 		writeUncommitedFile(t, fake.X, localProjects[4].Path, "extra", "")
+	} else if testProjectWithBranch {
+		// Create and checkout master.
+		git := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[4].Path))
+		if err := git.CreateAndCheckoutBranch("master"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, p := range m.Projects {
 		skip := false
@@ -1389,7 +1395,7 @@ func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool)
 	}
 	for i := 1; i <= 5; i++ {
 		err := dirExists(localProjects[i].Path)
-		if testDirtyProjectDelete && i >= 2 && i <= 4 {
+		if (testProjectWithBranch || testDirtyProjectDelete) && i >= 2 && i <= 4 {
 			if err != nil {
 				t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[i].Name, localProjects[i].Path)
 			}
@@ -1398,9 +1404,11 @@ func testUpdateUniverseDeletedProject(t *testing.T, testDirtyProjectDelete bool)
 		}
 	}
 }
+
 func TestUpdateUniverseDeletedProject(t *testing.T) {
-	testUpdateUniverseDeletedProject(t, false)
-	testUpdateUniverseDeletedProject(t, true)
+	testUpdateUniverseDeletedProject(t, false, false)
+	testUpdateUniverseDeletedProject(t, true, false)
+	testUpdateUniverseDeletedProject(t, false, true)
 }
 
 func TestIgnoredProjectsNotDeleted(t *testing.T) {

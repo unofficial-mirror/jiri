@@ -208,20 +208,27 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 		}
 		extraBranches := false
 		for _, branch := range branches {
-			if !strings.Contains(branch, "HEAD detached") && branch != "master" {
+			if !strings.Contains(branch, "HEAD detached") {
 				extraBranches = true
 				break
 			}
 		}
+
 		if extraBranches || uncommitted || untracked {
 			rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
 			unManageCommand := jirix.Color.Yellow("rm -rf %q", filepath.Join(op.source, jiri.ProjectMetaDir))
-			msg := fmt.Sprintf("Project %q won't be deleted as it might contain changes", op.project.Name)
+			msg := ""
+			if extraBranches {
+				msg = fmt.Sprintf("Project %q won't be deleted as it contains branches", op.project.Name)
+			} else {
+				msg = fmt.Sprintf("Project %q won't be deleted as it might contain changes", op.project.Name)
+			}
 			msg += fmt.Sprintf("\nIf you no longer need it, invoke '%s'", rmCommand)
 			msg += fmt.Sprintf("\nIf you no longer want jiri to manage it, invoke '%s'\n\n", unManageCommand)
 			jirix.Logger.Warningf(msg)
 			return nil
 		}
+
 		return fmtError(os.RemoveAll(op.source))
 	}
 	rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
