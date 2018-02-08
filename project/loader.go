@@ -300,7 +300,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 
 	for _, hook := range m.Hooks {
 		if hook.ActionPath == "" {
-			return fmt.Errorf("invalid hook \"%v\" for project \"%v\"", hook.Name, hook.ProjectName)
+			return fmt.Errorf("invalid hook %q for project %q. Please make sure you are importing project %q and this hook is in the manifest which directly/indirectly imports that project.", hook.Name, hook.ProjectName, hook.ProjectName)
 		}
 		key := hook.Key()
 		ld.Hooks[key] = hook

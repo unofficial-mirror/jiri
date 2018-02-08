@@ -344,7 +344,7 @@ func (g *Git) LsRemote(args ...string) (string, error) {
 		return "", err
 	}
 	if got, want := len(out), 1; got != want {
-		return "", fmt.Errorf("git ls-remote %s: unexpected length of %s: got %s, want %s", strings.Join(args, " "), out, got, want)
+		return "", fmt.Errorf("git ls-remote %s: unexpected length of %s: got %d, want %d", strings.Join(args, " "), out, got, want)
 	}
 	return out[0], nil
 }

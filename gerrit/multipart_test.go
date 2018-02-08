@@ -209,7 +209,7 @@ func TestNewOpenCLs(t *testing.T) {
 			t.Fatalf("case %d: want: %v, got: %v", index, test.expected, got)
 		}
 		if len(errs) != 0 {
-			t.Fatalf("case %d: multi-part errors: ", index, errs)
+			t.Fatalf("case %d: multi-part errors: %s", index, errs)
 		}
 	}
 }

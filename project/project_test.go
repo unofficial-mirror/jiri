@@ -219,7 +219,7 @@ func TestLocalProjects(t *testing.T) {
 	// Check that deleting a project forces LocalProjects to run a full scan,
 	// even if FastScan is specified.
 	if err := os.RemoveAll(projectPaths[0]); err != nil {
-		t.Fatalf("RemoveAll(%v) failed: %v", projectPaths[0])
+		t.Fatalf("RemoveAll(%s) failed: %s", projectPaths[0], err)
 	}
 	foundProjects, err = project.LocalProjects(jirix, project.FastScan)
 	if err != nil {

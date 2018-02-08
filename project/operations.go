@@ -196,15 +196,15 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 		g := git.NewGit(op.project.Path)
 		branches, _, err := g.GetBranches()
 		if err != nil {
-			return fmt.Errorf("Cannot get branches for project %q: %v", op.Project().Name, err)
+			return fmt.Errorf("Cannot get branches for project %q: %s", op.Project().Name, err)
 		}
 		uncommitted, err := g.HasUncommittedChanges()
 		if err != nil {
-			return fmt.Errorf("Cannot get uncommited changes for project %q", op.Project().Name, err)
+			return fmt.Errorf("Cannot get uncommited changes for project %q: %s", op.Project().Name, err)
 		}
 		untracked, err := g.HasUntrackedFiles()
 		if err != nil {
-			return fmt.Errorf("Cannot get untracked changes for project %q: %v", op.Project().Name, err)
+			return fmt.Errorf("Cannot get untracked changes for project %q: %s", op.Project().Name, err)
 		}
 		extraBranches := false
 		for _, branch := range branches {
