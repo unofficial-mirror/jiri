@@ -4,7 +4,7 @@ Jiri manifest files describe the set of projects that get synced when running "j
 
 The first manifest file that jiri reads is in [root]/.jiri\_manifest.  This manifest **must** exist for the jiri tool to work.
 
-Usually the manifest in [root]/.jiri\_manifest will import other manifests from remote repositories via <import> tags, but it can contain its own list of projects as well.
+Usually the manifest in [root]/.jiri\_manifest will import other manifests from remote repositories via &lt;import> tags, but it can contain its own list of projects as well.
 
 Manifests have the following XML schema:
 ```
@@ -38,21 +38,21 @@ Manifests have the following XML schema:
 
 </manifest>
 ```
-The <import> and <localimport> tags can be used to share common projects across multiple manifests.
+The &lt;import> and &lt;localimport> tags can be used to share common projects across multiple manifests.
 
-A <localimport> tag should be used when the manifest being imported and the importing manifest are both in the same repository, or when neither one is in a repository.  The "file" attribute is the path to the
+A &lt;localimport> tag should be used when the manifest being imported and the importing manifest are both in the same repository, or when neither one is in a repository.  The "file" attribute is the path to the
 manifest file being imported.  It can be absolute, or relative to the importing manifest file.
 
-If the manifest being imported and the importing manifest are in different repositories then an <import> tag must be used, with the following attributes:
+If the manifest being imported and the importing manifest are in different repositories then an &lt;import> tag must be used, with the following attributes:
 
 * remote (required) - The remote url of the repository containing the manifest to be imported
 
 * manifest (required) - The path of the manifest file to be imported, relative to the repository root.
 
-* name (optional) - The name of the project corresponding to the manifest repository.  If your manifest contains a <project> with the same remote as the manifest remote, then the "name" attribute of on the
-<import> tag should match the "name" attribute on the <project>.  Otherwise, jiri will clone the manifest repository on every update.
+* name (optional) - The name of the project corresponding to the manifest repository.  If your manifest contains a &lt;project> with the same remote as the manifest remote, then the "name" attribute of on the
+&lt;import> tag should match the "name" attribute on the &lt;project>.  Otherwise, jiri will clone the manifest repository on every update.
 
-The <project> tags describe the projects to sync, and what state they should sync to, accoring to the following attributes:
+The &lt;project> tags describe the projects to sync, and what state they should sync to, accoring to the following attributes:
 
 * name (required) - The name of the project.
 
@@ -70,7 +70,7 @@ The <project> tags describe the projects to sync, and what state they should syn
 
 * githooks (optional) - The path (relative to [root]) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
 
-The <hook> tag describes the hooks that must be executed after every 'jiri update' They are configured via the following attributes:
+The &lt;hook> tag describes the hooks that must be executed after every 'jiri update' They are configured via the following attributes:
 
 * name (required) - The name of the of the hook to identify it
 

@@ -14,7 +14,7 @@ All data managed by the jiri tool is located in the file system under a root dir
  [root]/[project1]/<<files>>              # project files
  [root]/[project2]...
 ```
-The [root] and [projectN] directory names are picked by the user.  The <<cls>> are named via jiri cl new, and the <<files>> are named as the user adds files and directories to their project.  All other names
+The [root] and [projectN] directory names are picked by the user.  The &lt;&lt;cls>> are named via jiri cl new, and the &lt;&lt;files>> are named as the user adds files and directories to their project.  All other names
 above have special meaning to the jiri tool, and cannot be changed; you must ensure your path names don't collide with these special names.
 
 To find the [root] directory, the jiri binary looks for the .jiri\_root directory, starting in the current working directory and walking up the directory chain.  The search is terminated successfully when the
