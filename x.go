@@ -102,6 +102,7 @@ type X struct {
 	failures          uint32
 	Attempts          uint
 	cleanupFuncs      []func()
+	AnalyticsSession  *analytics_util.AnalyticsSession
 }
 
 func (jirix *X) IncrementFailures() {
@@ -360,6 +361,7 @@ func (x *X) Clone(opts tool.ContextOpts) *X {
 		failures:          x.failures,
 		Attempts:          x.Attempts,
 		cleanupFuncs:      x.cleanupFuncs,
+		AnalyticsSession:  x.AnalyticsSession,
 	}
 }
 
@@ -425,7 +427,7 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 		return err
 	}
 	defer x.RunCleanup()
-	enablesdAnalytics := false
+	enabledAnalytics := false
 	userId := ""
 	analyticsCommandMsg := fmt.Sprintf("To check what data we collect run '%s'\n"+
 		"To opt-in run '%s'\n"+
@@ -442,10 +444,11 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 			x.Logger.Warningf("You have opted in for old version of data collection. Please opt in/out again\n%s\n\n", analyticsCommandMsg)
 		} else {
 			userId = x.config.AnalyticsUserId
-			enablesdAnalytics = true
+			enabledAnalytics = true
 		}
 	}
-	as := analytics_util.NewAnalyticsSession(enablesdAnalytics, "UA-101128147-1", userId)
+	as := analytics_util.NewAnalyticsSession(enabledAnalytics, "UA-101128147-1", userId)
+	x.AnalyticsSession = as
 	id := as.AddCommand(env.CommandName, env.CommandFlags)
 
 	err = r(x, args)

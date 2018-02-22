@@ -30,7 +30,8 @@ var CollectedData = `When opted in, jiri collects the following anonymized data 
 3. Creates a uuid for each jiri repository and sends that to track the session and user workflow.
 4. Tracks user's operating system and its architecture.
 5. Tracks the time taken by a command to complete.
-6. Tracks jiri version.`
+6. Tracks jiri version.
+7. Tracks time between subsequent jiri updates if more than 30 mins and less than 2 weeks.`
 
 var customDimensionMapping map[string]string
 
@@ -50,6 +51,13 @@ type Event struct {
 	Label           string
 	Value           int64
 	CustomDimension map[string]string
+}
+
+type UserTiming struct {
+	Category string
+	Variable string
+	Label    string
+	Timing   int64
 }
 
 type AnalyticsSession struct {
@@ -75,7 +83,20 @@ func (e Event) send(as *AnalyticsSession) {
 		params["ev"] = strconv.FormatInt(e.Value, 10)
 	}
 	as.sendAnalytic(params, e.CustomDimension)
+}
 
+func (ut UserTiming) send(as *AnalyticsSession) {
+	params := make(map[string]string)
+	params["t"] = "timing"
+	params["utc"] = ut.Category
+	if ut.Variable != "" {
+		params["utv"] = ut.Variable
+	}
+	if ut.Label != "" {
+		params["utl"] = ut.Label
+	}
+	params["utt"] = strconv.FormatInt(ut.Timing, 10)
+	as.sendAnalytic(params, nil)
 }
 
 type JiriObject interface {
@@ -137,6 +158,13 @@ func (as *AnalyticsSession) AddCommand(name string, flags map[string]string) int
 		return -1
 	}
 	return as.Add(newCommand(name, flags))
+}
+
+func (as *AnalyticsSession) AddCommandExecutionTiming(name string, timing time.Duration) int {
+	if !as.enabled {
+		return -1
+	}
+	return as.Add(newCommandExecutionTiming(name, timing))
 }
 
 func (as *AnalyticsSession) Send(id int) {

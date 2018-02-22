@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"fuchsia.googlesource.com/jiri/version"
 )
@@ -27,6 +28,48 @@ func TestAnalyticsDisabled(t *testing.T) {
 	as := NewAnalyticsSession(false, "UA-XXXXXX-1", "test-id")
 	as.AddCommand("test", nil)
 	as.SendAllAndWaitToFinish()
+}
+
+func TestSendExecutionCommandTiming(t *testing.T) {
+	serverMux := http.NewServeMux()
+	serverCalled := false
+	expectedVals := make(map[string]string)
+
+	serverMux.HandleFunc("/collect", func(rw http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		for k, v := range expectedVals {
+			if got, ok := r.Form[k]; !ok && v != "" {
+				t.Errorf("expected key %q", k)
+			} else if ok {
+				if len(got) != 1 {
+					t.Errorf("Expected one value for key %q", k)
+				}
+				if got[0] != v {
+					t.Errorf("%q should be %q, got %q", k, v, got[0])
+				}
+			}
+		}
+		serverCalled = true
+	})
+	server := httptest.NewServer(serverMux)
+	defer server.Close()
+	analyticsUrl = server.URL + "/collect"
+
+	expectedVals["v"] = "1"
+	expectedVals["cid"] = "test-id"
+	expectedVals["tid"] = "UA-XXXXXX-1"
+	expectedVals["t"] = "timing"
+	expectedVals["utc"] = "Execution"
+	expectedVals["utv"] = "Command"
+	expectedVals["utl"] = "update"
+	expectedVals["utt"] = "600000"
+	as := NewAnalyticsSession(true, expectedVals["tid"], expectedVals["cid"])
+	id := as.AddCommandExecutionTiming(expectedVals["utl"], time.Duration(10)*time.Minute)
+	as.Done(id)
+	as.SendAllAndWaitToFinish()
+	if !serverCalled {
+		t.Fatal("Analytics should have been sent")
+	}
 }
 
 func TestSendCommand(t *testing.T) {
