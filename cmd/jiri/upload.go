@@ -57,7 +57,7 @@ func init() {
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdUpload.Flags.StringVar(&uploadReviewersFlag, "r", "", `Comma-separated list of emails or LDAPs to request review.`)
 	cmdUpload.Flags.StringVar(&uploadTopicFlag, "topic", "", `CL topic. Default is <username>-<branchname>. If this flag is set, upload will ignore -set-topic and will set a topic.`)
-	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", false, `Set topic. This flag would be ignored if -topic or -multipart are passed.`)
+	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", false, `Set topic. This flag would be ignored if -topic passed.`)
 	cmdUpload.Flags.BoolVar(&uploadVerifyFlag, "verify", true, `Run pre-push git hooks.`)
 	cmdUpload.Flags.BoolVar(&uploadRebaseFlag, "rebase", false, `Run rebase before pushing.`)
 	cmdUpload.Flags.BoolVar(&uploadMultipartFlag, "multipart", false, `Send multipart CL.  Use -set-topic or -topic flag if you want to set a topic.`)
