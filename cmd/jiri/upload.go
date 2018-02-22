@@ -56,11 +56,11 @@ func init() {
 	cmdUpload.Flags.StringVar(&uploadPresubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdUpload.Flags.StringVar(&uploadReviewersFlag, "r", "", `Comma-separated list of emails or LDAPs to request review.`)
-	cmdUpload.Flags.StringVar(&uploadTopicFlag, "topic", "", `CL topic. Default is <username>-<branchname>.`)
-	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", true, `Set topic.`)
+	cmdUpload.Flags.StringVar(&uploadTopicFlag, "topic", "", `CL topic. Default is <username>-<branchname>. If this flag is set, upload will ignore -set-topic and will set a topic.`)
+	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", false, `Set topic. This flag would be ignored if -topic or -multipart are passed.`)
 	cmdUpload.Flags.BoolVar(&uploadVerifyFlag, "verify", true, `Run pre-push git hooks.`)
 	cmdUpload.Flags.BoolVar(&uploadRebaseFlag, "rebase", false, `Run rebase before pushing.`)
-	cmdUpload.Flags.BoolVar(&uploadMultipartFlag, "multipart", false, `Send multipart CL.`)
+	cmdUpload.Flags.BoolVar(&uploadMultipartFlag, "multipart", false, `Send multipart CL.  Use -set-topic or -topic flag if you want to set a topic.`)
 	cmdUpload.Flags.StringVar(&uploadBranchFlag, "branch", "", `Used when multipart flag is true and this command is executed from root folder`)
 	cmdUpload.Flags.StringVar(&uploadRemoteBranchFlag, "remoteBranch", "", `Remote branch to upload change to. If this is not specified and branch is untracked,
 change would be uploaded to branch in project manifest`)
@@ -98,6 +98,14 @@ func runUpload(jirix *jiri.X, args []string) error {
 		p = &project
 		break
 	}
+
+	setTopic := uploadSetTopicFlag
+
+	// Always set topic when either topic is passed.
+	if uploadTopicFlag != "" {
+		setTopic = true
+	}
+
 	currentBranch := ""
 	if p == nil {
 		if !uploadMultipartFlag {
@@ -113,7 +121,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 			if uploadMultipartFlag {
 				return fmt.Errorf("Current project is not on any branch. Multipart uploads require project to be on a branch.")
 			}
-			if uploadTopicFlag == "" && uploadSetTopicFlag {
+			if uploadTopicFlag == "" && setTopic {
 				return fmt.Errorf("Current project is not on any branch. Either provide a topic or set flag \"-set-topic\" to false.")
 			}
 		} else {
@@ -125,7 +133,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 	}
 	var projectsToProcess []project.Project
 	topic := ""
-	if uploadSetTopicFlag {
+	if setTopic {
 		if topic = uploadTopicFlag; topic == "" {
 			topic = fmt.Sprintf("%s-%s", os.Getenv("USER"), currentBranch) // use <username>-<branchname> as the default
 		}

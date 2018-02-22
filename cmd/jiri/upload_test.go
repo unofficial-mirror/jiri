@@ -120,7 +120,7 @@ func resetFlags() {
 	uploadMultipartFlag = false
 	uploadBranchFlag = ""
 	uploadRemoteBranchFlag = ""
-	uploadSetTopicFlag = true
+	uploadSetTopicFlag = false
 }
 
 func TestUpload(t *testing.T) {
@@ -155,14 +155,15 @@ func TestUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
 
 	uploadRemoteBranchFlag = "new-branch"
+	uploadSetTopicFlag = true
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
 	expectedRef = fmt.Sprintf("refs/for/%s%%topic=%s", uploadRemoteBranchFlag, topic)
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
@@ -200,8 +201,7 @@ func TestUploadRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files[0:1])
 	assertUploadFilesNotPushedToRef(t, fake.X, gerritPath, expectedRef, files[1:])
 }
@@ -241,8 +241,7 @@ func TestUploadWithOldMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
 }
 
@@ -263,8 +262,7 @@ func TestUploadFromDetachedHead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//	gerritPath := fake.Projects[localProjects[0].Name]
-	// uploadMultipartFlag = true
+	uploadSetTopicFlag = true
 	expectedErr := "Current project is not on any branch. Either provide a topic or set flag \"-set-topic\" to false."
 	if err := runUpload(fake.X, []string{}); err == nil {
 		t.Fatalf("expected error: %s", expectedErr)
@@ -272,6 +270,7 @@ func TestUploadFromDetachedHead(t *testing.T) {
 		t.Fatalf("expected error: %s\ngot error: %s", expectedErr, err)
 	}
 
+	resetFlags()
 	uploadMultipartFlag = true
 	expectedErr = "Current project is not on any branch. Multipart uploads require project to be on a branch."
 	if err := runUpload(fake.X, []string{}); err == nil {
@@ -280,7 +279,6 @@ func TestUploadFromDetachedHead(t *testing.T) {
 		t.Fatalf("expected a error: %s\ngot error: %s", expectedErr, err)
 	}
 	resetFlags()
-	uploadSetTopicFlag = false
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
@@ -329,15 +327,17 @@ func TestUploadMultipart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, []string{"file-10", "file-20"})
 
 	uploadRemoteBranchFlag = "new-branch"
+
+	uploadSetTopicFlag = true
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
+	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
 	expectedRef = fmt.Sprintf("refs/for/%s%%topic=%s", uploadRemoteBranchFlag, topic)
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, []string{"file-10", "file-20"})
@@ -383,9 +383,15 @@ func TestUploadMultipartWithBranchFlagSimple(t *testing.T) {
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
+	expectedRef := "refs/for/master"
+	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, []string{"file-10", "file-20"})
 
+	uploadSetTopicFlag = true
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Fatal(err)
+	}
 	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef = "refs/for/master%topic=" + topic
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, []string{"file-10", "file-20"})
 }
@@ -439,8 +445,7 @@ func TestUploadRebase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, localFiles)
 	assertUploadPushedFilesToRef(t, fake.X, localProjects[1].Path, branch, remoteFiles)
 }
@@ -479,9 +484,7 @@ func TestUploadMultipleCommits(t *testing.T) {
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
-
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, append(files1, files2...))
 }
 
@@ -513,8 +516,7 @@ func TestUploadUntrackedBranch(t *testing.T) {
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
-	topic := fmt.Sprintf("%s-%s", os.Getenv("USER"), branch)
-	expectedRef := "refs/for/master%topic=" + topic
+	expectedRef := "refs/for/master"
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
 
@@ -522,7 +524,7 @@ func TestUploadUntrackedBranch(t *testing.T) {
 	if err := runUpload(fake.X, []string{}); err != nil {
 		t.Fatal(err)
 	}
-	expectedRef = fmt.Sprintf("refs/for/%s%%topic=%s", uploadRemoteBranchFlag, topic)
+	expectedRef = fmt.Sprintf("refs/for/%s", uploadRemoteBranchFlag)
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
 }
