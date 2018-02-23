@@ -176,9 +176,6 @@ func (op createOperation) Test(jirix *jiri.X, updates *fsUpdates) error {
 // deleteOperation represents the deletion of a project.
 type deleteOperation struct {
 	commonOperation
-	// gc determines whether the operation should be executed or
-	// whether it should only print a notification.
-	gc bool
 }
 
 func (op deleteOperation) Kind() string {
@@ -190,55 +187,45 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 		jirix.Logger.Warningf("Project %s(%s) won't be deleted due to it's local-config\n\n", op.project.Name, op.source)
 		return nil
 	}
-	if op.gc {
-		// Never delete projects with non-master branches, uncommitted
-		// work, or untracked content.
-		g := git.NewGit(op.project.Path)
-		branches, _, err := g.GetBranches()
-		if err != nil {
-			return fmt.Errorf("Cannot get branches for project %q: %s", op.Project().Name, err)
-		}
-		uncommitted, err := g.HasUncommittedChanges()
-		if err != nil {
-			return fmt.Errorf("Cannot get uncommited changes for project %q: %s", op.Project().Name, err)
-		}
-		untracked, err := g.HasUntrackedFiles()
-		if err != nil {
-			return fmt.Errorf("Cannot get untracked changes for project %q: %s", op.Project().Name, err)
-		}
-		extraBranches := false
-		for _, branch := range branches {
-			if !strings.Contains(branch, "HEAD detached") {
-				extraBranches = true
-				break
-			}
-		}
-
-		if extraBranches || uncommitted || untracked {
-			rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
-			unManageCommand := jirix.Color.Yellow("rm -rf %q", filepath.Join(op.source, jiri.ProjectMetaDir))
-			msg := ""
-			if extraBranches {
-				msg = fmt.Sprintf("Project %q won't be deleted as it contains branches", op.project.Name)
-			} else {
-				msg = fmt.Sprintf("Project %q won't be deleted as it might contain changes", op.project.Name)
-			}
-			msg += fmt.Sprintf("\nIf you no longer need it, invoke '%s'", rmCommand)
-			msg += fmt.Sprintf("\nIf you no longer want jiri to manage it, invoke '%s'\n\n", unManageCommand)
-			jirix.Logger.Warningf(msg)
-			return nil
-		}
-
-		return fmtError(os.RemoveAll(op.source))
+	// Never delete projects with non-master branches, uncommitted
+	// work, or untracked content.
+	g := git.NewGit(op.project.Path)
+	branches, _, err := g.GetBranches()
+	if err != nil {
+		return fmt.Errorf("Cannot get branches for project %q: %s", op.Project().Name, err)
 	}
-	rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
-	gcCommand := jirix.Color.Yellow("jiri update -gc")
-	unManageCommand := jirix.Color.Yellow("rm -rf %q", filepath.Join(op.source, jiri.ProjectMetaDir))
-	msg := fmt.Sprintf("Project %q was not deleted", op.project.Name)
-	msg += fmt.Sprintf("\nIf you no longer need it, invoke '%s' or invoke '%s' to remove all such local projects", rmCommand, gcCommand)
-	msg += fmt.Sprintf("\nIf you no longer want jiri to manage it, invoke '%s'\n\n", unManageCommand)
-	jirix.Logger.Warningf(msg)
-	return nil
+	uncommitted, err := g.HasUncommittedChanges()
+	if err != nil {
+		return fmt.Errorf("Cannot get uncommited changes for project %q: %s", op.Project().Name, err)
+	}
+	untracked, err := g.HasUntrackedFiles()
+	if err != nil {
+		return fmt.Errorf("Cannot get untracked changes for project %q: %s", op.Project().Name, err)
+	}
+	extraBranches := false
+	for _, branch := range branches {
+		if !strings.Contains(branch, "HEAD detached") {
+			extraBranches = true
+			break
+		}
+	}
+
+	if extraBranches || uncommitted || untracked {
+		rmCommand := jirix.Color.Yellow("rm -rf %q", op.source)
+		unManageCommand := jirix.Color.Yellow("rm -rf %q", filepath.Join(op.source, jiri.ProjectMetaDir))
+		msg := ""
+		if extraBranches {
+			msg = fmt.Sprintf("Project %q won't be deleted as it contains branches", op.project.Name)
+		} else {
+			msg = fmt.Sprintf("Project %q won't be deleted as it might contain changes", op.project.Name)
+		}
+		msg += fmt.Sprintf("\nIf you no longer need it, invoke '%s'", rmCommand)
+		msg += fmt.Sprintf("\nIf you no longer want jiri to manage it, invoke '%s'\n\n", unManageCommand)
+		jirix.Logger.Warningf(msg)
+		return nil
+	}
+
+	return fmtError(os.RemoveAll(op.source))
 }
 
 func (op deleteOperation) String() string {
@@ -538,7 +525,7 @@ func computeOp(local, remote *Project, state *ProjectState, gc, rebaseTracked, r
 			destination: "",
 			project:     *local,
 			source:      local.Path,
-		}, gc}
+		}}
 	case local != nil && remote != nil:
 
 		localBranchesNeedUpdating := false
@@ -744,16 +731,27 @@ func (p *PathTrie) Insert(path string) {
 	}
 }
 
-func runDeleteOperations(jirix *jiri.X, ops []deleteOperation) error {
+func runDeleteOperations(jirix *jiri.X, ops []deleteOperation, gc bool) error {
+	if len(ops) == 0 {
+		return nil
+	}
 	notDeleted := NewPathTrie()
-	for _, op := range ops {
-		if !op.gc {
-			jirix.Logger.Debugf("%s", op)
-			if err := op.Run(jirix); err != nil {
-				return fmt.Errorf("Deleting project %q: %s", op.Project().Name, err)
-			}
-			continue
+	if !gc {
+		msg := fmt.Sprintf("%d project(s) is/are marked to be deleted. Run '%s' to delete them.", len(ops), jirix.Color.Yellow("jiri update -gc"))
+		if jirix.Logger.LoggerLevel < log.DebugLevel {
+			msg = fmt.Sprintf("%s\nOr run '%s' or '%s' to see the list of projects.", msg, jirix.Color.Yellow("jiri update -v"), jirix.Color.Yellow("jiri status"))
 		}
+		jirix.Logger.Warningf("%s\n\n", msg)
+		if jirix.Logger.LoggerLevel >= log.DebugLevel {
+			msg = "List of project(s) marked to be deleted:"
+			for _, op := range ops {
+				msg = fmt.Sprintf("%s\nName: %s, Path: '%s'", msg, jirix.Color.Yellow(op.project.Name), jirix.Color.Yellow(op.source))
+				jirix.Logger.Debugf("%s\n\n", msg)
+			}
+		}
+		return nil
+	}
+	for _, op := range ops {
 		if notDeleted.Contains(op.Project().Path) {
 			// not deleting project, add it to trie
 			notDeleted.Insert(op.source)

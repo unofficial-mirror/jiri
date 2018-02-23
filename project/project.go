@@ -1394,7 +1394,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 			nullOperations = append(nullOperations, o)
 		}
 	}
-	if err := runDeleteOperations(jirix, deleteOperations); err != nil {
+	if err := runDeleteOperations(jirix, deleteOperations, gc); err != nil {
 		return err
 	}
 	if err := runCommonOperations(jirix, changeRemoteOperations, log.DebugLevel); err != nil {

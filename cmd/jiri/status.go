@@ -111,7 +111,7 @@ func runStatus(jirix *jiri.X, args []string) error {
 		currentLog = colorFormatGitLog(jirix, currentLog)
 		if statusFlags.checkHead {
 			if headRev == "" {
-				revisionMessage = "Can't find project in manifest, can't get revision status"
+				revisionMessage = "Can't find project in manifest, it is marked to be deleted."
 			} else if headRev != state.CurrentBranch.Revision {
 				headLog, err := git.OneLineLog(headRev)
 				if err != nil {
