@@ -23,6 +23,7 @@ var statusFlags struct {
 	checkHead bool
 	branch    string
 	commits   bool
+	deleted   bool
 }
 
 var cmdStatus = &cmdline.Command{
@@ -42,6 +43,8 @@ func init() {
 	flags.BoolVar(&statusFlags.checkHead, "check-head", true, "Display projects that are not on HEAD/pinned revisions.")
 	flags.BoolVar(&statusFlags.commits, "commits", true, "Display commits not merged with remote. This only works when project is on a local branch.")
 	flags.StringVar(&statusFlags.branch, "branch", "", "Display all projects only on this branch along with their status.")
+	flags.BoolVar(&statusFlags.deleted, "deleted", false, "List all deleted projects. Other flags would be ignored.")
+	flags.BoolVar(&statusFlags.deleted, "d", false, "Same as -deleted.")
 }
 
 func colorFormatGitLog(jirix *jiri.X, log string) string {
@@ -68,6 +71,19 @@ func runStatus(jirix *jiri.X, args []string) error {
 	cDir, err := os.Getwd()
 	if err != nil {
 		return err
+	}
+	if statusFlags.deleted {
+		for key, localProject := range localProjects {
+			if _, remoteOk := remoteProjects[key]; !remoteOk {
+				relativePath, err := filepath.Rel(cDir, localProject.Path)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Name: '%s', Path: '%s'\n", jirix.Color.Red(localProject.Name), jirix.Color.Red(relativePath))
+			}
+			continue
+		}
+		return nil
 	}
 	states, err := project.GetProjectStates(jirix, localProjects, false)
 	if err != nil {

@@ -26,6 +26,7 @@ func setDefaultStatusFlags() {
 	statusFlags.checkHead = true
 	statusFlags.branch = ""
 	statusFlags.commits = true
+	statusFlags.deleted = false
 }
 
 func createCommits(t *testing.T, fake *jiritest.FakeJiriRoot, localProjects []project.Project) ([]string, []string, []string, []string) {
@@ -206,6 +207,49 @@ func TestStatusWhenUserUpdatesGitTree(t *testing.T) {
 	want := "" // no change
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestStatusDeleted(t *testing.T) {
+	setDefaultStatusFlags()
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Add projects
+	numProjects := 5
+	createProjects(t, fake, numProjects)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// delete some projects
+	manifest, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	deletedProjs := manifest.Projects[3:]
+	manifest.Projects = manifest.Projects[0:3]
+	if err := fake.WriteRemoteManifest(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	statusFlags.deleted = true
+
+	got := executeStatus(t, fake, "")
+	numOfLines := len(strings.Split(got, "\n"))
+	if numOfLines != 3 {
+		t.Errorf("got %s, wanted 3 deleted projects", got)
+	}
+	for _, dp := range deletedProjs {
+		if !strings.Contains(got, dp.Name) {
+			t.Fatalf("project %s should have been deleted, got\n%s", dp.Name, got)
+		}
+		if !strings.Contains(got, dp.Path) {
+			t.Fatalf("project %s should have been deleted, got\n%s", dp.Path, got)
+		}
 	}
 }
 

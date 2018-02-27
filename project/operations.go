@@ -739,7 +739,7 @@ func runDeleteOperations(jirix *jiri.X, ops []deleteOperation, gc bool) error {
 	if !gc {
 		msg := fmt.Sprintf("%d project(s) is/are marked to be deleted. Run '%s' to delete them.", len(ops), jirix.Color.Yellow("jiri update -gc"))
 		if jirix.Logger.LoggerLevel < log.DebugLevel {
-			msg = fmt.Sprintf("%s\nOr run '%s' or '%s' to see the list of projects.", msg, jirix.Color.Yellow("jiri update -v"), jirix.Color.Yellow("jiri status"))
+			msg = fmt.Sprintf("%s\nOr run '%s' or '%s' to see the list of projects.", msg, jirix.Color.Yellow("jiri update -v"), jirix.Color.Yellow("jiri status -d"))
 		}
 		jirix.Logger.Warningf("%s\n\n", msg)
 		if jirix.Logger.LoggerLevel >= log.DebugLevel {
