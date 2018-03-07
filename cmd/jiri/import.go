@@ -21,11 +21,13 @@ var (
 	flagImportOverwrite bool
 	flagImportOut       string
 	flagImportDelete    bool
+	flagImportRevision  string
 )
 
 func init() {
 	cmdImport.Flags.StringVar(&flagImportName, "name", "manifest", `The name of the remote manifest project.`)
 	cmdImport.Flags.StringVar(&flagImportRemoteBranch, "remote-branch", "master", `The branch of the remote manifest project to track, without the leading "origin/".`)
+	cmdImport.Flags.StringVar(&flagImportRevision, "revision", "", `Revision to check out for the remote.`)
 	cmdImport.Flags.StringVar(&flagImportRoot, "root", "", `Root to store the manifest project locally.`)
 
 	cmdImport.Flags.BoolVar(&flagImportOverwrite, "overwrite", false, `Write a new .jiri_manifest file with the given specification.  If it already exists, the existing content will be ignored and the file will be overwritten.`)
@@ -145,6 +147,7 @@ func runImport(jirix *jiri.X, args []string) error {
 			Name:         flagImportName,
 			Remote:       args[1],
 			RemoteBranch: flagImportRemoteBranch,
+			Revision:     flagImportRevision,
 			Root:         flagImportRoot,
 		})
 	}
