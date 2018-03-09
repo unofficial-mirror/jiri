@@ -211,9 +211,12 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		m, err = ManifestFromFile(jirix, file)
 	} else {
 		if s, err2 := gitutil.New(jirix, gitutil.RootDirOpt(repoPath)).Show(ref, file); err2 != nil {
-			return fmt.Errorf("Unable to get manifest file for %s %s:%s, %s", repoPath, ref, file, err2)
+			return fmt.Errorf("Unable to get manifest file for %s %s:%s:error(%s)", repoPath, ref, file, err2)
 		} else {
 			m, err = ManifestFromBytes([]byte(s))
+			if err != nil {
+				err = fmt.Errorf("Error reading from manifest file %s %s:%s:error(%s)", repoPath, ref, file, err)
+			}
 		}
 	}
 	if err != nil {
