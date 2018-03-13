@@ -66,10 +66,10 @@ func TestSourceManifest(t *testing.T) {
 	for i := 0; i < numProjects; i++ {
 		paths = append(paths, localProjectName(i))
 	}
-	revMap := make(map[string][]byte)
+	revMap := make(map[string]string)
 	for _, path := range paths {
 		g := git.NewGit(filepath.Join(fake.X.Root, path))
-		if rev, err := g.CurrentRevisionRaw(); err != nil {
+		if rev, err := g.CurrentRevision(); err != nil {
 			t.Fatal(err)
 		} else {
 			revMap[path] = rev

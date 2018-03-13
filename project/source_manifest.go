@@ -5,7 +5,6 @@
 package project
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -25,6 +24,7 @@ const (
 	SourceManifestVersion = int32(0)
 )
 
+// This was created using proto file: https://github.com/luci/recipes-py/blob/master/recipe_engine/source_manifest.proto.
 type SourceManifest_GitCheckout struct {
 	// The canonicalized URL of the original repo that is considered the “source
 	// of truth” for the source code. Ex.
@@ -43,7 +43,7 @@ type SourceManifest_GitCheckout struct {
 	//   3617b0eea7ec74b8e731a23fed2f4070cbc284c4
 	//
 	// Note that this is the raw revision bytes, not their hex-encoded form.
-	Revision []byte `json:"revision,omitempty"`
+	Revision string `json:"revision,omitempty"`
 
 	// The ref that the task used to resolve/fetch the revision of the source
 	// (if any). Ex.
@@ -124,7 +124,7 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, Multi
 		}
 		g := git.NewGit(filepath.Join(jirix.Root, proj.Path))
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(filepath.Join(jirix.Root, proj.Path)))
-		if rev, err := g.CurrentRevisionRaw(); err != nil {
+		if rev, err := g.CurrentRevision(); err != nil {
 			return err
 		} else {
 			gc.Revision = rev
@@ -132,8 +132,7 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, Multi
 		if proj.RemoteBranch == "" {
 			proj.RemoteBranch = "master"
 		}
-		revision := hex.EncodeToString(gc.Revision)
-		branchMap, err := scm.ListRemoteBranchesContainingRef(revision)
+		branchMap, err := scm.ListRemoteBranchesContainingRef(gc.Revision)
 		if err != nil {
 			return err
 		}
@@ -152,11 +151,11 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, Multi
 
 			// Try getting from gerrit
 			if gc.FetchRef == "" && proj.GerritHost != "" {
-				if ref, err := getCLRefByCommit(jirix, proj.GerritHost, revision); err != nil {
+				if ref, err := getCLRefByCommit(jirix, proj.GerritHost, gc.Revision); err != nil {
 					// Don't fail
 					jirix.Logger.Debugf("Error while fetching from gerrit for project %q: %s", proj.Name, err)
 				} else if ref == "" {
-					jirix.Logger.Debugf("Cannot get ref for project: %q, revision: %q", proj.Name, revision)
+					jirix.Logger.Debugf("Cannot get ref for project: %q, revision: %q", proj.Name, gc.Revision)
 				} else {
 					gc.FetchRef = ref
 				}
