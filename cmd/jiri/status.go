@@ -94,9 +94,14 @@ func runStatus(jirix *jiri.X, args []string) error {
 		keys = append(keys, key)
 	}
 	sort.Sort(keys)
+	deletedProjects := 0
 	for _, key := range keys {
 		localProject := localProjects[key]
-		remoteProject, _ := remoteProjects[key]
+		remoteProject, foundRemote := remoteProjects[key]
+		if !foundRemote {
+			deletedProjects++
+			continue
+		}
 		state, ok := states[key]
 		if !ok {
 			// this should not happen
@@ -126,9 +131,7 @@ func runStatus(jirix *jiri.X, args []string) error {
 		}
 		currentLog = colorFormatGitLog(jirix, currentLog)
 		if statusFlags.checkHead {
-			if headRev == "" {
-				revisionMessage = "Can't find project in manifest, it is marked to be deleted."
-			} else if headRev != state.CurrentBranch.Revision {
+			if headRev != state.CurrentBranch.Revision {
 				headLog, err := git.OneLineLog(headRev)
 				if err != nil {
 					jirix.Logger.Errorf("%s :%s\n\n", errorMsg, err)
@@ -164,6 +167,9 @@ func runStatus(jirix *jiri.X, args []string) error {
 			fmt.Println()
 		}
 
+	}
+	if deletedProjects != 0 {
+		jirix.Logger.Warningf("Found %d deleted project(s), run with -d flag to list them.\n\n", deletedProjects)
 	}
 	if jirix.Failures() != 0 {
 		return fmt.Errorf("completed with non-fatal errors")
