@@ -18,6 +18,7 @@ import (
 type importTestCase struct {
 	Args           []string
 	Filename       string
+	OutputFileName string
 	Exist, Want    string
 	Stdout, Stderr string
 	SetFlags       func()
@@ -32,6 +33,8 @@ func setDefaultImportFlags() {
 	flagImportOverwrite = false
 	flagImportOut = ""
 	flagImportDelete = false
+	flagImportList = false
+	flagImportJsonOutput = ""
 }
 
 func TestImport(t *testing.T) {
@@ -58,18 +61,6 @@ func TestImport(t *testing.T) {
 			Want: `<manifest>
   <imports>
     <import manifest="foo" name="name" remote="https://github.com/new.git" remotebranch="remotebranch" root="root"/>
-  </imports>
-</manifest>
-`,
-		},
-		{
-			SetFlags: func() {
-				flagImportRevision = "somerevision"
-			},
-			Args: []string{"foo", "https://github.com/new.git"},
-			Want: `<manifest>
-  <imports>
-    <import manifest="foo" name="manifest" remote="https://github.com/new.git" revision="somerevision"/>
   </imports>
 </manifest>
 `,
@@ -106,6 +97,54 @@ func TestImport(t *testing.T) {
     <import manifest="foo" name="manifest" remote="https://github.com/new.git"/>
   </imports>
 </manifest>
+`,
+		},
+		{
+			SetFlags: func() {
+				flagImportList = true
+				flagImportJsonOutput = "file"
+			},
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			OutputFileName: `file`,
+			Want: `[
+  {
+    "manifest": "bar",
+    "name": "manifest",
+    "remote": "https://github.com/orig.git",
+    "revision": "",
+    "remoteBranch": "",
+    "root": ""
+  }
+]`,
+		},
+		{
+			SetFlags: func() {
+				flagImportList = true
+			},
+			Exist: `<manifest>
+  <imports>
+    <import manifest="bar" name="manifest_bar" remote="https://github.com/bar.git"/>
+	<import manifest="foo" name="manifest_foo" remote="https://github.com/foo.git"/>
+  </imports>
+</manifest>
+`,
+			Stdout: `* import	manifest_bar
+  Manifest:	bar
+  Remote:	https://github.com/bar.git
+  Revision:	
+  RemoteBranch:	
+  Root:	
+* import	manifest_foo
+  Manifest:	foo
+  Remote:	https://github.com/foo.git
+  Revision:	
+  RemoteBranch:	
+  Root:	
 `,
 		},
 		{
@@ -383,10 +422,14 @@ func testImport(t *testing.T, test importTestCase) error {
 			return err
 		}
 	}
+	f := test.OutputFileName
+	if f == "" {
+		f = filename
+	}
 
 	// Make sure the right file is generated.
 	if test.Want != "" {
-		data, err := ioutil.ReadFile(filename)
+		data, err := ioutil.ReadFile(f)
 		if err != nil {
 			return err
 		}

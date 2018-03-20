@@ -214,13 +214,17 @@ func (i *Import) fillDefaults() error {
 	return i.validate()
 }
 
-func (i *Import) unfillDefaults() error {
+func (i *Import) RemoveDefaults() {
 	if i.RemoteBranch == "master" {
 		i.RemoteBranch = ""
 	}
 	if i.Revision == "HEAD" {
 		i.Revision = ""
 	}
+}
+
+func (i *Import) unfillDefaults() error {
+	i.RemoveDefaults()
 	return i.validate()
 }
 
