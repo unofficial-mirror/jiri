@@ -369,12 +369,17 @@ by running `jiri help upload`.
   ```
   git checkout <branch-name>
   ```
-2. Modify and commit the code.
+2. Modify the code.
+3. Add your modified code.
+  ```
+  git add -u
+  ```
+4. Commit the code.
   ```
   git commit --amend
   ```
-3. Reply to each Gerrit comment and click the "Reply" button to send them.
-4. Send the updated CL to Gerrit.
+5. Reply to each Gerrit comment and click the "Reply" button to send them.
+6. Send the updated CL to Gerrit.
   ```
   jiri upload
   ```
