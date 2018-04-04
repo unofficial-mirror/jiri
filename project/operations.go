@@ -84,40 +84,8 @@ func (op createOperation) Kind() string {
 	return "create"
 }
 
-func (op createOperation) Run(jirix *jiri.X) (e error) {
-	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-
-	// Check the local file system.
-	if _, err := os.Stat(op.destination); err != nil {
-		if !os.IsNotExist(err) {
-			return fmtError(err)
-		}
-	} else {
-		if isEmpty, err := isEmpty(op.destination); err != nil {
-			return err
-		} else if !isEmpty {
-			return fmt.Errorf("cannot create %q as it already exists and is not empty", op.destination)
-		} else {
-			if err := os.RemoveAll(op.destination); err != nil {
-				return fmt.Errorf("Not able to delete %q", op.destination)
-			}
-		}
-	}
-	// Create a temporary directory for the initial setup of the
-	// project to prevent an untimely termination from leaving the
-	// root directory in an inconsistent state.
-	if err := os.MkdirAll(path, perm); err != nil {
-		return fmtError(err)
-	}
-
-	cache, err := op.project.CacheDirPath(jirix)
-	if err != nil {
-		return err
-	}
-	if !isPathDir(cache) {
-		cache = ""
-	}
-
+func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
+	var err error
 	if jirix.Shared && cache != "" {
 		err = clone(jirix, cache, op.destination, gitutil.SharedOpt(true),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
@@ -131,15 +99,10 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
 	}
 	if err != nil {
-		if err2 := os.RemoveAll(op.destination); err2 != nil {
-			return fmt.Errorf("Not able to remove %q after clone failed: %s, original error: %s", op.destination, err2, err)
-		}
 		return err
 	}
+
 	if err := os.Chmod(op.destination, os.FileMode(0755)); err != nil {
-		if err2 := os.RemoveAll(op.destination); err2 != nil {
-			return fmt.Errorf("Not able to remove %q after chmod failed: %s, original error: %s", op.destination, err2, fmtError(err))
-		}
 		return fmtError(err)
 	}
 
@@ -161,6 +124,47 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 				jirix.Logger.Warningf("not able to delete branch %s for project %s(%s)\n\n", b, op.project.Name, op.project.Path)
 			}
 		}
+	}
+	return nil
+}
+
+func (op createOperation) Run(jirix *jiri.X) (e error) {
+	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
+
+	// Check the local file system.
+	if _, err := os.Stat(op.destination); err != nil {
+		if !os.IsNotExist(err) {
+			return fmtError(err)
+		}
+	} else {
+		if isEmpty, err := isEmpty(op.destination); err != nil {
+			return err
+		} else if !isEmpty {
+			return fmt.Errorf("cannot create %q as it already exists and is not empty", op.destination)
+		} else {
+			if err := os.RemoveAll(op.destination); err != nil {
+				return fmt.Errorf("Not able to delete %q", op.destination)
+			}
+		}
+	}
+
+	if err := os.MkdirAll(path, perm); err != nil {
+		return fmtError(err)
+	}
+
+	cache, err := op.project.CacheDirPath(jirix)
+	if err != nil {
+		return err
+	}
+	if !isPathDir(cache) {
+		cache = ""
+	}
+
+	if err := op.checkoutProject(jirix, cache); err != nil {
+		if err := os.RemoveAll(op.destination); err != nil {
+			jirix.Logger.Warningf("Not able to remove %q after create failed: %s", op.destination, err)
+		}
+		return err
 	}
 	return nil
 }

@@ -1042,6 +1042,38 @@ func TestUpdateUniverseWithRevision(t *testing.T) {
 	}
 }
 
+// TestUpdateUniverseWithBadRevision checks that UpdateUniverse
+// will not leave bad state behind.
+func TestUpdateUniverseWithBadRevision(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == localProjects[1].Name {
+			p.Revision = "badrev"
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err == nil {
+		t.Fatal("should have thrown error")
+	}
+
+	if err := dirExists(localProjects[1].Path); err == nil {
+		t.Fatalf("expected project %q at path %q not to exist but it did", localProjects[1].Name, localProjects[1].Path)
+	}
+
+}
+
 func commitChanges(t *testing.T, jirix *jiri.X, dir string) {
 	scm := gitutil.New(jirix, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(dir))
 	if err := scm.AddUpdatedFiles(); err != nil {
