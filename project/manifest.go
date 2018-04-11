@@ -585,7 +585,7 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 			bytes := []byte(`#!/bin/sh
 
 if ! git symbolic-ref HEAD &> /dev/null; then
-  echo -e "WARNING: You are in a detached head state! You might loose this commit.\nUse 'git checkout -b <branch> to put it on a branch.\n"
+  echo -e "WARNING: You are in a detached head state! You might lose this commit.\nUse 'git checkout -b <branch> to put it on a branch.\n"
 fi
 `)
 			if _, err := commitHook.Write(bytes); err != nil {
