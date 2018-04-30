@@ -750,8 +750,8 @@ func runDeleteOperations(jirix *jiri.X, ops []deleteOperation, gc bool) error {
 			msg = "List of project(s) marked to be deleted:"
 			for _, op := range ops {
 				msg = fmt.Sprintf("%s\nName: %s, Path: '%s'", msg, jirix.Color.Yellow(op.project.Name), jirix.Color.Yellow(op.source))
-				jirix.Logger.Debugf("%s\n\n", msg)
 			}
+			jirix.Logger.Debugf("%s\n\n", msg)
 		}
 		return nil
 	}
