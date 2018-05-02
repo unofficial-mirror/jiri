@@ -73,6 +73,7 @@ func (ec *editChanges) toFile(filename string) error {
 	return nil
 }
 
+// TODO(IN-361): Make this a subcommand of 'manifest'
 var cmdEdit = &cmdline.Command{
 	Runner:   jiri.RunnerFunc(runEdit),
 	Name:     "edit",

@@ -63,6 +63,7 @@ Command jiri is a multi-purpose tool for multi-repo development.
 			cmdPatch,
 			cmdProject,
 			cmdProjectConfig,
+			cmdManifest,
 			cmdRunHooks,
 			cmdRunP,
 			cmdSelfUpdate,
@@ -127,7 +128,7 @@ The jiri binary is located at [root]/.jiri_root/bin/jiri
 }
 
 var topicManifest = cmdline.Topic{
-	Name:  "manifest",
+	Name:  "manifest-files",
 	Short: "Description of manifest files",
 	Long: `
 Jiri manifest files describe the set of projects that get synced when running
