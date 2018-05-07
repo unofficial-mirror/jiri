@@ -23,23 +23,21 @@ type Context struct {
 
 // ContextOpts records the context options.
 type ContextOpts struct {
-	Manifest *string
-	Env      map[string]string
-	Stdin    io.Reader
-	Stdout   io.Writer
-	Stderr   io.Writer
-	Timer    *timing.Timer
+	Env    map[string]string
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+	Timer  *timing.Timer
 }
 
 // newContextOpts is the ContextOpts factory.
 func newContextOpts() *ContextOpts {
 	return &ContextOpts{
-		Env:      map[string]string{},
-		Manifest: &ManifestFlag,
-		Stdin:    os.Stdin,
-		Stdout:   os.Stdout,
-		Stderr:   os.Stderr,
-		Timer:    nil,
+		Env:    map[string]string{},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		Timer:  nil,
 	}
 }
 
@@ -47,9 +45,6 @@ func newContextOpts() *ContextOpts {
 func initOpts(defaultOpts, opts *ContextOpts) {
 	if opts.Env == nil {
 		opts.Env = defaultOpts.Env
-	}
-	if opts.Manifest == nil {
-		opts.Manifest = defaultOpts.Manifest
 	}
 	if opts.Stdin == nil {
 		opts.Stdin = defaultOpts.Stdin
@@ -105,11 +100,6 @@ func (ctx Context) Env() map[string]string {
 // communicate with a Jenkins server running at the given host.
 func (ctx Context) Jenkins(host string) (*jenkins.Jenkins, error) {
 	return jenkins.New(host)
-}
-
-// Manifest returns the manifest of the context.
-func (ctx Context) Manifest() string {
-	return *ctx.opts.Manifest
 }
 
 // Stdin returns the standard input of the context.

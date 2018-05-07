@@ -13,7 +13,6 @@ import (
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/retry"
-	"fuchsia.googlesource.com/jiri/tool"
 )
 
 var (
@@ -36,8 +35,6 @@ const (
 )
 
 func init() {
-	tool.InitializeProjectFlags(&cmdUpdate.Flags)
-
 	cmdUpdate.Flags.BoolVar(&gcFlag, "gc", false, "Garbage collect obsolete repositories.")
 	cmdUpdate.Flags.BoolVar(&localManifestFlag, "local-manifest", false, "Use local manifest")
 	cmdUpdate.Flags.UintVar(&attemptsFlag, "attempts", 1, "Number of attempts before failing.")

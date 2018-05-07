@@ -110,14 +110,9 @@ func TestSnapshot(t *testing.T) {
 		}
 	}
 
-	// Check that invoking the UpdateUniverse() with the snapshot restores the
-	// local repositories.
 	snapshotFile := tmpfile.Name()
-	localX := fake.X.Clone(tool.ContextOpts{
-		Manifest: &snapshotFile,
-	})
-	if err := project.UpdateUniverse(localX, true, false, false, false, false, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
-		t.Fatalf("%v", err)
+	if err := project.CheckoutSnapshot(fake.X, snapshotFile, false, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
+		t.Fatalf("%s", err)
 	}
 	for i, _ := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
