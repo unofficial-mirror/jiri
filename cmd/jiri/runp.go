@@ -39,6 +39,7 @@ var runpFlags struct {
 	exitOnError    bool
 	collateOutput  bool
 	branch         string
+	remote         string
 }
 
 var cmdRunP = &cmdline.Command{
@@ -71,6 +72,7 @@ func init() {
 	cmdRunP.Flags.BoolVar(&runpFlags.collateOutput, "collate-stdout", true, "Collate all stdout output from each parallel invocation and display it as if had been generated sequentially. This flag cannot be used with -show-name-prefix, -show-key-prefix or -interactive.")
 	cmdRunP.Flags.BoolVar(&runpFlags.exitOnError, "exit-on-error", false, "If set, all commands will killed as soon as one reports an error, otherwise, each will run to completion.")
 	cmdRunP.Flags.StringVar(&runpFlags.branch, "branch", "", "A regular expression specifying branch names to use in matching projects. A project will match if the specified branch exists, even if it is not checked out.")
+	cmdRunP.Flags.StringVar(&runpFlags.remote, "remote", "", "A Regular expression specifying projects to run commands in by matching against their remote URLs.")
 }
 
 type mapInput struct {
@@ -284,7 +286,7 @@ func runRunp(jirix *jiri.X, args []string) error {
 		runpFlags.collateOutput = false
 	}
 
-	var keysRE, branchRE *regexp.Regexp
+	var keysRE, branchRE, remoteRE *regexp.Regexp
 	var err error
 
 	if runpFlags.projectKeys != "" {
@@ -303,6 +305,13 @@ func runRunp(jirix *jiri.X, args []string) error {
 		branchRE, err = regexp.Compile(runpFlags.branch)
 		if err != nil {
 			return fmt.Errorf("failed to compile has-branch regexp: %q: %v", runpFlags.branch, err)
+		}
+	}
+
+	if runpFlags.remote != "" {
+		remoteRE, err = regexp.Compile(runpFlags.remote)
+		if err != nil {
+			return fmt.Errorf("failed to compile remotes regexp: %q: %v", runpFlags.remote, err)
 		}
 	}
 
@@ -358,6 +367,9 @@ func runRunp(jirix *jiri.X, args []string) error {
 			if !found {
 				continue
 			}
+		}
+		if remoteRE != nil && !remoteRE.MatchString(localProject.Remote) {
+			continue
 		}
 		if (runpFlags.untracked && !state.HasUntracked) || (runpFlags.noUntracked && state.HasUntracked) {
 			continue

@@ -30,6 +30,7 @@ func setDefaultRunpFlags() {
 	runpFlags.exitOnError = false
 	runpFlags.collateOutput = true
 	runpFlags.branch = ""
+	runpFlags.remote = ""
 }
 
 func addProjects(t *testing.T, fake *jiritest.FakeJiriRoot) []*project.Project {
@@ -260,5 +261,14 @@ func TestRunP(t *testing.T) {
 
 	if err := os.MkdirAll(filepath.Join(rb, ".jiri", "a1"), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
+	}
+
+	// Just the projects with remotes containing "sub".
+	setDefaultRunpFlags()
+	runpFlags.remote = "sub"
+	runpFlags.showNamePrefix = true
+	got = executeRunp(t, fake, "echo")
+	if want := "sub/r.t1: \nsub/sub2/r.t2:"; got != want {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
