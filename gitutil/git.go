@@ -39,7 +39,7 @@ func (ge GitError) Error() string {
 	result = "'git "
 	result += strings.Join(ge.Args, " ")
 	result += "' failed:\n"
-	result += ge.ErrorOutput
+	result += ge.Output + "\n" + ge.ErrorOutput
 	return result
 }
 
