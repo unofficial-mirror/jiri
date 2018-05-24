@@ -86,6 +86,7 @@ func (op createOperation) Kind() string {
 
 func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	var err error
+	remote := rewriteRemote(jirix, op.project.Remote)
 	if jirix.Shared && cache != "" {
 		err = clone(jirix, cache, op.destination, gitutil.SharedOpt(true),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
@@ -94,7 +95,6 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		if op.project.HistoryDepth > 0 {
 			ref = ""
 		}
-		remote := rewriteRemote(jirix, op.project.Remote)
 		err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(ref),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
 	}
@@ -113,9 +113,15 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
 		return err
 	}
+	g := git.NewGit(op.project.Path)
+
+	// Reset remote to point to correct location so that shared cache does not cause problem.
+	if err := g.SetRemoteUrl("origin", remote); err != nil {
+		return err
+	}
 
 	// Delete inital branch(es)
-	if branches, _, err := git.NewGit(op.project.Path).GetBranches(); err != nil {
+	if branches, _, err := g.GetBranches(); err != nil {
 		jirix.Logger.Warningf("not able to get branches for newly created project %s(%s)\n\n", op.project.Name, op.project.Path)
 	} else {
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
