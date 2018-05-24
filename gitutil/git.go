@@ -23,14 +23,16 @@ type GitError struct {
 	Args        []string
 	Output      string
 	ErrorOutput string
+	err         error
 }
 
-func Error(output, errorOutput, root string, args ...string) GitError {
+func Error(output, errorOutput string, err error, root string, args ...string) GitError {
 	return GitError{
 		Root:        root,
 		Args:        args,
 		Output:      output,
 		ErrorOutput: errorOutput,
+		err:         err,
 	}
 }
 
@@ -39,7 +41,8 @@ func (ge GitError) Error() string {
 	result = "'git "
 	result += strings.Join(ge.Args, " ")
 	result += "' failed:\n"
-	result += ge.Output + "\n" + ge.ErrorOutput
+	result += ge.ErrorOutput
+	result += "\ncommand fail error: " + ge.err.Error()
 	return result
 }
 
@@ -992,7 +995,7 @@ func (g *Git) Version() (int, int, error) {
 func (g *Git) run(args ...string) error {
 	var stdout, stderr bytes.Buffer
 	if err := g.runGit(&stdout, &stderr, args...); err != nil {
-		return Error(stdout.String(), stderr.String(), g.rootDir, args...)
+		return Error(stdout.String(), stderr.String(), err, g.rootDir, args...)
 	}
 	return nil
 }
@@ -1008,7 +1011,7 @@ func trimOutput(o string) []string {
 func (g *Git) runOutput(args ...string) ([]string, error) {
 	var stdout, stderr bytes.Buffer
 	if err := g.runGit(&stdout, &stderr, args...); err != nil {
-		return nil, Error(stdout.String(), stderr.String(), g.rootDir, args...)
+		return nil, Error(stdout.String(), stderr.String(), err, g.rootDir, args...)
 	}
 	return trimOutput(stdout.String()), nil
 }
@@ -1018,7 +1021,7 @@ func (g *Git) runInteractive(args ...string) error {
 	// In order for the editing to work correctly with
 	// terminal-based editors, notably "vim", use os.Stdout.
 	if err := g.runGit(os.Stdout, &stderr, args...); err != nil {
-		return Error("", stderr.String(), g.rootDir, args...)
+		return Error("", stderr.String(), err, g.rootDir, args...)
 	}
 	return nil
 }
