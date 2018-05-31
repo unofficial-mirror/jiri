@@ -341,14 +341,24 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath, 
 		if !lm {
 			// We only fetch on updates.
 			if ld.update {
-				if cacheDirPath != "" {
-					remoteUrl := rewriteRemote(jirix, project.Remote)
-					if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, project.RemoteBranch, 0); err != nil {
-						return err
+				// Fetch only if project not pinned or revision not available in
+				// local git as we anyways update all the projects later.
+				fetch := true
+				if project.Revision != "" && project.Revision != "HEAD" {
+					if _, err := gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).Show(project.Revision, ""); err == nil {
+						fetch = false
 					}
 				}
-				if err := fetchAll(jirix, project); err != nil {
-					return fmt.Errorf("Fetch failed for project(%s), %s", project.Path, err)
+				if fetch {
+					if cacheDirPath != "" {
+						remoteUrl := rewriteRemote(jirix, project.Remote)
+						if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, project.RemoteBranch, 0); err != nil {
+							return err
+						}
+					}
+					if err := fetchAll(jirix, project); err != nil {
+						return fmt.Errorf("Fetch failed for project(%s), %s", project.Path, err)
+					}
 				}
 			} else {
 				// If not updating then try to get file from JIRI_HEAD
