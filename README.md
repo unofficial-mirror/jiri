@@ -1,4 +1,5 @@
 # Jiri
+/jɪəri/ YEER-ee
 
 *"Jiri integrates repositories intelligently"*
 
