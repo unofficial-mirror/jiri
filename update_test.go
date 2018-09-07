@@ -6,10 +6,10 @@ package jiri
 
 import (
 	"bytes"
-	"net/http"
-	"net/http/httptest"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 )
