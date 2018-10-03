@@ -185,7 +185,7 @@ func rebaseProject(jirix *jiri.X, project project.Project, remoteBranch string) 
 		jirix.IncrementFailures()
 		return nil
 	}
-	if err := scm.Rebase("origin/" + remoteBranch); err != nil {
+	if err := scm.Rebase("remotes/origin/" + remoteBranch); err != nil {
 		if err2 := scm.RebaseAbort(); err2 != nil {
 			return err2
 		}
@@ -268,8 +268,6 @@ func runPatch(jirix *jiri.X, args []string) error {
 	var p *project.Project
 	host := patchHostFlag
 	if patchProjectFlag != "" {
-		// TODO: TO-592 - remove this hardcode
-		remoteBranch = "master"
 		projects, err := project.LocalProjects(jirix, project.FastScan)
 		if err != nil {
 			return err
@@ -284,6 +282,12 @@ func runPatch(jirix *jiri.X, args []string) error {
 		p = findProject(jirix, patchProjectFlag, projects, host, hostUrl, changeRef)
 		if p == nil {
 			return fmt.Errorf("Cannot find project for %q", patchProjectFlag)
+		}
+		// TODO: TO-592 - remove this hardcode
+		if p.RemoteBranch != "" {
+			remoteBranch = p.RemoteBranch
+		} else {
+			remoteBranch = "master"
 		}
 	} else if project, perr := currentProject(jirix); perr == nil {
 		p = &project
