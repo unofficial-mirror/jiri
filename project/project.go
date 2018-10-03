@@ -915,7 +915,7 @@ func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
 	if project.Revision != "HEAD" {
 		return project.Revision, nil
 	}
-	return "origin/" + project.RemoteBranch, nil
+	return "remotes/origin/" + project.RemoteBranch, nil
 }
 
 func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) error {
