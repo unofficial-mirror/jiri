@@ -13,7 +13,6 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/gerrit"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 )
@@ -184,7 +183,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 			relativePath = project.Path
 		}
 		if uploadRebaseFlag {
-			if changes, err := git.NewGit(project.Path).HasUncommittedChanges(); err != nil {
+			if changes, err := gitutil.New(jirix, gitutil.RootDirOpt(project.Path)).HasUncommittedChanges(); err != nil {
 				return err
 			} else if changes {
 				return fmt.Errorf("Project %s(%s) has uncommited changes, please commit them or stash them. Cannot rebase before pushing.", project.Name, relativePath)

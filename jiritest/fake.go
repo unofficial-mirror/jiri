@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 )
@@ -135,7 +134,7 @@ func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
 	dir := filepath.Join(fake.remote, ManifestProjectPath)
 	scm := gitutil.New(fake.X, gitutil.RootDirOpt(dir))
-	if ok, err := git.NewGit(dir).BranchExists("non-master"); ok && err == nil {
+	if ok, err := scm.BranchExists("non-master"); ok && err == nil {
 		if err := scm.CreateBranch("non-master"); err != nil {
 			return err
 		}

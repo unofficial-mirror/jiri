@@ -17,7 +17,6 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/gerrit"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 )
@@ -271,8 +270,7 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 	}
 	gerrit := gerrit.New(jirix, hostUrl)
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
-	g := git.NewGit(local.Path)
-	branches, err := g.GetAllBranchesInfo()
+	branches, err := scm.GetAllBranchesInfo()
 	if err != nil {
 		retErr = append(retErr, err)
 		return nil, retErr
@@ -287,12 +285,12 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 			return nil, nil
 		}
 		if b.IsHead {
-			untracked, err := g.HasUntrackedFiles()
+			untracked, err := scm.HasUntrackedFiles()
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get changes: %s\n", b.Name, err))
 				continue
 			}
-			uncommited, err := g.HasUncommittedChanges()
+			uncommited, err := scm.HasUncommittedChanges()
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get changes: %s\n", b.Name, err))
 				continue
@@ -328,7 +326,7 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 		deleteBranch := true
 		for _, c := range extraCommits {
 			deleteBranch = false
-			log, err := g.CommitMsg(c)
+			log, err := scm.CommitMsg(c)
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting branch %q as can't get log for rev %q: %s\n", b.Name, c, err))
 				break
@@ -365,7 +363,7 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 			}
 		}
 
-		shortHash, err := g.ShortHash(b.Revision)
+		shortHash, err := scm.ShortHash(b.Revision)
 		if err != nil {
 			retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't short hash: %s\n", b.Name, err))
 			continue
@@ -389,8 +387,7 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 	var retErr MultiError
 	var mergedBranches map[string]bool
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
-	g := git.NewGit(local.Path)
-	branches, err := g.GetAllBranchesInfo()
+	branches, err := scm.GetAllBranchesInfo()
 	if err != nil {
 		retErr = append(retErr, err)
 		return nil, retErr
@@ -410,7 +407,7 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 				if rb == "" {
 					rb = "master"
 				}
-				if mbs, err := g.MergedBranches("remotes/origin/" + rb); err != nil {
+				if mbs, err := scm.MergedBranches("remotes/origin/" + rb); err != nil {
 					retErr = append(retErr, fmt.Errorf("Not able to get merged un-tracked branches: %s\n", err))
 					continue
 				} else {
@@ -426,12 +423,12 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 		}
 
 		if b.IsHead {
-			untracked, err := g.HasUntrackedFiles()
+			untracked, err := scm.HasUntrackedFiles()
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get changes: %s\n", b.Name, err))
 				continue
 			}
-			uncommited, err := g.HasUncommittedChanges()
+			uncommited, err := scm.HasUncommittedChanges()
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get changes: %s\n", b.Name, err))
 				continue
@@ -451,7 +448,7 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 			}
 		}
 
-		shortHash, err := g.ShortHash(b.Revision)
+		shortHash, err := scm.ShortHash(b.Revision)
 		if err != nil {
 			retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't short hash: %s\n", b.Name, err))
 			continue
@@ -515,7 +512,7 @@ func deleteBranches(jirix *jiri.X, branchToDelete string) error {
 					errors = true
 					fmt.Printf(jirix.Color.Red("Error while deleting branch: %s\n", err))
 				} else {
-					shortHash, err := scm.GetShortHash(branch.Revision)
+					shortHash, err := scm.ShortHash(branch.Revision)
 					if err != nil {
 						return err
 					}

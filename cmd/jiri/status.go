@@ -13,7 +13,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 )
@@ -182,7 +181,6 @@ func getStatus(jirix *jiri.X, local project.Project, remote project.Project, cur
 	headRev := ""
 	changes := ""
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
-	g := git.NewGit(local.Path)
 	var err error
 	if statusFlags.changes {
 		changes, err = scm.ShortStatus()
@@ -192,14 +190,14 @@ func getStatus(jirix *jiri.X, local project.Project, remote project.Project, cur
 	}
 	if statusFlags.checkHead && remote.Name != "" {
 		// try getting JIRI_HEAD first
-		if r, err := g.CurrentRevisionForRef("JIRI_HEAD"); err == nil {
+		if r, err := scm.CurrentRevisionForRef("JIRI_HEAD"); err == nil {
 			headRev = r
 		} else {
 			headRev, err = project.GetHeadRevision(jirix, remote)
 			if err != nil {
 				return "", "", nil, err
 			}
-			if r, err := g.CurrentRevisionForRef(headRev); err != nil {
+			if r, err := scm.CurrentRevisionForRef(headRev); err != nil {
 				return "", "", nil, fmt.Errorf("Cannot find revision for ref %q for project %q: %s", headRev, local.Name, err)
 			} else {
 				headRev = r

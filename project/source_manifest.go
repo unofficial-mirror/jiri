@@ -16,7 +16,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/gerrit"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 )
 
@@ -122,9 +121,8 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, Multi
 		gc := &SourceManifest_GitCheckout{
 			RepoUrl: proj.Remote,
 		}
-		g := git.NewGit(filepath.Join(jirix.Root, proj.Path))
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(filepath.Join(jirix.Root, proj.Path)))
-		if rev, err := g.CurrentRevision(); err != nil {
+		if rev, err := scm.CurrentRevision(); err != nil {
 			return err
 		} else {
 			gc.Revision = rev

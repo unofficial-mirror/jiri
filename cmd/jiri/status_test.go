@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
@@ -40,20 +39,19 @@ func createCommits(t *testing.T, fake *jiritest.FakeJiriRoot, localProjects []pr
 	var relativePaths []string
 	for i, localProject := range localProjects {
 		setDummyUser(t, fake.X, fake.Projects[localProject.Name])
-		gr := git.NewGit(fake.Projects[localProject.Name])
 		gitRemote := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[localProject.Name]))
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file1"+strconv.Itoa(i), "file1"+strconv.Itoa(i))
 		gitRemote.CreateAndCheckoutBranch("file-1")
 		gitRemote.CheckoutBranch("master")
-		file1CommitRev, _ := gr.CurrentRevision()
+		file1CommitRev, _ := gitRemote.CurrentRevision()
 		file1CommitRevs = append(file1CommitRevs, file1CommitRev)
 		gitRemote.CreateAndCheckoutBranch("file-2")
 		gitRemote.CheckoutBranch("master")
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file2"+strconv.Itoa(i), "file2"+strconv.Itoa(i))
-		file2CommitRev, _ := gr.CurrentRevision()
+		file2CommitRev, _ := gitRemote.CurrentRevision()
 		file2CommitRevs = append(file2CommitRevs, file2CommitRev)
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file3"+strconv.Itoa(i), "file3"+strconv.Itoa(i))
-		file3CommitRev, _ := gr.CurrentRevision()
+		file3CommitRev, _ := gitRemote.CurrentRevision()
 		latestCommitRevs = append(latestCommitRevs, file3CommitRev)
 		relativePath, _ := filepath.Rel(cwd, localProject.Path)
 		relativePaths = append(relativePaths, relativePath)
@@ -300,7 +298,7 @@ func statusFlagsTest(t *testing.T) {
 		}
 		extraCommits5 = append([]string{log}, extraCommits5...)
 	}
-	gl5 := git.NewGit(localProjects[5].Path)
+	gl5 := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[5].Path))
 	currentCommit5, err := gl5.CurrentRevision()
 	if err != nil {
 		t.Error(err)

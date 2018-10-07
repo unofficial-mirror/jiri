@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
@@ -68,8 +67,8 @@ func TestSourceManifest(t *testing.T) {
 	}
 	revMap := make(map[string]string)
 	for _, path := range paths {
-		g := git.NewGit(filepath.Join(fake.X.Root, path))
-		if rev, err := g.CurrentRevision(); err != nil {
+		scm := gitutil.New(fake.X, gitutil.RootDirOpt(filepath.Join(fake.X.Root, path)))
+		if rev, err := scm.CurrentRevision(); err != nil {
 			t.Fatal(err)
 		} else {
 			revMap[path] = rev

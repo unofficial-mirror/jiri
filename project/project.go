@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/retry"
@@ -236,7 +235,7 @@ func (p *Project) CacheDirPath(jirix *jiri.X) (string, error) {
 }
 
 func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
-	g := git.NewGit(p.Path)
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
 	file := filepath.Join(p.Path, ".git", "JIRI_HEAD")
 	head := "refs/remotes/origin/master"
 	var err error
@@ -245,7 +244,7 @@ func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 	} else if p.RemoteBranch != "" {
 		head = "refs/remotes/origin/" + p.RemoteBranch
 	}
-	head, err = g.CurrentRevisionForRef(head)
+	head, err = scm.CurrentRevisionForRef(head)
 	if err != nil {
 		return fmt.Errorf("Cannot find revision for ref %q for project %s(%s): %s", head, p.Name, p.Path, err)
 	}
@@ -253,15 +252,15 @@ func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 		return err
 	}
 	file = filepath.Join(p.Path, ".git", "JIRI_LAST_BASE")
-	if rev, err := g.CurrentRevision(); err != nil {
+	if rev, err := scm.CurrentRevision(); err != nil {
 		return fmt.Errorf("Cannot find current revision for for project %s(%s): %s", p.Name, p.Path, err)
 	} else {
 		return safeWriteFile(jirix, file, []byte(rev))
 	}
 }
 
-func (p *Project) IsOnJiriHead() (bool, error) {
-	g := git.NewGit(p.Path)
+func (p *Project) IsOnJiriHead(jirix *jiri.X) (bool, error) {
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
 	jiriHead := "refs/remotes/origin/master"
 	var err error
 	if p.Revision != "" && p.Revision != "HEAD" {
@@ -269,11 +268,11 @@ func (p *Project) IsOnJiriHead() (bool, error) {
 	} else if p.RemoteBranch != "" {
 		jiriHead = "refs/remotes/origin/" + p.RemoteBranch
 	}
-	jiriHead, err = g.CurrentRevisionForRef(jiriHead)
+	jiriHead, err = scm.CurrentRevisionForRef(jiriHead)
 	if err != nil {
 		return false, fmt.Errorf("Cannot find revision for ref %q for project %s(%s): %s", jiriHead, p.Name, p.Path, err)
 	}
-	head, err := g.CurrentRevision()
+	head, err := scm.CurrentRevision()
 	if err != nil {
 		return false, fmt.Errorf("Cannot find current revision  for project %s(%s): %s", p.Name, p.Path, err)
 	}
@@ -453,8 +452,8 @@ func setProjectRevisions(jirix *jiri.X, projects Projects) (Projects, error) {
 	jirix.TimerPush("set revisions")
 	defer jirix.TimerPop()
 	for name, project := range projects {
-		g := git.NewGit(project.Path)
-		revision, err := g.CurrentRevision()
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
+		revision, err := scm.CurrentRevision()
 		if err != nil {
 			return nil, fmt.Errorf("Can't get revision for project %q: %v", project.Name, err)
 		}
@@ -722,12 +721,11 @@ func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool
 // and uncommitted changes, and optionally deletes all the branches except master.
 func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches bool) error {
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
-	g := git.NewGit(local.Path)
 	headRev, err := GetHeadRevision(jirix, remote)
 	if err != nil {
 		return err
 	} else {
-		if headRev, err = g.CurrentRevisionForRef(headRev); err != nil {
+		if headRev, err = scm.CurrentRevisionForRef(headRev); err != nil {
 			return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", headRev, local.Name, err)
 		}
 	}
@@ -745,7 +743,7 @@ func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches boo
 	}
 
 	// Delete all the other branches.
-	branches, _, err := g.GetBranches()
+	branches, _, err := scm.GetBranches()
 	if err != nil {
 		return fmt.Errorf("Cannot get branches for project %q: %v", local.Name, err)
 	}
@@ -894,9 +892,9 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if project.Remote == "" {
 		return fmt.Errorf("project %q does not have a remote", project.Name)
 	}
-	g := git.NewGit(project.Path)
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	remote := rewriteRemote(jirix, project.Remote)
-	if err := g.SetRemoteUrl("origin", remote); err != nil {
+	if err := scm.SetRemoteUrl("origin", remote); err != nil {
 		return err
 	}
 	if project.HistoryDepth > 0 {
@@ -968,9 +966,8 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 	}
 
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
-	g := git.NewGit(project.Path)
 
-	if uncommitted, err := g.HasUncommittedChanges(); err != nil {
+	if uncommitted, err := scm.HasUncommittedChanges(); err != nil {
 		return fmt.Errorf("Cannot get uncommited changes for project %q: %s", project.Name, err)
 	} else if uncommitted {
 		msg := fmt.Sprintf("Project %s(%s) contains uncommited changes.", project.Name, relativePath)
@@ -1168,12 +1165,12 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 			for key := range keys {
 				local := localProjects[key]
 				remote := remoteProjects[key]
-				g := git.NewGit(local.Path)
+				scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
 				b := "master"
 				if remote.RemoteBranch != "" {
 					b = remote.RemoteBranch
 				}
-				rev, err := g.CurrentRevisionForRef("remotes/origin/" + b)
+				rev, err := scm.CurrentRevisionForRef("remotes/origin/" + b)
 				if err != nil {
 					errs <- err
 					return
@@ -1212,7 +1209,7 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 
 func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) error {
 	if isPathDir(dir) {
-		if err := git.NewGit(dir).SetRemoteUrl("origin", remote); err != nil {
+		if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).SetRemoteUrl("origin", remote); err != nil {
 			return err
 		}
 
@@ -1478,14 +1475,14 @@ func getProjectStatus(jirix *jiri.X, ps Projects) ([]ProjectStatus, MultiError) 
 				if project.LocalConfig.Ignore || project.LocalConfig.NoUpdate {
 					continue
 				}
-				g := git.NewGit(project.Path)
-				uncommitted, err := g.HasUncommittedChanges()
+				scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
+				uncommitted, err := scm.HasUncommittedChanges()
 				if err != nil {
 					errs <- fmt.Errorf("Cannot get uncommited changes for project %q: %s", project.Name, err)
 					continue
 				}
 
-				isOnJiriHead, err := project.IsOnJiriHead()
+				isOnJiriHead, err := project.IsOnJiriHead(jirix)
 				if err != nil {
 					errs <- err
 					continue

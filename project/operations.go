@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/osutil"
@@ -113,15 +112,15 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
 		return err
 	}
-	g := git.NewGit(op.project.Path)
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
 
 	// Reset remote to point to correct location so that shared cache does not cause problem.
-	if err := g.SetRemoteUrl("origin", remote); err != nil {
+	if err := scm.SetRemoteUrl("origin", remote); err != nil {
 		return err
 	}
 
 	// Delete inital branch(es)
-	if branches, _, err := g.GetBranches(); err != nil {
+	if branches, _, err := scm.GetBranches(); err != nil {
 		jirix.Logger.Warningf("not able to get branches for newly created project %s(%s)\n\n", op.project.Name, op.project.Path)
 	} else {
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
@@ -199,16 +198,16 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 	}
 	// Never delete projects with non-master branches, uncommitted
 	// work, or untracked content.
-	g := git.NewGit(op.project.Path)
-	branches, _, err := g.GetBranches()
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
+	branches, _, err := scm.GetBranches()
 	if err != nil {
 		return fmt.Errorf("Cannot get branches for project %q: %s", op.Project().Name, err)
 	}
-	uncommitted, err := g.HasUncommittedChanges()
+	uncommitted, err := scm.HasUncommittedChanges()
 	if err != nil {
 		return fmt.Errorf("Cannot get uncommited changes for project %q: %s", op.Project().Name, err)
 	}
-	untracked, err := g.HasUntrackedFiles()
+	untracked, err := scm.HasUntrackedFiles()
 	if err != nil {
 		return fmt.Errorf("Cannot get untracked changes for project %q: %s", op.Project().Name, err)
 	}

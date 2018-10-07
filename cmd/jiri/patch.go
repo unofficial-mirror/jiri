@@ -14,7 +14,6 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/gerrit"
-	"fuchsia.googlesource.com/jiri/git"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
 )
@@ -73,7 +72,6 @@ change "B" is created on top of "A" and both have same topic.
 // patchProject checks out the given change.
 func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote string) (bool, error) {
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
-	g := git.NewGit(local.Path)
 	if !detachedHeadFlag {
 		if branch == "" {
 			cl, ps, err := gerrit.ParseRefString(ref)
@@ -83,13 +81,13 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 			branch = fmt.Sprintf("change/%v/%v", cl, ps)
 		}
 		jirix.Logger.Infof("Patching project %s(%s) on branch %q to ref %q\n", local.Name, local.Path, branch, ref)
-		branchExists, err := g.BranchExists(branch)
+		branchExists, err := scm.BranchExists(branch)
 		if err != nil {
 			return false, err
 		}
 		if branchExists {
 			if patchDeleteFlag {
-				_, currentBranch, err := g.GetBranches()
+				_, currentBranch, err := scm.GetBranches()
 				if err != nil {
 					return false, err
 				}
@@ -129,10 +127,10 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 		branchBase = "HEAD"
 	}
 	if !detachedHeadFlag {
-		if err := g.CreateBranchFromRef(branch, branchBase); err != nil {
+		if err := scm.CreateBranchFromRef(branch, branchBase); err != nil {
 			return false, err
 		}
-		if err := g.SetUpstream(branch, "origin/"+remote); err != nil {
+		if err := scm.SetUpstream(branch, "origin/"+remote); err != nil {
 			return false, fmt.Errorf("setting upstream to 'origin/%s': %s", remote, err)
 		}
 		if err := scm.CheckoutBranch(branch); err != nil {
@@ -174,12 +172,13 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 // rebaseProject rebases the current branch on top of a given branch.
 func rebaseProject(jirix *jiri.X, project project.Project, remoteBranch string) error {
 	jirix.Logger.Infof("Rebasing project %s(%s)\n", project.Name, project.Path)
-	g := git.NewGit(project.Path)
-	name, email, err := g.UserInfoForCommit("HEAD")
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
+	name, email, err := scm.UserInfoForCommit("HEAD")
 	if err != nil {
 		return fmt.Errorf("Rebase: cannot get user info for HEAD: %s", err)
 	}
-	scm := gitutil.New(jirix, gitutil.UserNameOpt(name), gitutil.UserEmailOpt(email), gitutil.RootDirOpt(project.Path))
+	// TODO: provide a way to set username and email
+	scm = gitutil.New(jirix, gitutil.UserNameOpt(name), gitutil.UserEmailOpt(email), gitutil.RootDirOpt(project.Path))
 	if err := scm.FetchRefspec("origin", remoteBranch); err != nil {
 		jirix.Logger.Errorf("Not able to fetch branch %q: %s", remoteBranch, err)
 		jirix.IncrementFailures()
