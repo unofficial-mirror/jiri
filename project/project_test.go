@@ -425,7 +425,7 @@ func TestOldMetaDirIsMovedOnUpdate(t *testing.T) {
 
 // TestUpdateUniverseWithCache checks that UpdateUniverse can clone and pull
 // from a cache.
-func testWithCache(t *testing.T, shared bool) {
+func TestUpdateUniverseWithCache(t *testing.T) {
 	localProjects, fake, cleanup := setupUniverse(t)
 	defer cleanup()
 
@@ -443,7 +443,6 @@ func testWithCache(t *testing.T, shared bool) {
 		}
 	}()
 	fake.X.Cache = cacheDir
-	fake.X.Shared = shared
 
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
@@ -451,7 +450,7 @@ func testWithCache(t *testing.T, shared bool) {
 	for _, p := range localProjects {
 		// Check that local clone was referenced from cache
 		err := fileExists(p.Path + "/.git/objects/info/alternates")
-		if shared || p.HistoryDepth == 0 {
+		if p.HistoryDepth == 0 {
 			if err != nil {
 				t.Fatalf("expected %v to exist, but not found", p.Path+"/.git/objects/info/alternates")
 			}
@@ -488,19 +487,6 @@ func testWithCache(t *testing.T, shared bool) {
 	if cacheRev != localRev {
 		t.Fatalf("Cache revision(%v) not equal to local revision(%v)", cacheRev, localRev)
 	}
-
-}
-
-// TestUpdateUniverseWithCache checks that UpdateUniverse can clone and pull
-// from a cache.
-func TestUpdateUniverseWithCache(t *testing.T) {
-	testWithCache(t, false)
-}
-
-// TestUpdateUniverseWithiSharedCache checks that UpdateUniverse can clone and pull
-// from a cache when it is of type "shared"
-func TestUpdateUniverseWithSharedCache(t *testing.T) {
-	testWithCache(t, true)
 }
 
 func TestProjectUpdateWhenNoUpdate(t *testing.T) {
@@ -514,7 +500,7 @@ func TestProjectUpdateWhenNoUpdate(t *testing.T) {
 	project.WriteLocalConfig(fake.X, localProjects[1], lc)
 	// Commit to master branch of a project 1.
 	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
-	gitRemote :=  gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	gitRemote := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
 	remoteRev, _ := gitRemote.CurrentRevision()
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)

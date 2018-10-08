@@ -227,6 +227,10 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 	args := []string{"clone"}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
+		case BareOpt:
+			if typedOpt {
+				args = append(args, "--bare")
+			}
 		case ReferenceOpt:
 			reference := string(typedOpt)
 			if reference != "" {

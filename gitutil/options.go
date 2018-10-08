@@ -110,3 +110,7 @@ type NoCheckoutOpt bool
 func (NoCheckoutOpt) cloneOpt() {}
 
 func (DepthOpt) cloneOpt() {}
+
+type BareOpt bool
+
+func (BareOpt) cloneOpt() {}

@@ -86,15 +86,11 @@ func (op createOperation) Kind() string {
 func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	var err error
 	remote := rewriteRemote(jirix, op.project.Remote)
-	if jirix.Shared && cache != "" {
-		err = clone(jirix, cache, op.destination, gitutil.SharedOpt(true),
-			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+	// Shallow clones can not be used as as local git reference
+	if op.project.HistoryDepth > 0 && cache != "" {
+		err = clone(jirix, cache, op.destination, gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
 	} else {
-		ref := cache
-		if op.project.HistoryDepth > 0 {
-			ref = ""
-		}
-		err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(ref),
+		err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(cache),
 			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
 	}
 	if err != nil {

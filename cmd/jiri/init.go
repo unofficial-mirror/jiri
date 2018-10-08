@@ -44,7 +44,7 @@ var (
 
 func init() {
 	cmdInit.Flags.StringVar(&cacheFlag, "cache", "", "Jiri cache directory.")
-	cmdInit.Flags.BoolVar(&sharedFlag, "shared", false, "Use shared cache, which doesn't commit or push.")
+	cmdInit.Flags.BoolVar(&sharedFlag, "shared", false, "[DEPRECATED] All caches are shared.")
 	cmdInit.Flags.BoolVar(&showAnalyticsDataFlag, "show-analytics-data", false, "Show analytics data that jiri collect when you opt-in and exits.")
 	cmdInit.Flags.StringVar(&analyticsOptFlag, "analytics-opt", "", "Opt in/out of analytics collection. Takes true/false")
 	cmdInit.Flags.StringVar(&rewriteSsoToHttpsFlag, "rewrite-sso-to-https", "", "Rewrites sso fetches, clones, etc to https. Takes true/false.")
@@ -117,7 +117,6 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if cacheFlag != "" {
 		config.CachePath = cacheFlag
-		config.Shared = sharedFlag
 	}
 
 	if rewriteSsoToHttpsFlag != "" {

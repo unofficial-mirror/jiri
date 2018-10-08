@@ -170,22 +170,10 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 		if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, remote.RemoteBranch, 0); err != nil {
 			return err
 		}
-		if jirix.Shared {
-			if err := clone(jirix, cacheDirPath, path, gitutil.SharedOpt(true),
-				gitutil.NoCheckoutOpt(true)); err != nil {
-				return err
-			}
-		} else {
-			if err := clone(jirix, remoteUrl, path, gitutil.ReferenceOpt(cacheDirPath),
-				gitutil.NoCheckoutOpt(true)); err != nil {
-				return err
-			}
-		}
-
-	} else {
-		if err := clone(jirix, remoteUrl, path, gitutil.NoCheckoutOpt(true)); err != nil {
-			return err
-		}
+	}
+	if err := clone(jirix, remoteUrl, path, gitutil.ReferenceOpt(cacheDirPath),
+		gitutil.NoCheckoutOpt(true)); err != nil {
+		return err
 	}
 	p.Revision = remote.Revision
 	p.RemoteBranch = remote.RemoteBranch
