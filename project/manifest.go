@@ -30,6 +30,7 @@ type Manifest struct {
 	Imports      []Import      `xml:"imports>import"`
 	LocalImports []LocalImport `xml:"imports>localimport"`
 	Projects     []Project     `xml:"projects>project"`
+	Overrides    []Project     `xml:"overrides>project"`
 	Hooks        []Hook        `xml:"hooks>hook"`
 	XMLName      struct{}      `xml:"manifest"`
 }
@@ -73,6 +74,7 @@ var (
 	newlineBytes       = []byte("\n")
 	emptyImportsBytes  = []byte("\n  <imports></imports>\n")
 	emptyProjectsBytes = []byte("\n  <projects></projects>\n")
+	emptyOverridesBytes = []byte("\n  <overrides></overrides>\n")
 	emptyHooksBytes    = []byte("\n  <hooks></hooks>\n")
 
 	endElemBytes        = []byte("/>\n")
@@ -92,6 +94,7 @@ func (m *Manifest) deepCopy() *Manifest {
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.LocalImports = append([]LocalImport(nil), m.LocalImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
+	x.Overrides = append([]Project(nil), m.Overrides...)
 	x.Hooks = append([]Hook(nil), m.Hooks...)
 	return x
 }
@@ -110,6 +113,7 @@ func (m *Manifest) ToBytes() ([]byte, error) {
 	// elements, or produce short empty elements, so we post-process the data.
 	data = bytes.Replace(data, emptyImportsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyProjectsBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyOverridesBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyHooksBytes, newlineBytes, -1)
 	data = bytes.Replace(data, endImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endLocalImportBytes, endElemBytes, -1)
@@ -163,6 +167,11 @@ func (m *Manifest) fillDefaults() error {
 			return err
 		}
 	}
+	for index := range m.Overrides {
+		if err := m.Overrides[index].fillDefaults(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -179,6 +188,11 @@ func (m *Manifest) unfillDefaults() error {
 	}
 	for index := range m.Projects {
 		if err := m.Projects[index].unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Overrides {
+		if err := m.Overrides[index].unfillDefaults(); err != nil {
 			return err
 		}
 	}

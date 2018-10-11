@@ -2,7 +2,8 @@
 
 Jiri manifest files describe the set of projects that get synced when running "jiri update".
 
-The first manifest file that jiri reads is in [root]/.jiri\_manifest.  This manifest **must** exist for the jiri tool to work.
+The first manifest file that jiri reads is in [root]/.jiri\_manifest.  This root manifest
+**must** exist for the jiri tool to work.
 
 Usually the manifest in [root]/.jiri\_manifest will import other manifests from remote repositories via &lt;import> tags, but it can contain its own list of projects as well.
 
@@ -29,6 +30,9 @@ Manifests have the following XML schema:
     />
     ...
   </projects>
+  <overrides>
+    <project ... />
+  </overrides>
   <hooks>
     <hook name="update"
           project="mojo/public"
@@ -69,6 +73,10 @@ The &lt;project> tags describe the projects to sync, and what state they should 
 * gerrithost (optional) - The url of the Gerrit host for the project.  If specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 
 * githooks (optional) - The path (relative to [root]) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
+
+The projects in the &lt;overrides> tag replace existing projects defined by in the &lt;projects> tag (and from transitively imported lt;projects> tags).
+Only the root manifest can contain overrides and repositories referenced using the
+&lt;import> tag (including from transitive imports) cannot be overridden.
 
 The &lt;hook> tag describes the hooks that must be executed after every 'jiri update' They are configured via the following attributes:
 
