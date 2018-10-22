@@ -214,6 +214,27 @@ func (p *Project) validate() error {
 	return nil
 }
 
+func (p *Project) update(other *Project) {
+	if other.Path != "" {
+		p.Path = other.Path
+	}
+	if other.RemoteBranch != "" {
+		p.RemoteBranch = other.RemoteBranch
+	}
+	if other.Revision != "" {
+		p.Revision = other.Revision
+	}
+	if other.HistoryDepth != 0 {
+		p.HistoryDepth = other.HistoryDepth
+	}
+	if other.GerritHost != "" {
+		p.GerritHost = other.GerritHost
+	}
+	if other.GitHooks != "" {
+		p.GitHooks = other.GitHooks
+	}
+}
+
 func cacheDirPathFromRemote(cacheRoot, remote string) (string, error) {
 	if cacheRoot != "" {
 		url, err := url.Parse(remote)
