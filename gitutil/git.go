@@ -531,7 +531,7 @@ func (g *Git) CurrentRevision() (string, error) {
 
 // CurrentRevisionForRef gets current rev for ref/branch/tags
 func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
-	out, err := g.runOutput("rev-parse", ref)
+	out, err := g.runOutput("rev-list", "-n", "1", ref)
 	if err != nil {
 		return "", err
 	}
