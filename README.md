@@ -216,7 +216,7 @@ Now we just need to import that new manifest and `jiri update`.
 
 ```
 cd "$MY_ROOT"
-jiri import my_manifest /tmp/my_manifest_repo
+jiri import -name=my_manifest_repo my_manifest /tmp/my_manifest_repo
 jiri update
 ```
 
