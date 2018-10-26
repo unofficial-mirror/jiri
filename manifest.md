@@ -74,7 +74,7 @@ The &lt;project> tags describe the projects to sync, and what state they should 
 
 * githooks (optional) - The path (relative to [root]) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
 
-The projects in the &lt;overrides> tag replace existing projects defined by in the &lt;projects> tag (and from transitively imported lt;projects> tags).
+The projects in the &lt;overrides> tag replace existing projects defined by in the &lt;projects> tag (and from transitively imported &lt;projects> tags).
 Only the root manifest can contain overrides and repositories referenced using the
 &lt;import> tag (including from transitive imports) cannot be overridden.
 
