@@ -22,6 +22,7 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/log"
+	"fuchsia.googlesource.com/jiri/retry"
 )
 
 var (
@@ -1228,6 +1229,11 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 }
 
 func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) error {
+	refspec := "+refs/heads/*:refs/heads/*"
+	if depth > 0 {
+		// Shallow cache, fetch only manifest tracked remote branch
+		refspec = fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
+	}
 	if isPathDir(dir) {
 		if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).SetRemoteUrl("origin", remote); err != nil {
 			return err
@@ -1239,7 +1245,12 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		defer task.Done()
 		t := jirix.Logger.TrackTime(msg)
 		defer t.Done()
-		if err := fetch(jirix, dir, "origin", gitutil.PruneOpt(true)); err != nil {
+		// We need to explicitly specify the ref for fetch to update in case
+		// the cache was created with a previous version and uses "refs/*"
+		if err := retry.Function(jirix, func() error {
+			return gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true))
+		}, fmt.Sprintf("Fetching for %s:%s", dir, refspec),
+			retry.AttemptsOpt(jirix.Attempts)); err != nil {
 			return err
 		}
 	} else {
@@ -1255,16 +1266,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 			return err
 		}
 		// We need to explicitly specify the ref for fetch to update the bare
-		// repository.  Alternative would be to use
-		//
-		//   git fetch --prune origin "+refs/heads/*:refs/heads/*"
-		//
-		// when updating the cache in the other branch above.
-		refspec := "+refs/heads/*:refs/heads/*"
-		if depth > 0 {
-			// Shallow cache, fetch only manifest tracked remote branch
-			refspec = fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
-		}
+		// repository.
 		if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Config("remote.origin.fetch", refspec); err != nil {
 			return err
 		}
