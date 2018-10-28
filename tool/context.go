@@ -10,7 +10,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/envvar"
-	"fuchsia.googlesource.com/jiri/jenkins"
 	"fuchsia.googlesource.com/jiri/timing"
 )
 
@@ -94,12 +93,6 @@ func (ctx Context) Clone(opts ContextOpts) *Context {
 // Env returns the environment of the context.
 func (ctx Context) Env() map[string]string {
 	return ctx.opts.Env
-}
-
-// Jenkins returns a new Jenkins instance that can be used to
-// communicate with a Jenkins server running at the given host.
-func (ctx Context) Jenkins(host string) (*jenkins.Jenkins, error) {
-	return jenkins.New(host)
 }
 
 // Stdin returns the standard input of the context.
