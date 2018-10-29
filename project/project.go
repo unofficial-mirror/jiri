@@ -1248,7 +1248,8 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		// We need to explicitly specify the ref for fetch to update in case
 		// the cache was created with a previous version and uses "refs/*"
 		if err := retry.Function(jirix, func() error {
-			return gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec, gitutil.PruneOpt(true))
+			return gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec,
+				gitutil.DepthOpt(depth), gitutil.PruneOpt(true), gitutil.UpdateShallowOpt(true))
 		}, fmt.Sprintf("Fetching for %s:%s", dir, refspec),
 			retry.AttemptsOpt(jirix.Attempts)); err != nil {
 			return err
