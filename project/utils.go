@@ -101,15 +101,6 @@ func fetch(jirix *jiri.X, path, remote string, opts ...gitutil.FetchOpt) error {
 	}, msg, retry.AttemptsOpt(jirix.Attempts))
 }
 
-func fetchRefspec(jirix *jiri.X, path, refspec, remote string, opts ...gitutil.FetchOpt) error {
-	msg := fmt.Sprintf("Fetching for %s %s", path, refspec)
-	t := jirix.Logger.TrackTime(msg)
-	defer t.Done()
-	return retry.Function(jirix, func() error {
-		return gitutil.New(jirix, gitutil.RootDirOpt(path)).FetchRefspec(remote, refspec, opts...)
-	}, msg, retry.AttemptsOpt(jirix.Attempts))
-}
-
 type MultiError []error
 
 func (m MultiError) Error() string {

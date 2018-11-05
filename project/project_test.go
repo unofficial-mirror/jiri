@@ -1640,6 +1640,61 @@ func TestUpdateWhenConflictMerge(t *testing.T) {
 	checkJiriRevFiles(t, fake.X, localProjects[1])
 }
 
+func TestTagNotContainedInBranch(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitRemote := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(fake.Projects[localProjects[1].Name]))
+	if err := gitRemote.CreateAndCheckoutBranch("non-master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create commits in remote repo
+	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "non-master commit")
+	writeFile(t, fake.X, fake.Projects[localProjects[1].Name], "file1", "file1")
+	file1CommitRev, _ := gitRemote.CurrentRevision()
+	if err := gitRemote.CreateLightweightTag("testtag"); err != nil {
+		t.Fatalf("Creating tag: %s", err)
+
+	}
+	if err := gitRemote.CheckoutBranch("master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := gitRemote.DeleteBranch("non-master", gitutil.ForceOpt(true)); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == localProjects[1].Name {
+			p.Revision = "testtag"
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
+	// It rebased properly and pulled latest changes
+	localRev, _ := gitLocal.CurrentRevision()
+	if file1CommitRev != localRev {
+		t.Fatalf("Current commit is %v, it should be %v\n", localRev, file1CommitRev)
+	}
+}
+
 // TestCheckoutSnapshotUrl tests checking out snapshot functionality from a url
 func TestCheckoutSnapshotUrl(t *testing.T) {
 	testCheckoutSnapshot(t, true)
