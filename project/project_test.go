@@ -189,6 +189,7 @@ func TestLocalProjects(t *testing.T) {
 
 	// Create a latest update snapshot but only tell it about the first project.
 	manifest := project.Manifest{
+		Version: project.ManifestVersion,
 		Projects: []project.Project{
 			{
 				Name: projectName(0),
@@ -1744,7 +1745,7 @@ func testCheckoutSnapshot(t *testing.T, testURL bool) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	manifest := &project.Manifest{}
+	manifest := &project.Manifest{Version: project.ManifestVersion}
 	for _, localProject := range localProjects {
 		manifest.Projects = append(manifest.Projects, localProject)
 	}

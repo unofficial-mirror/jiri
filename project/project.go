@@ -7,6 +7,7 @@ package project
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,15 +27,16 @@ import (
 )
 
 var (
-	JiriProject = "release.go.jiri"
-	JiriName    = "jiri"
-	JiriPackage = "fuchsia.googlesource.com/jiri"
-	ssoRe       = regexp.MustCompile("^sso://(.*?)/")
+	errVersionMismatch = errors.New("Snapshot file version mismatch")
+	ssoRe              = regexp.MustCompile("^sso://(.*?)/")
+	DefaultHookTimeout = uint(5) // DefaultHookTimeout is the time in minutes to wait for a hook to timeout
 )
 
-var (
-	// time in minutes
-	DefaultHookTimeout = uint(5)
+const (
+	JiriProject     = "release.go.jiri"
+	JiriName        = "jiri"
+	JiriPackage     = "fuchsia.googlesource.com/jiri"
+	ManifestVersion = "1.0"
 )
 
 // Project represents a jiri project.
@@ -371,7 +373,8 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, localManifest bool)
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
-	manifest := Manifest{}
+	// Create a new Manifest with a Jiri version pinned to each snapshot
+	manifest := Manifest{Version: ManifestVersion}
 
 	// Add all local projects to manifest.
 	localProjects, err := LocalProjects(jirix, FullScan)
@@ -445,6 +448,15 @@ func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, error) {
 		}
 
 	}
+
+	m, err := ManifestFromFile(jirix, snapshot)
+	if err != nil {
+		return nil, nil, err
+	}
+	if ManifestVersion != m.Version {
+		return nil, nil, errVersionMismatch
+	}
+
 	return LoadManifestFile(jirix, snapshot, nil, false)
 }
 
@@ -518,6 +530,9 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 		// load the snapshot, in order to determine the local projects.
 		snapshotProjects, _, err := LoadSnapshotFile(jirix, latestSnapshot)
 		if err != nil {
+			if err == errVersionMismatch {
+				return loadLocalProjectsSlow(jirix)
+			}
 			return nil, err
 		}
 		projectsExist, err := projectsExistLocally(jirix, snapshotProjects)
@@ -536,6 +551,10 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 		}
 	}
 
+	return loadLocalProjectsSlow(jirix)
+}
+
+func loadLocalProjectsSlow(jirix *jiri.X) (Projects, error) {
 	// Slow path: Either full scan was requested, or projects exist in manifest
 	// that were not found locally.  Do a recursive scan of all projects under
 	// the root.

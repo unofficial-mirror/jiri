@@ -21,8 +21,8 @@ import (
 // Setup two snapshots and also return their diff
 func setUpSnapshots(t *testing.T, rootDir string) ([]byte, []byte, *Diff) {
 	n := 7
-	m1 := &project.Manifest{}
-	m2 := &project.Manifest{}
+	m1 := &project.Manifest{Version: project.ManifestVersion}
+	m2 := &project.Manifest{Version: project.ManifestVersion}
 	m1.Projects = make([]project.Project, n)
 	m2.Projects = make([]project.Project, n)
 	for i := 0; i < n; i++ {
