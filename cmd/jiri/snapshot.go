@@ -26,5 +26,5 @@ func runSnapshot(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
-	return project.CreateSnapshot(jirix, args[0], nil, false)
+	return project.CreateSnapshot(jirix, args[0], nil, nil, false)
 }

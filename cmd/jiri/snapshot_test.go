@@ -84,7 +84,7 @@ func TestSnapshot(t *testing.T) {
 	for i := 0; i < numProjects; i++ {
 		writeReadme(t, fake.X, fake.Projects[remoteProjectName(i)], "revision 1")
 	}
-	if err := project.UpdateUniverse(fake.X, true, false, false, false, false, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
+	if err := project.UpdateUniverse(fake.X, true, false, false, false, false, true /*run-hooks*/, true /*run-packages*/, project.DefaultHookTimeout, project.DefaultPackageTimeout); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -111,7 +111,7 @@ func TestSnapshot(t *testing.T) {
 	}
 
 	snapshotFile := tmpfile.Name()
-	if err := project.CheckoutSnapshot(fake.X, snapshotFile, false, true /*run-hooks*/, project.DefaultHookTimeout); err != nil {
+	if err := project.CheckoutSnapshot(fake.X, snapshotFile, false, true /*run-hooks*/, true /*run-packages*/, project.DefaultHookTimeout, project.DefaultPackageTimeout); err != nil {
 		t.Fatalf("%s", err)
 	}
 	for i, _ := range remoteProjects {

@@ -171,7 +171,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 		return err
 	}
 	var gerritPushOptions []GerritPushOption
-	remoteProjects, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, false /*localManifest*/)
+	remoteProjects, _, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, false /*localManifest*/)
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,7 @@ type importCache struct {
 type loader struct {
 	Projects       Projects
 	Hooks          Hooks
+	Packages       Packages
 	TmpDir         string
 	localProjects  Projects
 	importProjects Projects
@@ -60,6 +61,7 @@ func newManifestLoader(localProjects Projects, update bool, file string) *loader
 	return &loader{
 		Projects:       make(Projects),
 		Hooks:          make(Hooks),
+		Packages:       make(Packages),
 		localProjects:  localProjects,
 		importProjects: make(Projects),
 		update:         update,
@@ -326,6 +328,11 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		}
 		key := hook.Key()
 		ld.Hooks[key] = hook
+	}
+
+	for _, pkg := range m.Packages {
+		key := pkg.Key()
+		ld.Packages[key] = pkg
 	}
 	return nil
 }

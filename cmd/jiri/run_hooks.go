@@ -43,6 +43,6 @@ func runHooks(jirix *jiri.X, args []string) error {
 	jirix.Attempts = runHooksFlags.attempts
 
 	// Get hooks.
-	_, hooks, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
+	_, hooks, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
 	return project.RunHooks(jirix, hooks, runHooksFlags.hookTimeout)
 }

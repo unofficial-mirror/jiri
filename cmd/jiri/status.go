@@ -63,7 +63,7 @@ func runStatus(jirix *jiri.X, args []string) error {
 	if err != nil {
 		return err
 	}
-	remoteProjects, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, false /*localManifest*/)
+	remoteProjects, _, _, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, false /*localManifest*/)
 	if err != nil {
 		return err
 	}

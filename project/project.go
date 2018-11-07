@@ -27,9 +27,10 @@ import (
 )
 
 var (
-	errVersionMismatch = errors.New("Snapshot file version mismatch")
-	ssoRe              = regexp.MustCompile("^sso://(.*?)/")
-	DefaultHookTimeout = uint(5) // DefaultHookTimeout is the time in minutes to wait for a hook to timeout
+	errVersionMismatch    = errors.New("snapshot file version mismatch")
+	ssoRe                 = regexp.MustCompile("^sso://(.*?)/")
+	DefaultHookTimeout    = uint(5) // DefaultHookTimeout is the time in minutes to wait for a hook to timeout.
+	DefaultPackageTimeout = uint(5) // DefaultPackageTimeout is the time in minutes to wait for cipd fetching packages.
 )
 
 const (
@@ -369,7 +370,7 @@ func (sm ScanMode) String() string {
 // HEAD of all projects and writes this snapshot out to the given file.
 // if hooks are not passed, jiri will read JiriManifestFile and get hooks from there,
 // so always pass hooks incase updating from a snapshot
-func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, localManifest bool) error {
+func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, localManifest bool) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
@@ -386,13 +387,25 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, localManifest bool)
 		manifest.Projects = append(manifest.Projects, project)
 	}
 
-	if hooks == nil {
-		if _, hooks, err = LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest); err != nil {
+	if hooks == nil || pkgs == nil {
+		if _, tmpHooks, tmpPkgs, err := LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest); err != nil {
 			return err
+		} else {
+			if hooks == nil {
+				hooks = tmpHooks
+			}
+			if pkgs == nil {
+				pkgs = tmpPkgs
+			}
 		}
 	}
+
 	for _, hook := range hooks {
 		manifest.Hooks = append(manifest.Hooks, hook)
+	}
+
+	for _, pack := range pkgs {
+		manifest.Packages = append(manifest.Packages, pack)
 	}
 
 	return manifest.ToFile(jirix, file)
@@ -400,7 +413,7 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, localManifest bool)
 
 // CheckoutSnapshot updates project state to the state specified in the given
 // snapshot file.  Note that the snapshot file must not contain remote imports.
-func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks bool, runHookTimeout uint) error {
+func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks, fetchPkgs bool, runHookTimeout, fetchTimeout uint) error {
 	// Find all local projects.
 	scanMode := FastScan
 	if gc {
@@ -410,51 +423,51 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks bool, runHook
 	if err != nil {
 		return err
 	}
-	remoteProjects, hooks, err := LoadSnapshotFile(jirix, snapshot)
+	remoteProjects, hooks, pkgs, err := LoadSnapshotFile(jirix, snapshot)
 	if err != nil {
 		return err
 	}
-	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/, runHooks); err != nil {
+	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, pkgs, gc, runHookTimeout, fetchTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/, runHooks, fetchPkgs); err != nil {
 		return err
 	}
-	return WriteUpdateHistorySnapshot(jirix, snapshot, hooks, false)
+	return WriteUpdateHistorySnapshot(jirix, snapshot, hooks, pkgs, false)
 }
 
 // LoadSnapshotFile loads the specified snapshot manifest.  If the snapshot
 // manifest contains a remote import, an error will be returned.
-func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, error) {
+func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, Packages, error) {
 	if _, err := os.Stat(snapshot); err != nil {
 		if !os.IsNotExist(err) {
-			return nil, nil, fmtError(err)
+			return nil, nil, nil, fmtError(err)
 		}
 		u, err := url.ParseRequestURI(snapshot)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%q is neither a URL nor a valid file path", snapshot)
+			return nil, nil, nil, fmt.Errorf("%q is neither a URL nor a valid file path", snapshot)
 		}
 		jirix.Logger.Infof("Getting snapshot from URL %q", u)
 		resp, err := http.Get(u.String())
 		if err != nil {
-			return nil, nil, fmt.Errorf("Error getting snapshot from URL %q: %v", u, err)
+			return nil, nil, nil, fmt.Errorf("Error getting snapshot from URL %q: %v", u, err)
 		}
 		defer resp.Body.Close()
 		tmpFile, err := ioutil.TempFile("", "snapshot")
 		if err != nil {
-			return nil, nil, fmt.Errorf("Error creating tmp file: %v", err)
+			return nil, nil, nil, fmt.Errorf("Error creating tmp file: %v", err)
 		}
 		snapshot = tmpFile.Name()
 		defer os.Remove(snapshot)
 		if _, err = io.Copy(tmpFile, resp.Body); err != nil {
-			return nil, nil, fmt.Errorf("Error writing to tmp file: %v", err)
+			return nil, nil, nil, fmt.Errorf("Error writing to tmp file: %v", err)
 		}
 
 	}
 
 	m, err := ManifestFromFile(jirix, snapshot)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if ManifestVersion != m.Version {
-		return nil, nil, errVersionMismatch
+		return nil, nil, nil, errVersionMismatch
 	}
 
 	return LoadManifestFile(jirix, snapshot, nil, false)
@@ -528,7 +541,7 @@ func LocalProjects(jirix *jiri.X, scanMode ScanMode) (Projects, error) {
 		// An error will be returned if the snapshot contains remote imports, since
 		// that would cause an infinite loop; we'd need local projects, in order to
 		// load the snapshot, in order to determine the local projects.
-		snapshotProjects, _, err := LoadSnapshotFile(jirix, latestSnapshot)
+		snapshotProjects, _, _, err := LoadSnapshotFile(jirix, latestSnapshot)
 		if err != nil {
 			if err == errVersionMismatch {
 				return loadLocalProjectsSlow(jirix)
@@ -624,7 +637,7 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 // counterparts identified in the manifest. Optionally, the 'gc' flag can be
 // used to indicate that local projects that no longer exist remotely should be
 // removed.
-func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bool, rebaseUntracked bool, rebaseAll bool, runHooks bool, runHookTimeout uint) (e error) {
+func UpdateUniverse(jirix *jiri.X, gc, localManifest, rebaseTracked, rebaseUntracked, rebaseAll, runHooks, fetchPkgs bool, runHookTimeout, fetchTimeout uint) (e error) {
 	jirix.Logger.Infof("Updating all projects")
 
 	updateFn := func(scanMode ScanMode) error {
@@ -638,7 +651,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 		}
 
 		// Determine the set of remote projects and match them up with the locals.
-		remoteProjects, hooks, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
+		remoteProjects, hooks, pkgs, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
 		MatchLocalWithRemote(localProjects, remoteProjects)
 
 		if err != nil {
@@ -646,7 +659,7 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 		}
 
 		// Actually update the projects.
-		return updateProjects(jirix, localProjects, remoteProjects, hooks, gc, runHookTimeout, rebaseTracked, rebaseUntracked, rebaseAll, false /*snapshot*/, runHooks)
+		return updateProjects(jirix, localProjects, remoteProjects, hooks, pkgs, gc, runHookTimeout, fetchTimeout, rebaseTracked, rebaseUntracked, rebaseAll, false /*snapshot*/, runHooks, fetchPkgs)
 	}
 
 	// Specifying gc should always force a full filesystem scan.
@@ -672,9 +685,9 @@ func UpdateUniverse(jirix *jiri.X, gc bool, localManifest bool, rebaseTracked bo
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
 // projects and writes it to the update history directory.
-func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks, localManifest bool) error {
+func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks, pkgs Packages, localManifest bool) error {
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile, hooks, localManifest); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile, hooks, pkgs, localManifest); err != nil {
 		return err
 	}
 
@@ -715,7 +728,7 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks,
 // all the local changes. If "cleanupBranches" is true, it will also delete all
 // the non-master branches.
 func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool) (e error) {
-	remoteProjects, _, err := LoadManifest(jirix)
+	remoteProjects, _, _, err := LoadManifest(jirix)
 	if err != nil {
 		return err
 	}
@@ -1389,7 +1402,7 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 	return nil
 }
 
-func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, gc bool, runHookTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot, shouldRunHooks bool) error {
+func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, pkgs Packages, gc bool, runHookTimeout, fetchTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot, shouldRunHooks, shouldFetchPkgs bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
@@ -1485,11 +1498,18 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		jirix.Logger.Warningf("%s\n\n", msg)
 	}
 
+	if shouldFetchPkgs && len(pkgs) > 0 {
+		if err := FetchPackages(jirix, pkgs, fetchTimeout); err != nil {
+			return err
+		}
+	}
+
 	if shouldRunHooks {
 		if err := RunHooks(jirix, hooks, runHookTimeout); err != nil {
 			return err
 		}
 	}
+
 	return applyGitHooks(jirix, ops)
 }
 

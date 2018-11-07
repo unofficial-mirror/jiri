@@ -16,11 +16,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/retry"
 )
@@ -33,6 +36,7 @@ type Manifest struct {
 	Projects     []Project     `xml:"projects>project"`
 	Overrides    []Project     `xml:"overrides>project"`
 	Hooks        []Hook        `xml:"hooks>hook"`
+	Packages     []Package     `xml:"packages>package"`
 	XMLName      struct{}      `xml:"manifest"`
 }
 
@@ -77,12 +81,14 @@ var (
 	emptyProjectsBytes  = []byte("\n  <projects></projects>\n")
 	emptyOverridesBytes = []byte("\n  <overrides></overrides>\n")
 	emptyHooksBytes     = []byte("\n  <hooks></hooks>\n")
+	emptyPackagesBytes  = []byte("\n  <packages></packages>\n")
 
 	endElemBytes        = []byte("/>\n")
 	endImportBytes      = []byte("></import>\n")
 	endLocalImportBytes = []byte("></localimport>\n")
 	endProjectBytes     = []byte("></project>\n")
 	endHookBytes        = []byte("></hook>\n")
+	endPackageBytes     = []byte("></package>\n")
 
 	endImportSoloBytes  = []byte("></import>")
 	endProjectSoloBytes = []byte("></project>")
@@ -97,6 +103,7 @@ func (m *Manifest) deepCopy() *Manifest {
 	x.Projects = append([]Project(nil), m.Projects...)
 	x.Overrides = append([]Project(nil), m.Overrides...)
 	x.Hooks = append([]Hook(nil), m.Hooks...)
+	x.Packages = append([]Package(nil), m.Packages...)
 	x.Version = m.Version
 	return x
 }
@@ -117,10 +124,12 @@ func (m *Manifest) ToBytes() ([]byte, error) {
 	data = bytes.Replace(data, emptyProjectsBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyOverridesBytes, newlineBytes, -1)
 	data = bytes.Replace(data, emptyHooksBytes, newlineBytes, -1)
+	data = bytes.Replace(data, emptyPackagesBytes, newlineBytes, -1)
 	data = bytes.Replace(data, endImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endLocalImportBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endProjectBytes, endElemBytes, -1)
 	data = bytes.Replace(data, endHookBytes, endElemBytes, -1)
+	data = bytes.Replace(data, endPackageBytes, endElemBytes, -1)
 	if !bytes.HasSuffix(data, newlineBytes) {
 		data = append(data, '\n')
 	}
@@ -405,6 +414,23 @@ func (hooks HooksByName) Less(i, j int) bool {
 	return hooks[i].Name < hooks[j].Name
 }
 
+// Package struct represents the <package> tag in manifest files.
+type Package struct {
+	Name     string   `xml:"name,attr"`
+	Version  string   `xml:"version,attr"`
+	Path     string   `xml:"path,attr,omitempty"`
+	Internal bool     `xml:"internal,attr,omitempty"`
+	XMLName  struct{} `xml:"package"`
+}
+
+type PackageKey string
+
+type Packages map[PackageKey]Package
+
+func (pkg Package) Key() PackageKey {
+	return PackageKey(pkg.Name)
+}
+
 // LoadManifest loads the manifest, starting with the .jiri_manifest file,
 // resolving remote and local imports.  Returns the projects specified by
 // the manifest.
@@ -413,13 +439,13 @@ func (hooks HooksByName) Less(i, j int) bool {
 // git operations which require a lock on the filesystem.  If you see errors
 // about ".git/index.lock exists", you are likely calling LoadManifest in
 // parallel.
-func LoadManifest(jirix *jiri.X) (Projects, Hooks, error) {
+func LoadManifest(jirix *jiri.X) (Projects, Hooks, Packages, error) {
 	jirix.TimerPush("load manifest")
 	defer jirix.TimerPop()
 	file := jirix.JiriManifestFile()
 	localProjects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	return LoadManifestFile(jirix, file, localProjects, false)
 }
@@ -432,24 +458,96 @@ func LoadManifest(jirix *jiri.X) (Projects, Hooks, error) {
 // invokes git operations which require a lock on the filesystem.  If you see
 // errors about ".git/index.lock exists", you are likely calling
 // LoadManifestFile in parallel.
-func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
+func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localManifest bool) (Projects, Hooks, Packages, error) {
 	ld := newManifestLoader(localProjects, false, file)
 	if err := ld.Load(jirix, "", "", file, "", "", "", localManifest); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	jirix.AddCleanupFunc(ld.cleanup)
-	return ld.Projects, ld.Hooks, nil
+	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 
-func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, error) {
+// LoadUpdatedManifest loads an updated manifest starting with the .jiri_manifest file for localProjects. It will use
+// local manifest files instead of manifest files in remote repositories if localManifest is set to true.
+func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bool) (Projects, Hooks, Packages, error) {
 	jirix.TimerPush("load updated manifest")
 	defer jirix.TimerPop()
 	ld := newManifestLoader(localProjects, true, jirix.JiriManifestFile())
 	if err := ld.Load(jirix, "", "", jirix.JiriManifestFile(), "", "", "", localManifest); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	jirix.AddCleanupFunc(ld.cleanup)
-	return ld.Projects, ld.Hooks, nil
+	return ld.Projects, ld.Hooks, ld.Packages, nil
+}
+
+// FetchPackages fetches prebuilt packages described in given pkgs using cipd.
+// Parameter fetchTimeout is in minutes.
+func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
+	jirix.TimerPush("fetch cipd packages")
+	defer jirix.TimerPop()
+
+	ensureFile, err := ioutil.TempFile("", "jiri*.ensure")
+	if err != nil {
+		return fmt.Errorf("not able to create tmp file: %v", err)
+	}
+	defer ensureFile.Close()
+	ensureFilePath := ensureFile.Name()
+	defer os.Remove(ensureFilePath)
+
+	// Write header information
+	// TODO: add "verfy_platform" attribute to each package tag
+	// to avoid hardcoding platform names in Jiri
+	var ensureFileBuf bytes.Buffer
+	ensureFileBuf.WriteString("$VerifiedPlatform linux-amd64\n")
+	ensureFileBuf.WriteString("$VerifiedPlatform mac-amd64\n")
+	ensureFileBuf.WriteString("$ParanoidMode CheckPresence\n")
+	ensureFileBuf.WriteString("\n")
+
+	// TODO: perform ACL checks on internal projects
+	for _, pkg := range pkgs {
+		cipdDecl, err := pkg.cipdDecl()
+		if err != nil {
+			return err
+		}
+		ensureFileBuf.WriteString(cipdDecl)
+		ensureFileBuf.WriteString("\n")
+	}
+
+	if _, err := ensureFileBuf.WriteTo(ensureFile); err != nil {
+		return err
+	}
+	if err := ensureFile.Sync(); err != nil {
+		return err
+	}
+	jirix.Logger.Debugf("Generated cipd ensure file at %s ", ensureFilePath)
+	if err := cipd.Ensure(jirix, ensureFilePath, jirix.Root, fetchTimeout); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ArchType struct {
+	OS   string
+	ARCH string
+}
+
+func (pkg *Package) cipdDecl() (string, error) {
+	var buf bytes.Buffer
+	// Write "@Subdir" line to cipd declaration
+	subdir := pkg.Path
+	arch := ArchType{runtime.GOOS, runtime.GOARCH}
+	tmpl, err := template.New("pack").Parse(subdir)
+	if err != nil {
+		return "", fmt.Errorf("parsing package path %q failed", subdir)
+	}
+	var subdirBuf bytes.Buffer
+	tmpl.Execute(&subdirBuf, arch)
+	subdir = subdirBuf.String()
+	buf.WriteString(fmt.Sprintf("@Subdir %s\n", subdir))
+	// Write package version line to cipd declaration
+	buf.WriteString(fmt.Sprintf("%s %s\n", pkg.Name, pkg.Version))
+	return buf.String(), nil
 }
 
 // RunHooks runs all given hooks.
