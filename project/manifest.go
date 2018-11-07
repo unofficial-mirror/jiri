@@ -585,6 +585,13 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 					if b, err := ioutil.ReadAll(response.Body); err != nil {
 						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
 					} else {
+						// Check if downloaded githook is a valid script. If not delete it and
+						// raise an error.
+						if len(b) <= 2 || (len(b) > 2 && !(b[0] == '#' && b[1] == '!')) {
+							commitHook.Close()
+							os.Remove(hookPath)
+							return fmt.Errorf("%q does not look like a githook script; check your access to %q", downloadPath, hookPath)
+						}
 						bytes = b
 						commitHookMap[op.Project().GerritHost] = b
 					}
