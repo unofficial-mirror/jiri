@@ -503,8 +503,28 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	ensureFileBuf.WriteString("$ParanoidMode CheckPresence\n")
 	ensureFileBuf.WriteString("\n")
 
-	// TODO: perform ACL checks on internal projects
+	// Perform ACL checks on internal projects
+	pkgACLMap := make(map[string]bool)
+	pkgVersionMap := make(map[string]string)
 	for _, pkg := range pkgs {
+		pkg.Name = strings.TrimRight(pkg.Name, "/")
+		if pkg.Internal {
+			pkgACLMap[pkg.Name] = false
+			pkgVersionMap[pkg.Name] = pkg.Version
+		}
+	}
+	if len(pkgACLMap) != 0 {
+		if err := cipd.CheckPackageACL(jirix, pkgACLMap, pkgVersionMap); err != nil {
+			return err
+		}
+	}
+
+	hasSkippedPkgs := false
+	for _, pkg := range pkgs {
+		if val, ok := pkgACLMap[pkg.Name]; ok && !val {
+			hasSkippedPkgs = true
+			continue
+		}
 		cipdDecl, err := pkg.cipdDecl()
 		if err != nil {
 			return err
@@ -513,15 +533,24 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 		ensureFileBuf.WriteString("\n")
 	}
 
+	jirix.Logger.Debugf("Generated ensure file content:\n%v", ensureFileBuf.String())
 	if _, err := ensureFileBuf.WriteTo(ensureFile); err != nil {
 		return err
 	}
 	if err := ensureFile.Sync(); err != nil {
 		return err
 	}
-	jirix.Logger.Debugf("Generated cipd ensure file at %s ", ensureFilePath)
 	if err := cipd.Ensure(jirix, ensureFilePath, jirix.Root, fetchTimeout); err != nil {
 		return err
+	}
+	if hasSkippedPkgs {
+		cipdLoggedIn, err := cipd.CheckLoggedIn(jirix)
+		if err != nil {
+			return err
+		}
+		if !cipdLoggedIn {
+			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"cipd auth-login\" and try again")
+		}
 	}
 
 	return nil

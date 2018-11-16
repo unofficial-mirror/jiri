@@ -51,6 +51,7 @@ mac-amd64       sha256  4d015791ed6f03f305cf6a5a673a447e5c47ff5fdb701f43f99fba9c
 windows-386     sha256  b8102c9a1b93915c128e7577c89fd77991ab83d52c356913e56ea505ab338735
 windows-amd64   sha256  a117e3984c111c68698faf91815c4b7d374404fa82dff318aadb9f2f0582ca8d
 `
+	cipdNotLoggedInStr = "Not logged in"
 )
 
 var (
@@ -242,6 +243,91 @@ func fetchFile(url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	return ioutil.ReadAll(resp.Body)
+}
+
+type packageACL struct {
+	path   string
+	access bool
+}
+
+func checkPackageACL(jirix *jiri.X, path, version string, c chan<- packageACL) {
+	// cipd should be already bootstrapped before this go routine.
+	// Silently return a false just in case if cipd is not found.
+	if cipdBinary == "" {
+		c <- packageACL{path: path, access: false}
+		return
+	}
+
+	args := []string{"resolve", path, "-version", version}
+	if jirix != nil {
+		jirix.Logger.Debugf("Invoke cipd with %v", args)
+	}
+	command := exec.Command(cipdBinary, args...)
+	var stdoutBuf, stderrBuf bytes.Buffer
+	command.Stdout = &stdoutBuf
+	command.Stderr = &stderrBuf
+	// Return false if cipd cannot be executed or cipd returned a non-zero
+	// return code, which usually means the package cannot be found due to
+	// access control.
+	if err := command.Run(); err != nil {
+		if jirix != nil {
+			jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stderrBuf.String())
+		}
+		c <- packageACL{path: path, access: false}
+		return
+	}
+	// cipd returned zero. Package can be accessed.
+	c <- packageACL{path: path, access: true}
+	return
+}
+
+// CheckPackageACL checks cipd's access to packages in map "pkgs". The package
+// names in "pkgs" should have trailing '/' removed before calling this
+// function.
+func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool, versions map[string]string) error {
+	// Not declared as CheckPackageACL(jirix *jiri.X, pkgs map[*package.Package]bool)
+	// due to import cycles. Package jiri/package imports jiri/cipd so here we cannot
+	// import jiri/package.
+	if _, err := Bootstrap(); err != nil {
+		return err
+	}
+
+	c := make(chan packageACL)
+	for key := range pkgs {
+		go checkPackageACL(jirix, key, versions[key], c)
+	}
+
+	for i := 0; i < len(pkgs); i++ {
+		acl := <-c
+		pkgs[acl.path] = acl.access
+	}
+	return nil
+}
+
+// CheckLoggedIn checks cipd's user login information. It will return true
+// if login information is found or return false if login information is not
+// found.
+func CheckLoggedIn(jirix *jiri.X) (bool, error) {
+	cipdPath, err := Bootstrap()
+	if err != nil {
+		return false, err
+	}
+	args := []string{"auth-info"}
+	command := exec.Command(cipdPath, args...)
+	var stdoutBuf, stderrBuf bytes.Buffer
+	command.Stdout = &stdoutBuf
+	command.Stderr = &stderrBuf
+	if err := command.Run(); err != nil {
+		stdErrMsg := strings.TrimSpace(stderrBuf.String())
+		if jirix != nil {
+			jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stdErrMsg)
+		}
+		if _, ok := err.(*exec.ExitError); ok && stdErrMsg == cipdNotLoggedInStr {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // Ensure runs cipd binary's ensure funcationality over file. Fetched packages will be

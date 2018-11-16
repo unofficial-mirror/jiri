@@ -17,6 +17,11 @@ const (
 	// Some random valid cipd version tags from infra/tools/cipd
 	cipdVersionForTestA = "git_revision:00e2d8b49a4e7505d1c71f19d15c9e7c5b9245a5"
 	cipdVersionForTestB = "git_revision:8fac632847b1ce0de3b57d16d0f2193625f4a4f0"
+	// package path and versions for ACL tests
+	cipdPkgPathA    = "gn/gn/${platform}"
+	cipdPkgVersionA = "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06"
+	cipdPkgPathB    = "notexist/notexist"
+	cipdPkgVersionB = "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06"
 )
 
 var (
@@ -163,4 +168,31 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 		}
 		t.Errorf("failed to execute os.Stat() on fetched cipd package due to error: %v", err)
 	}
+}
+
+func TestCheckACL(t *testing.T) {
+	cipdPath, err := Bootstrap()
+	if err != nil {
+		t.Errorf("bootstrap failed due to error: %v", err)
+	}
+	defer os.Remove(cipdPath)
+
+	pkgMap := make(map[string]bool)
+	pkgMap[cipdPkgPathA] = false
+	pkgMap[cipdPkgPathB] = false
+	versionMap := make(map[string]string)
+	versionMap[cipdPkgPathA] = cipdPkgVersionA
+	versionMap[cipdPkgPathB] = cipdPkgVersionB
+	if err := CheckPackageACL(nil, pkgMap, versionMap); err != nil {
+		t.Errorf("CheckPackageACL failed due to error: %v", err)
+	}
+
+	if !pkgMap[cipdPkgPathA] {
+		t.Errorf("pkg %q should be accessible, but it is not accessible by cipd", cipdPkgPathA)
+	}
+
+	if pkgMap[cipdPkgPathB] {
+		t.Errorf("pkg %q should not be accessible, but it is accessible by cipd", cipdPkgPathB)
+	}
+
 }
