@@ -200,12 +200,7 @@ func findProject(jirix *jiri.X, projectName string, projects project.Projects, h
 	var projectToPatch *project.Project
 	var projectToPatchNoGerritHost *project.Project
 	for _, p := range projects {
-		u, err := url.Parse(strings.Trim(p.Remote, "/"))
-		if err != nil {
-			jirix.Logger.Warningf("invalid remote %q for project %s: %s", p.Remote, p.Name, err)
-			continue
-		}
-		if u.EscapedPath() == "/"+projectName {
+		if p.Name == projectName {
 			if host != "" && p.GerritHost != host {
 				if p.GerritHost == "" {
 					cp := p
