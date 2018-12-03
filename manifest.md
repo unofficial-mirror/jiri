@@ -72,7 +72,7 @@ The &lt;project> tags describe the projects to sync, and what state they should 
 
 * gerrithost (optional) - The url of the Gerrit host for the project.  If specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 
-* githooks (optional) - The path (relative to [root]) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
+* githooks (optional) - The path (relative to the jiri root) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
 
 The projects in the &lt;overrides> tag replace existing projects defined by in the &lt;projects> tag (and from transitively imported &lt;projects> tags).
 Only the root manifest can contain overrides and repositories referenced using the
