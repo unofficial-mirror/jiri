@@ -8,11 +8,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +25,7 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/envvar"
+	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/retry"
 )
 
@@ -93,6 +94,8 @@ var (
 	endImportSoloBytes  = []byte("></import>")
 	endProjectSoloBytes = []byte("></project>")
 	endElemSoloBytes    = []byte("/>")
+
+	errGitHookNotRequired = errors.New("git hooks are not required")
 )
 
 // deepCopy returns a deep copy of Manifest.
@@ -686,10 +689,41 @@ func RunHooks(jirix *jiri.X, hooks Hooks, runHookTimeout uint) error {
 	return err
 }
 
+type commitMsgFetcher map[string][]byte
+
+func (f commitMsgFetcher) fetch(jirix *jiri.X, gerritHost, path string) ([]byte, error) {
+	bytes, ok := f[gerritHost]
+	if !ok {
+		jirix.Logger.Debugf("Fetching %q ", gerritHost+"/tools/hooks/commit-msg")
+		data, err := gerrit.FetchFile(gerritHost, "/tools/hooks/commit-msg")
+		if err != nil {
+			if err != gerrit.ErrRedirectOnGerrit {
+				// Network or disk IO error, halt jiri
+				return nil, err
+			}
+			// gerritHost require SSO login, try SSO
+			if jirix.RewriteSsoToHttps {
+				// Gerrit host require SSO but jiri has rewritesso flag turned on
+				// In this case git hooks are useless, stop fetching git hooks
+				return nil, errGitHookNotRequired
+			}
+			jirix.Logger.Debugf("%q require SSO login, try again using SSO credentials", gerritHost+"/tools/hooks/commit-msg")
+			data, err = gerrit.FetchFileSSO(jirix, gerritHost, "/tools/hooks/commit-msg")
+			if err != nil {
+				return nil, err
+			}
+		}
+		f[gerritHost] = data
+		return data, nil
+	}
+	jirix.Logger.Debugf("Cached %q ", gerritHost+"/tools/hooks/commit-msg")
+	return bytes, nil
+}
+
 func applyGitHooks(jirix *jiri.X, ops []operation) error {
 	jirix.TimerPush("apply githooks")
 	defer jirix.TimerPop()
-	commitHookMap := make(map[string][]byte)
+	commitMsgFetcher := commitMsgFetcher{}
 	for _, op := range ops {
 		if op.Kind() != "delete" && !op.Project().LocalConfig.Ignore && !op.Project().LocalConfig.NoUpdate {
 			if op.Project().GerritHost != "" {
@@ -698,26 +732,27 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 				if err != nil {
 					return fmtError(err)
 				}
-				bytes, ok := commitHookMap[op.Project().GerritHost]
-				if !ok {
-					downloadPath := op.Project().GerritHost + "/tools/hooks/commit-msg"
-					response, err := http.Get(downloadPath)
-					if err != nil {
-						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
-					}
-					if response.StatusCode != http.StatusOK {
-						return fmt.Errorf("Error while downloading %q, status code: %d", downloadPath, response.StatusCode)
-					}
-					defer response.Body.Close()
-					if b, err := ioutil.ReadAll(response.Body); err != nil {
-						return fmt.Errorf("Error while downloading %q: %v", downloadPath, err)
-					} else {
-						bytes = b
-						commitHookMap[op.Project().GerritHost] = b
-					}
+				bytes, err := commitMsgFetcher.fetch(jirix, op.Project().GerritHost, "/tools/hooks/commit-msg")
+				if err == errGitHookNotRequired {
+					// Skip fetching git hooks for this sso project
+					// if RewriteSSOToHttps flag is on (for bots)
+					commitHook.Close()
+					os.Remove(hookPath)
+					continue
 				}
-				if _, err := commitHook.Write(bytes); err != nil {
+				// TODO: should be changed to if err != nil {return err}
+				// once jirissohelper can be bootstrapped by jiri
+				// fallback to manifest githooks attribute for now
+				if err != nil && err != gerrit.ErrSSOPathNotSet {
+					commitHook.Close()
+					os.Remove(hookPath)
 					return err
+				}
+				if err == nil {
+					if _, err := commitHook.Write(bytes); err != nil {
+						return err
+					}
+					jirix.Logger.Debugf("Saved commit-msg hook to project %q", op.Project().Path)
 				}
 				commitHook.Close()
 				if err := os.Chmod(hookPath, 0750); err != nil {

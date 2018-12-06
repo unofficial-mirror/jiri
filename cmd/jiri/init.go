@@ -40,6 +40,7 @@ var (
 	showAnalyticsDataFlag bool
 	analyticsOptFlag      string
 	rewriteSsoToHttpsFlag string
+	ssoCookieFlag         string
 )
 
 func init() {
@@ -48,6 +49,7 @@ func init() {
 	cmdInit.Flags.BoolVar(&showAnalyticsDataFlag, "show-analytics-data", false, "Show analytics data that jiri collect when you opt-in and exits.")
 	cmdInit.Flags.StringVar(&analyticsOptFlag, "analytics-opt", "", "Opt in/out of analytics collection. Takes true/false")
 	cmdInit.Flags.StringVar(&rewriteSsoToHttpsFlag, "rewrite-sso-to-https", "", "Rewrites sso fetches, clones, etc to https. Takes true/false.")
+	cmdInit.Flags.StringVar(&ssoCookieFlag, "sso-cookie-path", "", "Path to master SSO cookie file.")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -125,6 +127,10 @@ func runInit(env *cmdline.Env, args []string) error {
 		} else {
 			config.RewriteSsoToHttps = val
 		}
+	}
+
+	if ssoCookieFlag != "" {
+		config.SsoCookiePath = ssoCookieFlag
 	}
 
 	if analyticsOptFlag != "" {

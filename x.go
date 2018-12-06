@@ -48,6 +48,7 @@ type Config struct {
 	CachePath         string `xml:"cache>path,omitempty"`
 	Shared            bool   `xml:"cache>shared,omitempty"`
 	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
+	SsoCookiePath     string `xml:"SsoCookiePath,omitempty`
 	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	// version user has opted-in to
@@ -97,6 +98,7 @@ type X struct {
 	Shared            bool
 	Jobs              uint
 	RewriteSsoToHttps bool
+	SsoCookiePath     string
 	Color             color.Color
 	Logger            *log.Logger
 	failures          uint32
@@ -223,6 +225,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	}
 	if x.config != nil {
 		x.RewriteSsoToHttps = x.config.RewriteSsoToHttps
+		x.SsoCookiePath = x.config.SsoCookiePath
 	}
 	x.Cache, err = findCache(root, x.config)
 	if x.config != nil {
