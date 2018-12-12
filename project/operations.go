@@ -6,7 +6,9 @@ package project
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -230,7 +232,44 @@ func (op deleteOperation) Run(jirix *jiri.X) error {
 		return nil
 	}
 
-	return fmtError(os.RemoveAll(op.source))
+	if err := os.RemoveAll(op.source); err != nil {
+		return fmtError(err)
+	}
+	return removeEmptyParents(jirix, path.Dir(op.source))
+}
+
+func removeEmptyParents(jirix *jiri.X, dir string) error {
+	isEmpty := func(name string) (bool, error) {
+		f, err := os.Open(name)
+		if err != nil {
+			return false, err
+		}
+		defer f.Close()
+		_, err = f.Readdirnames(1)
+		if err == io.EOF {
+			// empty dir
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if jirix.Root == dir || dir == "" || dir == "." {
+		return nil
+	}
+	empty, err := isEmpty(dir)
+	if err != nil {
+		return err
+	}
+	if empty {
+		if err := os.Remove(dir); err != nil {
+			return err
+		}
+		jirix.Logger.Debugf("gc deleted empty parent directory: %v", dir)
+		return removeEmptyParents(jirix, path.Dir(dir))
+	}
+	return nil
 }
 
 func (op deleteOperation) String() string {
