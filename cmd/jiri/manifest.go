@@ -32,8 +32,8 @@ var manifestFlags struct {
 var cmdManifest = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runManifest),
 	Name:   "manifest",
-	Short:  "Reads <import> or <project> information from a manifest file",
-	Long: `Reads <import> or <project> information from a manifest file.
+	Short:  "Reads <import>, <project> or <package> information from a manifest file",
+	Long: `Reads <import>, <project> or <package> information from a manifest file.
 	A template matching the schema defined in pkg/text/template is used to fill
 	in the requested information.  Some examples:
 
@@ -42,6 +42,9 @@ var cmdManifest = &cmdline.Command{
 
 	    Read import's 'path' attribute:
 	        manifest -element=$IMPORT_NAME -template="{{.Path}}"
+
+	    Read packages's 'version' attribute:
+	        manifest -element=$PACKAGE_NAME -template="{{.Version}}"
 	`,
 	ArgsName: "<manifest>",
 	ArgsLong: "<manifest> is the manifest file.",
@@ -53,7 +56,7 @@ func init() {
 
 // setManifestFlags sets command-line flags for the manifest command.
 func setManifestFlags(f *flag.FlagSet) {
-	f.StringVar(&manifestFlags.ElementName, "element", "", "Name of the <project> or <import>.")
+	f.StringVar(&manifestFlags.ElementName, "element", "", "Name of the <project>, <import> or <package>.")
 	f.StringVar(&manifestFlags.Template, "template", "", "The template for the fields to display.")
 }
 
@@ -102,6 +105,13 @@ func readManifest(jirix *jiri.X, manifestPath string, tmpl *template.Template) e
 		}
 	}
 
+	// Check if any <package> elements match the given element name.
+	for _, pkg := range manifest.Packages {
+		if strings.ToLower(pkg.Name) == elementName {
+			return tmpl.Execute(os.Stdout, &pkg)
+		}
+	}
+
 	// Found nothing.
-	return fmt.Errorf("found no project/import named %s", manifestFlags.ElementName)
+	return fmt.Errorf("found no project/import/package named %s", manifestFlags.ElementName)
 }

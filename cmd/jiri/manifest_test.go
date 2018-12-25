@@ -23,7 +23,7 @@ func TestManifest(t *testing.T) {
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
 	<imports>
-	<import name="the_import"
+		<import name="the_import"
 			manifest="the_import_manifest"
 			remote="https://fuchsia.googlesource.com/the_import"
 			revision="the_import_revision"
@@ -31,15 +31,21 @@ func TestManifest(t *testing.T) {
 			root="the_import_root"/>
 	</imports>
 	<projects>
-	<project name="the_project"
-				path="path/to/the_project"
-				remote="https://fuchsia.googlesource.com/the_project"
-				remotebranch="the_project_remotebranch"
-				revision="the_project_revision"
-				githooks="the_project_githooks"
-				gerrithost="https://fuchsia-review.googlesource.com"
-				historydepth="2"/>
+		<project name="the_project"
+			path="path/to/the_project"
+			remote="https://fuchsia.googlesource.com/the_project"
+			remotebranch="the_project_remotebranch"
+			revision="the_project_revision"
+			githooks="the_project_githooks"
+			gerrithost="https://fuchsia-review.googlesource.com"
+			historydepth="2"/>
 	</projects>
+	<packages>
+		<package name="the_package"
+			version="the_package_version"
+			path="path/to/the_package"
+			internal="false" />
+	</packages>
 </manifest>
 `))
 
@@ -210,5 +216,35 @@ func TestManifest(t *testing.T) {
 			testManifestFile.Name(),
 		},
 			"the_import_remotebranch")
+	})
+
+	t.Run("should read <package> attributes", func(t *testing.T) {
+		expectAttributeValue(t, []string{
+			"-element=the_package",
+			"-template={{.Name}}",
+			testManifestFile.Name(),
+		},
+			"the_package")
+
+		expectAttributeValue(t, []string{
+			"-element=the_package",
+			"-template={{.Version}}",
+			testManifestFile.Name(),
+		},
+			"the_package_version")
+
+		expectAttributeValue(t, []string{
+			"-element=the_package",
+			"-template={{.Path}}",
+			testManifestFile.Name(),
+		},
+			"path/to/the_package")
+
+		expectAttributeValue(t, []string{
+			"-element=the_package",
+			"-template={{.Internal}}",
+			testManifestFile.Name(),
+		},
+			"false")
 	})
 }
