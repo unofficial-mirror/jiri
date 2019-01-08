@@ -6,6 +6,7 @@ package project
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -236,6 +238,109 @@ func (p *Project) update(other *Project) {
 	if other.GitHooks != "" {
 		p.GitHooks = other.GitHooks
 	}
+}
+
+// ProjectLock describes locked version information for a jiri managed project.
+type ProjectLock struct {
+	Remote   string `json:"repository_url"`
+	Revision string `json:"revision"`
+}
+
+// ProjectLockKey defines the key used in ProjectLocks type
+type ProjectLockKey string
+
+// ProjectLocks type is a map wrapper over ProjectLock for faster look up.
+type ProjectLocks map[ProjectLockKey]ProjectLock
+
+func (p ProjectLock) Key() ProjectLockKey {
+	return ProjectLockKey(p.Remote)
+}
+
+// PackageLock describes locked version information for a jiri managed package.
+type PackageLock struct {
+	PackageName string `json:"package"`
+	InstanceID  string `json:"instance_id"`
+}
+
+// PackageLockKey defines the key used in PackageLocks type
+type PackageLockKey string
+
+// PackageLocks type is map wrapper over PackageLock for faster look up
+type PackageLocks map[PackageLockKey]PackageLock
+
+func (p PackageLock) Key() PackageLockKey {
+	return PackageLockKey(p.PackageName)
+}
+
+// UnmarshalLockEntries unmarshals project locks and package locks from
+// jsonData.
+func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
+	entries := make([]interface{}, 0)
+	projectLocks := make(ProjectLocks)
+	pkgLocks := make(PackageLocks)
+	if err := json.Unmarshal(jsonData, &entries); err != nil {
+		return nil, nil, err
+	}
+	for _, entry := range entries {
+		entryMap := entry.(map[string]interface{})
+		if _, ok := entryMap["package"]; ok {
+			pkgName, ok := entryMap["package"].(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("package name %+v is not a valid string", entryMap["package"])
+			}
+			id, ok := entryMap["instance_id"].(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("package instance_id %+v is not a valid string", entryMap["instance_id"])
+			}
+			pkgLock := PackageLock{pkgName, id}
+			if v, ok := pkgLocks[pkgLock.Key()]; ok {
+				if v != pkgLock {
+					return nil, nil, fmt.Errorf("package %q has more than 1 version lock %q, %q", pkgName, v.InstanceID, id)
+				}
+			}
+			pkgLocks[pkgLock.Key()] = pkgLock
+		} else if _, ok := entryMap["repository_url"]; ok {
+			repoURL, ok := entryMap["repository_url"].(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("project repository url %+v is not a valid string", entryMap["repository_url"])
+			}
+			revision, ok := entryMap["revision"].(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("project revision %+v is not a valid string", entryMap["revision"])
+			}
+			projectLock := ProjectLock{repoURL, revision}
+			if v, ok := projectLocks[projectLock.Key()]; ok {
+				if v != projectLock {
+					return nil, nil, fmt.Errorf("package %q has more than 1 revision lock %q, %q", repoURL, v.Revision, revision)
+				}
+			}
+			projectLocks[projectLock.Key()] = projectLock
+		}
+		// Ignore unknown lockfile entries without raising an error
+	}
+	return projectLocks, pkgLocks, nil
+}
+
+// MarshalLockEntries marshals project locks and package locks into
+// json format data.
+func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byte, error) {
+	entries := make([]interface{}, len(projectLocks)+len(pkgLocks))
+
+	i := 0
+	for _, v := range projectLocks {
+		entries[i] = v
+		i++
+	}
+	for _, v := range pkgLocks {
+		entries[i] = v
+		i++
+	}
+
+	jsonData, err := json.MarshalIndent(&entries, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+	return jsonData, nil
 }
 
 func cacheDirPathFromRemote(cacheRoot, remote string) (string, error) {
@@ -631,6 +736,112 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 			}
 		}
 	}
+}
+
+func loadManifestFiles(jirix *jiri.X, manifestFiles []string, localManifest bool) (Projects, Packages, error) {
+	localProjects, err := LocalProjects(jirix, FullScan)
+	if err != nil {
+		return nil, nil, err
+	}
+	allProjects := make(Projects)
+	allPkgs := make(Packages)
+
+	addProject := func(projects Projects) error {
+		for _, project := range projects {
+			if existingProject, ok := allProjects[project.Key()]; ok {
+				if existingProject != project {
+					return fmt.Errorf("project: %v conflicts with project: %v", existingProject, project)
+				}
+				continue
+			} else {
+				allProjects[project.Key()] = project
+			}
+		}
+		return nil
+	}
+
+	addPkg := func(pkgs Packages) error {
+		for _, pkg := range pkgs {
+			if existingPkg, ok := allPkgs[pkg.Key()]; ok {
+				if existingPkg != pkg {
+					return fmt.Errorf("package: %v conflicts with package: %v", existingPkg, pkg)
+				}
+				continue
+			} else {
+				allPkgs[pkg.Key()] = pkg
+			}
+		}
+		return nil
+	}
+
+	for _, manifestFile := range manifestFiles {
+		remoteProjects, _, pkgs, err := LoadManifestFile(jirix, manifestFile, localProjects, localManifest)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := addProject(remoteProjects); err != nil {
+			return nil, nil, err
+		}
+		if err := addPkg(pkgs); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return allProjects, allPkgs, nil
+}
+
+func writeLockFile(jirix *jiri.X, lockfilePath string, projectLocks ProjectLocks, pkgLocks PackageLocks) error {
+	data, err := MarshalLockEntries(projectLocks, pkgLocks)
+	if err != nil {
+		return err
+	}
+	jirix.Logger.Debugf("Generated jiri lockfile content: \n%v", string(data))
+
+	tempFile, err := ioutil.TempFile(path.Dir(lockfilePath), "jirilock.*")
+	if err != nil {
+		return err
+	}
+	defer tempFile.Close()
+	defer os.Remove(tempFile.Name())
+	if _, err := tempFile.Write(data); err != nil {
+		return errors.New("I/O error while writing jiri lockfile")
+	}
+	tempFile.Close()
+	if err := os.Rename(tempFile.Name(), lockfilePath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GenerateJiriLockFile generates jiri lockfile to lockFilePath using
+// manifests in manifestFiles slice.
+func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, lockFilePath string, localManifest bool) error {
+	jirix.Logger.Debugf("Generate jiri lockfile for manifests %v to %q", manifestFiles, lockFilePath)
+
+	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool) (ProjectLocks, PackageLocks, error) {
+		projects, pkgs, err := loadManifestFiles(jirix, manifestFiles, localManifest)
+		if err != nil {
+			return nil, nil, err
+		}
+		projectLocks, err := resolveProjectLocks(jirix, projects)
+		if err != nil {
+			return nil, nil, err
+		}
+		pkgLocks, err := resolvePackageLocks(jirix, pkgs)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return projectLocks, pkgLocks, nil
+	}
+
+	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, localManifest)
+	if err != nil {
+		return err
+	}
+
+	return writeLockFile(jirix, lockFilePath, projectLocks, pkgLocks)
 }
 
 // UpdateUniverse updates all local projects and tools to match the remote

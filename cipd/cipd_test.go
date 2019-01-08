@@ -5,6 +5,7 @@
 package cipd
 
 import (
+	"bytes"
 	"encoding/hex"
 	"io/ioutil"
 	"os"
@@ -37,6 +38,10 @@ var (
 		"linux-arm64":  "e1d6aadc9bfc155e9088aa3de39b9d3311c7359f398f372b5ad1c308e25edfeb",
 		"linux-armv6l": "3ad97b47ecc1b358c8ebd1b0307087d354433d88f24bf8ece096fb05452837f9",
 		"mac-amd64":    "167edadf7c7c019a40b9f7869a4c05b2d9834427dad68e295442ef9ebce88dba",
+	}
+	instanceIDMap = map[string]string{
+		"gn/gn/linux-amd64": "0uGjKAZkJXPZjtYktgEwHiNbwsut_qRsk7ZCGGxi82IC",
+		"gn/gn/mac-amd64":   "rN2F641yR4Bj-H1q8OwC_RiqRpUYxy3hryzRfPER9wcC",
 	}
 )
 
@@ -195,4 +200,52 @@ func TestCheckACL(t *testing.T) {
 		t.Errorf("pkg %q should not be accessible, but it is accessible by cipd", cipdPkgPathB)
 	}
 
+}
+
+func TestResolve(t *testing.T) {
+	cipdPath, err := Bootstrap()
+	if err != nil {
+		t.Errorf("bootstrap failed due to error: %v", err)
+	}
+	defer os.Remove(cipdPath)
+
+	// Write test ensure file
+	testEnsureFile, err := ioutil.TempFile("", "test_jiri*.ensure")
+	if err != nil {
+		t.Errorf("failed to create test ensure file: %v", err)
+	}
+	defer testEnsureFile.Close()
+	ensureFileName := testEnsureFile.Name()
+	defer os.Remove(ensureFileName)
+	versionFileName := ensureFileName[:len(ensureFileName)-len(".ensure")] + ".version"
+	var ensureBuf bytes.Buffer
+	ensureBuf.WriteString("$ResolvedVersions " + versionFileName + "\n")
+	ensureBuf.WriteString(`
+$ParanoidMode CheckPresence
+$VerifiedPlatform linux-amd64
+$VerifiedPlatform mac-amd64
+
+# GN
+gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
+`)
+	_, err = testEnsureFile.Write(ensureBuf.Bytes())
+	if err != nil {
+		t.Errorf("failed to write test ensure file: %v", err)
+	}
+
+	testEnsureFile.Sync()
+	instances, err := Resolve(nil, testEnsureFile.Name())
+	if err != nil {
+		t.Errorf("resolve failed due to error: %v", err)
+	}
+	for _, instance := range instances {
+		if val, ok := instanceIDMap[instance.PackageName]; ok {
+			if val != instance.InstanceID {
+				t.Errorf("instance id %q for package %q does not match the record %q",
+					instance.InstanceID, instance.PackageName, val)
+			}
+		} else {
+			t.Errorf("package %q is not found in record", instance.PackageName)
+		}
+	}
 }

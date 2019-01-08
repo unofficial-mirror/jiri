@@ -2210,3 +2210,56 @@ func TestProjectToFromFile(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
+
+	projectLock0 := project.ProjectLock{"https://dart.googlesource.com/web_socket_channel.git", "1.0.9"}
+	pkgLock0 := project.PackageLock{"fuchsia/go/mac-amd64", "3c33b55c1a75b900536c91181805bb8668857341"}
+
+	testProjectLocks0 := project.ProjectLocks{
+		projectLock0.Key(): projectLock0,
+	}
+	testPkgLocks0 := project.PackageLocks{
+		pkgLock0.Key(): pkgLock0,
+	}
+
+	jsonData, err := project.MarshalLockEntries(testProjectLocks0, testPkgLocks0)
+
+	if err != nil {
+		t.Errorf("marshalling lockfile failed due to error: %v", err)
+	}
+
+	projectLocks, pkgLocks, err := project.UnmarshalLockEntries(jsonData)
+	if err != nil {
+		t.Errorf("unmarshalling lockfile failed due to error: %v", err)
+	}
+
+	if !reflect.DeepEqual(projectLocks, testProjectLocks0) {
+		t.Errorf("unmarshalled project locks do not match test data, expecting %v, got %v", testProjectLocks0, projectLocks)
+	}
+
+	if !reflect.DeepEqual(pkgLocks, testPkgLocks0) {
+		t.Errorf("unmarshalled locks do not match test data, expecting %v, got %v", testPkgLocks0, pkgLocks)
+	}
+
+	jsonData = []byte(`
+[
+	{
+		"repository_url": "https://dart.googlesource.com/web_socket_channel.git",
+		"revision": "1.0.9"
+	},
+	{
+		"repository_url": "https://dart.googlesource.com/web_socket_channel.git",
+		"revision": "1.1.0"
+	}
+]`)
+
+	if _, _, err := project.UnmarshalLockEntries(jsonData); err == nil {
+		t.Errorf("unmarshalling lockfile with conflicting data should fail but it did not happen")
+	} else {
+		if !strings.Contains(err.Error(), "has more than 1") {
+			t.Errorf("unmarshalling lockfile with conflicting data failed due to unrelated error: %v", err)
+		}
+	}
+
+}

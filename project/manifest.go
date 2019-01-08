@@ -483,26 +483,80 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 
+// resovlePackageLocks resolves instance ids using versions described in given
+// pkgs using cipd.
+func resolvePackageLocks(jirix *jiri.X, pkgs Packages) (PackageLocks, error) {
+	jirix.TimerPush("resove instance id for cipd packages")
+	defer jirix.TimerPop()
+
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false)
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(ensureFilePath)
+
+	pkgInstances, err := cipd.Resolve(jirix, ensureFilePath)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Remove this boilerplate once we have a better package
+	// layout that doesn't cause import cycles
+	pkgLocks := make(PackageLocks)
+	for _, val := range pkgInstances {
+		pkgLock := PackageLock{val.PackageName, val.InstanceID}
+		pkgLocks[pkgLock.Key()] = pkgLock
+	}
+
+	return pkgLocks, nil
+}
+
+// resolveProjectLocks resolves project revisions <project> tags in manifests
+func resolveProjectLocks(jirix *jiri.X, projects Projects) (ProjectLocks, error) {
+	projectLocks := make(ProjectLocks)
+	for _, v := range projects {
+		projectLock := ProjectLock{v.Remote, v.Revision}
+		projectLocks[projectLock.Key()] = projectLock
+	}
+	return projectLocks, nil
+}
+
 // FetchPackages fetches prebuilt packages described in given pkgs using cipd.
 // Parameter fetchTimeout is in minutes.
 func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	jirix.TimerPush("fetch cipd packages")
 	defer jirix.TimerPop()
 
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, true)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(ensureFilePath)
+
+	if err := cipd.Ensure(jirix, ensureFilePath, jirix.Root, fetchTimeout); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (string, error) {
 	ensureFile, err := ioutil.TempFile("", "jiri*.ensure")
 	if err != nil {
-		return fmt.Errorf("not able to create tmp file: %v", err)
+		return "", fmt.Errorf("not able to create tmp file: %v", err)
 	}
 	defer ensureFile.Close()
 	ensureFilePath := ensureFile.Name()
-	defer os.Remove(ensureFilePath)
 
 	// Write header information
 	// TODO: add "verfy_platform" attribute to each package tag
 	// to avoid hardcoding platform names in Jiri
 	var ensureFileBuf bytes.Buffer
-	ensureFileBuf.WriteString("$VerifiedPlatform linux-amd64\n")
-	ensureFileBuf.WriteString("$VerifiedPlatform mac-amd64\n")
+	if !ignoreCryptoCheck {
+		ensureFileBuf.WriteString("$VerifiedPlatform linux-amd64\n")
+		ensureFileBuf.WriteString("$VerifiedPlatform mac-amd64\n")
+		versionFileName := ensureFilePath[:len(ensureFilePath)-len(".ensure")] + ".version"
+		ensureFileBuf.WriteString("$ResolvedVersions " + versionFileName + "\n")
+	}
 	ensureFileBuf.WriteString("$ParanoidMode CheckPresence\n")
 	ensureFileBuf.WriteString("\n")
 
@@ -518,7 +572,7 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	}
 	if len(pkgACLMap) != 0 {
 		if err := cipd.CheckPackageACL(jirix, pkgACLMap, pkgVersionMap); err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -530,7 +584,7 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 		}
 		cipdDecl, err := pkg.cipdDecl()
 		if err != nil {
-			return err
+			return "", err
 		}
 		ensureFileBuf.WriteString(cipdDecl)
 		ensureFileBuf.WriteString("\n")
@@ -538,25 +592,21 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 
 	jirix.Logger.Debugf("Generated ensure file content:\n%v", ensureFileBuf.String())
 	if _, err := ensureFileBuf.WriteTo(ensureFile); err != nil {
-		return err
+		return "", err
 	}
 	if err := ensureFile.Sync(); err != nil {
-		return err
-	}
-	if err := cipd.Ensure(jirix, ensureFilePath, jirix.Root, fetchTimeout); err != nil {
-		return err
+		return "", err
 	}
 	if hasSkippedPkgs {
 		cipdLoggedIn, err := cipd.CheckLoggedIn(jirix)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if !cipdLoggedIn {
 			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"cipd auth-login\" and try again")
 		}
 	}
-
-	return nil
+	return ensureFilePath, nil
 }
 
 type ArchType struct {
