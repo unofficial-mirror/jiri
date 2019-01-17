@@ -38,6 +38,7 @@ var (
 	ErrCookieNotExist         = errors.New("cookie file not found")
 	ErrSSOPathNotSet          = errors.New("master SSO cookie path is not set, please run \"jiri init --sso-cookie-path PATH_TO_SSO\" and try again")
 	ErrSSOCookieExpireInvalid = errors.New("SSO cookie is either invalid or expired, please run \"glogin\" and try again")
+	ErrHTTPForbidden          = errors.New("server return HTTP 403, cookies are not accepted")
 
 	ssoCookiePath      = "" // path to user master SSO cookie
 	ssoCookieCachePath = "" // path to jiri managed SSO cookie cache
@@ -131,7 +132,7 @@ func FetchFile(gerritHost, path string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func fetchFileSSO(gerritHost, path string, jar http.CookieJar) ([]byte, error) {
+func fetchFileWithJar(jirix *jiri.X, gerritHost, path string, jar http.CookieJar) ([]byte, error) {
 	hostName := gerritHost[len("https://"):]
 	client := &http.Client{
 		Jar: jar,
@@ -151,9 +152,40 @@ func fetchFileSSO(gerritHost, path string, jar http.CookieJar) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		// Unexpected response from server, log HTTP headers.
+		if jirix != nil {
+			jirix.Logger.Debugf("got HTTP %d when accessing %q", resp.StatusCode, downloadPath)
+			jirix.Logger.Debugf(dumpHeaders(resp))
+		}
+		if resp.StatusCode == http.StatusForbidden {
+			return nil, ErrHTTPForbidden
+		}
 		return nil, fmt.Errorf("expecting status code %d from %q, got %d ", http.StatusOK, downloadPath, resp.StatusCode)
 	}
 	return ioutil.ReadAll(resp.Body)
+}
+
+func dumpHeaders(resp *http.Response) string {
+	var output bytes.Buffer
+
+	header := resp.Request.Header
+	if header != nil {
+		output.WriteString("HTTP Request Header:\n")
+		for k, v := range header {
+			output.WriteString(fmt.Sprintf("\t%s: %v\n", k, v))
+		}
+	}
+
+	header = resp.Header
+	if header != nil {
+		output.WriteString("\nHTTP Response Header:\n")
+		for k, v := range header {
+			output.WriteString(fmt.Sprintf("\t%s: %v\n", k, v))
+		}
+	}
+	output.WriteByte('\n')
+
+	return output.String()
 }
 
 // FetchFileSSO downloads a file from a gerrit host that requires SSO login
@@ -166,33 +198,69 @@ func FetchFileSSO(jirix *jiri.X, gerritHost, path string) ([]byte, error) {
 		return nil, fmt.Errorf("Unsupported scheme for host %q", gerritHost)
 	}
 	hostName := gerritHost[len("https://"):]
-	jar, err := LoadCookies(jirix, ssoCookieCachePath, hostName, false)
-	if err != nil {
-		return nil, err
-	}
-	data, err := fetchFileSSO(gerritHost, path, jar)
-	if err == ErrRedirectOnGerritSSO {
-		// The cached cookie might be expired eventhough it is not
-		// marked as expired in the cache file, retry using master SSO
-		// cookie
-		jar, err = LoadCookies(jirix, ssoCookieCachePath, hostName, true)
+
+	fetcher := func(jirix *jiri.X, cookieCache, gerritHost string, cookieType CookieType) ([]byte, *ssoCookieJar, error) {
+		jar, err := LoadCookies(jirix, cookieCache, hostName, cookieType)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		data, err = fetchFileSSO(gerritHost, path, jar)
-		if err == ErrRedirectOnGerritSSO {
+		data, err := fetchFileWithJar(jirix, gerritHost, path, jar)
+		return data, jar, err
+	}
+
+	cookieType := GitCookieOnly
+	var data []byte
+	var jar *ssoCookieJar
+	var err error
+	for data, jar, err = fetcher(jirix, ssoCookieCachePath, gerritHost, cookieType); err != nil; {
+		switch cookieType {
+		case SiteSSO, MasterSSO:
+			jirix.Logger.Debugf("failed to fetch %s%s using sso cookies", gerritHost, path)
+		case GitCookieOnly:
+			jirix.Logger.Debugf("failed to fetch %s%s using git cookies", gerritHost, path)
+		}
+
+		switch err {
+		case ErrHTTPForbidden:
+			if cookieType == GitCookieOnly {
+				return nil, fmt.Errorf("git cookies for %s are invalid, please follow the instructions at %q to refresh your git cookies", gerritHost, fmt.Sprintf(generatePasswordURL, hostName))
+			}
+			// Unexpected access deny when using cookies other than git cookies. Report the error.
+			return nil, fmt.Errorf("access to %s%s is denied. Got HTTP 403 error from the server", gerritHost, path)
+
+		case ErrRedirectOnGerritSSO:
+			if cookieType == GitCookieOnly {
+				cookieType = SiteSSO
+				continue
+			}
+			if cookieType == SiteSSO {
+				cookieType = MasterSSO
+				continue
+			}
+			// cookieType == MasterSSO
 			// It generally means both gerrit SSO cookie and
 			// master SSO cookies are both exipred, ask user to refresh
 			// cookies
 			return nil, ErrSSOCookieExpireInvalid
+
+		default:
+			return nil, err
 		}
 	}
-	if err != nil {
-		return nil, err
+
+	// Succesfully fetched the target file
+	switch cookieType {
+	case SiteSSO, MasterSSO:
+		jirix.Logger.Debugf("fetched %s:%s using sso cookies", gerritHost, path)
+		// Cache the SSO cookies if the file is fetched using SSO cookies
+		if err := CacheCookies(ssoCookieCachePath, hostName, jar); err != nil {
+			return nil, err
+		}
+
+	case GitCookieOnly:
+		jirix.Logger.Debugf("fetched %s:%s using git cookies", gerritHost, path)
 	}
-	if err := CacheCookies(ssoCookieCachePath, hostName, jar); err != nil {
-		return nil, err
-	}
+
 	return data, nil
 }
 
@@ -294,15 +362,33 @@ func loadJiriCookies(jiriCookiePath string) []*http.Cookie {
 	return cookies
 }
 
+// CookieType specifies the type of cookies should be loaded by LoadCookies
+// function.
+type CookieType int
+
+const (
+	// GitCookieOnly specifies that only git cookies should be loaded by
+	// LoadCookies function.
+	GitCookieOnly CookieType = iota
+	// SiteSSO specifies that site SSO cookie should be loaded from jiri
+	// cookie cache by LoadCookies function. If it is not found or experied,
+	// The combination of master SSO and git cookies should be loaded.
+	SiteSSO
+	// MasterSSO specifies that the combination of master SSO and git cookies
+	// should be loaded by LoadCookies function regardless of the status of
+	// site SSO cookie.
+	MasterSSO
+)
+
 // LoadCookies loads necessary cookies from various sources (master sso,
 // gitcookies and cached jiricookies), returning a cookiejar that contains
 // necessary cookies to login to the hostName. An error will be returned
 // if no suitable cookie is found or if there is an I/O error.
-func LoadCookies(jirix *jiri.X, jiriCookiePath, hostName string, forceUsingMasterSSO bool) (*ssoCookieJar, error) {
+func LoadCookies(jirix *jiri.X, jiriCookiePath, hostName string, cookieType CookieType) (*ssoCookieJar, error) {
 	cookieJar, err := newSSOCookieJar()
 
 	// Read jiriCookiePath, it may have cached cookies for gerrit host
-	if !forceUsingMasterSSO {
+	if cookieType == SiteSSO {
 		cachedSSOCookies := loadJiriCookies(jiriCookiePath)
 		var cachedSSOCookie *http.Cookie
 		if cachedSSOCookies != nil {
@@ -325,27 +411,29 @@ func LoadCookies(jirix *jiri.X, jiriCookiePath, hostName string, forceUsingMaste
 		}
 	}
 
-	// No cached/unexpired gerrit SSO cookie found, fall back to master SSO
-	// cookie with git cookies. Read master SSO cookie
-	ssoPath, err := getSSOCookiePath()
-	if err != nil {
-		if err == ErrCookieNotExist {
+	// Load master SSO if site SSO cookie is not found and cookieType
+	// is not GitCookieOnly.
+	if cookieType != GitCookieOnly {
+		ssoPath, err := getSSOCookiePath()
+		if err != nil {
+			if err == ErrCookieNotExist {
+				return nil, ErrSSOCookieExpireInvalid
+			}
+			return nil, err
+		}
+		ssoCookie, err := readMasterSSOCookie(ssoPath)
+		if err != nil {
+			return nil, err
+		}
+		if loginRequired(ssoCookie) {
 			return nil, ErrSSOCookieExpireInvalid
 		}
-		return nil, err
+		cookieJar.SetCookies(&url.URL{
+			Scheme: "https",
+			Host:   ssoCookie.Domain,
+			Path:   "/",
+		}, []*http.Cookie{ssoCookie})
 	}
-	ssoCookie, err := readMasterSSOCookie(ssoPath)
-	if err != nil {
-		return nil, err
-	}
-	if loginRequired(ssoCookie) {
-		return nil, ErrSSOCookieExpireInvalid
-	}
-	cookieJar.SetCookies(&url.URL{
-		Scheme: "https",
-		Host:   ssoCookie.Domain,
-		Path:   "/",
-	}, []*http.Cookie{ssoCookie})
 
 	// Read .gitcookies
 	gitCookiePath, err := getCookiePath(jirix)
@@ -366,7 +454,7 @@ func LoadCookies(jirix *jiri.X, jiriCookiePath, hostName string, forceUsingMaste
 	for _, cookie := range cookies {
 		if cookie.Domain == hostName && cookie.Name == "o" && strings.HasPrefix(cookie.Value, "git") {
 			gerritGitCookie = cookie
-			break
+			// Always load last git cookies as the last one is the latest one in git cookie file.
 		}
 	}
 
@@ -462,9 +550,9 @@ func getCookiePath(jirix *jiri.X) (string, error) {
 			return "", err
 		}
 		return cookieFilePath, nil
-	} else {
-		return "", err
 	}
+	// http.cookiefile does not exist. Raise error to ask user to refresh git cookies
+	return "", ErrCookieNotExist
 }
 
 func getSSOCookiePath() (string, error) {
