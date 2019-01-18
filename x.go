@@ -48,7 +48,7 @@ type Config struct {
 	CachePath         string `xml:"cache>path,omitempty"`
 	Shared            bool   `xml:"cache>shared,omitempty"`
 	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
-	SsoCookiePath     string `xml:"SsoCookiePath,omitempty`
+	SsoCookiePath     string `xml:"SsoCookiePath,omitempty"`
 	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	// version user has opted-in to
