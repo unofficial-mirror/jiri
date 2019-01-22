@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -60,6 +61,13 @@ var (
 	cipdArch       string
 	cipdBinary     string
 	selfUpdateOnce sync.Once
+	templateRE     = regexp.MustCompile(`\${[^}]*}`)
+
+	// ErrSkipTemplate may be returned from Expander.Expand to indicate that
+	// a given expansion doesn't apply to the current template parameters. For
+	// example, expanding `"foo/${os=linux,mac}"` with a template parameter of "os"
+	// == "win", would return ErrSkipTemplate.
+	ErrSkipTemplate = errors.New("package template does not apply to the current system")
 )
 
 func init() {
@@ -481,4 +489,126 @@ func parseVersions(file string) ([]PackageInstance, error) {
 		}
 	}
 	return output, nil
+}
+
+// Platform contains the parameters for a "${platform}" template.
+// The string value can be obtained by calling String().
+type Platform struct {
+	// OS defines the operating system of this platform. It can be any OS
+	// supported by golang.
+	OS string
+	// Arch defines the CPU architecture of this platform. It can be any
+	// architecture supported by golang.
+	Arch string
+}
+
+// String generates a string represents the Platform in "OS"-"Arch" form.
+func (p Platform) String() string {
+	return p.OS + "-" + p.Arch
+}
+
+// Expander returns an Expander populated with p's fields.
+func (p Platform) Expander() Expander {
+	return Expander{
+		"os":       p.OS,
+		"arch":     p.Arch,
+		"platform": p.String(),
+	}
+}
+
+// Expander is a mapping of simple string substitutions which is used to
+// expand cipd package name templates. For example:
+//
+//   ex, err := template.Expander{
+//     "platform": "mac-amd64"
+//   }.Expand("foo/${platform}")
+//
+// `ex` would be "foo/mac-amd64".
+type Expander map[string]string
+
+// Expand applies package template expansion rules to the package template,
+//
+// If err == ErrSkipTemplate, that means that this template does not apply to
+// this os/arch combination and should be skipped.
+//
+// The expansion rules are as follows:
+//   - "some text" will pass through unchanged
+//   - "${variable}" will directly substitute the given variable
+//   - "${variable=val1,val2}" will substitute the given variable, if its value
+//     matches one of the values in the list of values. If the current value
+//     does not match, this returns ErrSkipTemplate.
+//
+// Attempting to expand an unknown variable is an error.
+// After expansion, any lingering '$' in the template is an error.
+func (t Expander) Expand(template string) (pkg string, err error) {
+	skip := false
+
+	pkg = templateRE.ReplaceAllStringFunc(template, func(parm string) string {
+		// ${...}
+		contents := parm[2 : len(parm)-1]
+
+		varNameValues := strings.SplitN(contents, "=", 2)
+		if len(varNameValues) == 1 {
+			// ${varName}
+			if value, ok := t[varNameValues[0]]; ok {
+				return value
+			}
+
+			err = fmt.Errorf("unknown variable in ${%s}", contents)
+		}
+
+		// ${varName=value,value}
+		ourValue, ok := t[varNameValues[0]]
+		if !ok {
+			err = fmt.Errorf("unknown variable %q", parm)
+			return parm
+		}
+
+		for _, val := range strings.Split(varNameValues[1], ",") {
+			if val == ourValue {
+				return ourValue
+			}
+		}
+		skip = true
+		return parm
+	})
+	if skip {
+		err = ErrSkipTemplate
+	}
+	if err == nil && strings.ContainsRune(pkg, '$') {
+		err = fmt.Errorf("unable to process some variables in %q", template)
+	}
+	return
+}
+
+// Expand method expands a cipdPath that contains templates such as ${platform}
+// into concrete full paths.
+func Expand(cipdPath string, platforms []Platform) ([]string, error) {
+	output := make([]string, 0)
+	//expanders := make([]Expander, 0)
+	if !templateRE.MatchString(cipdPath) {
+		output = append(output, cipdPath)
+		return output, nil
+	}
+
+	for _, plat := range platforms {
+		pkg, err := plat.Expander().Expand(cipdPath)
+		if err == ErrSkipTemplate {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, pkg)
+	}
+	return output, nil
+}
+
+// DefaultPlatforms returns a slice of Platform objects that are currently
+// validated by jiri.
+func DefaultPlatforms() []Platform {
+	return []Platform{
+		Platform{"linux", "amd64"},
+		Platform{"mac", "amd64"},
+	}
 }

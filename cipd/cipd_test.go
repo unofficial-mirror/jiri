@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -263,6 +265,32 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 			}
 		} else {
 			t.Errorf("package %q is not found in record", instance.PackageName)
+		}
+	}
+}
+
+func TestExpand(t *testing.T) {
+	platforms := []Platform{
+		Platform{"linux", "amd64"},
+		Platform{"linux", "arm64"},
+		Platform{"mac", "amd64"},
+	}
+
+	tests := map[string][]string{
+		"gn/gn/${platform}":                   []string{"gn/gn/linux-amd64", "gn/gn/linux-arm64", "gn/gn/mac-amd64"},
+		"fuchsia/sysroot/${os=linux}-${arch}": []string{"fuchsia/sysroot/linux-amd64", "fuchsia/sysroot/linux-arm64"},
+		"infra/ninja/linux-amd64":             []string{"infra/ninja/linux-amd64"},
+	}
+
+	for k, p := range tests {
+		pkgs, err := Expand(k, platforms)
+		if err != nil {
+			t.Errorf("Expand faild on path %q due to error: %v", p, err)
+		}
+		sort.Strings(p)
+		sort.Strings(pkgs)
+		if !reflect.DeepEqual(p, pkgs) {
+			t.Errorf("test on %q failed: expecting %v, got %v", k, p, pkgs)
 		}
 	}
 }

@@ -42,6 +42,8 @@ var (
 	rewriteSsoToHttpsFlag string
 	ssoCookieFlag         string
 	keepGitHooks          string
+	enableLockfileFlag    string
+	lockfileNameFlag      string
 )
 
 func init() {
@@ -52,6 +54,8 @@ func init() {
 	cmdInit.Flags.StringVar(&rewriteSsoToHttpsFlag, "rewrite-sso-to-https", "", "Rewrites sso fetches, clones, etc to https. Takes true/false.")
 	cmdInit.Flags.StringVar(&ssoCookieFlag, "sso-cookie-path", "", "Path to master SSO cookie file.")
 	cmdInit.Flags.StringVar(&keepGitHooks, "keep-git-hooks", "", "Whether to keep current git hooks in '.git/hooks' when doing 'jiri update'. Takes true/false.")
+	cmdInit.Flags.StringVar(&enableLockfileFlag, "enable-lockfile", "", "Enable lockfile enforcement")
+	cmdInit.Flags.StringVar(&lockfileNameFlag, "lockfile-name", "", "Set up filename of lockfile")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -141,6 +145,18 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if ssoCookieFlag != "" {
 		config.SsoCookiePath = ssoCookieFlag
+	}
+
+	if lockfileNameFlag != "" {
+		config.LockfileName = lockfileNameFlag
+	}
+
+	if enableLockfileFlag != "" {
+		if val, err := strconv.ParseBool(enableLockfileFlag); err != nil {
+			return fmt.Errorf("'enableLockfileFlag' flag should be true or false")
+		} else {
+			config.LockfileEnabled = val
+		}
 	}
 
 	if analyticsOptFlag != "" {

@@ -425,11 +425,12 @@ func (hooks HooksByName) Less(i, j int) bool {
 
 // Package struct represents the <package> tag in manifest files.
 type Package struct {
-	Name     string   `xml:"name,attr"`
-	Version  string   `xml:"version,attr"`
-	Path     string   `xml:"path,attr,omitempty"`
-	Internal bool     `xml:"internal,attr,omitempty"`
-	XMLName  struct{} `xml:"package"`
+	Name      string            `xml:"name,attr"`
+	Version   string            `xml:"version,attr"`
+	Path      string            `xml:"path,attr,omitempty"`
+	Internal  bool              `xml:"internal,attr,omitempty"`
+	Instances []PackageInstance `xml:"instance"`
+	XMLName   struct{}          `xml:"package"`
 }
 
 type PackageKey string
@@ -438,6 +439,12 @@ type Packages map[PackageKey]Package
 
 func (pkg Package) Key() PackageKey {
 	return PackageKey(pkg.Name)
+}
+
+type PackageInstance struct {
+	Name    string   `xml:"name,attr"`
+	ID      string   `xml:"id,attr"`
+	XMLName struct{} `xml:"instance"`
 }
 
 // LoadManifest loads the manifest, starting with the .jiri_manifest file,
@@ -459,6 +466,61 @@ func LoadManifest(jirix *jiri.X) (Projects, Hooks, Packages, error) {
 	return LoadManifestFile(jirix, file, localProjects, false)
 }
 
+func (ld *loader) enforceLocks(jirix *jiri.X) error {
+	enforceProjLocks := func(jirix *jiri.X) (err error) {
+		for _, v := range ld.Projects {
+			if projectLock, ok := ld.ProjectLocks[ProjectLockKey(v.Key())]; ok {
+				if v.Revision == "" {
+					v.Revision = projectLock.Revision
+					ld.Projects[v.Key()] = v
+				}
+			} else if v.Revision != projectLock.Revision {
+				s := fmt.Sprintf("project %+v has conflicting revisions in manifest and jiri.lock: %s:%s", v, v.Revision, projectLock.Revision)
+				jirix.Logger.Debugf(s)
+				err = errors.New(s)
+			}
+		}
+		return
+	}
+
+	if err := enforceProjLocks(jirix); err != nil {
+		return err
+	}
+
+	plats := cipd.DefaultPlatforms()
+	usedPkgLocks := make(map[PackageLockKey]bool)
+	for k := range ld.PackageLocks {
+		usedPkgLocks[k] = false
+	}
+	for _, v := range ld.Packages {
+		pkgs, err := cipd.Expand(v.Name, plats)
+		if err != nil {
+			return err
+		}
+
+		for _, pkg := range pkgs {
+			if pkgLock, ok := ld.PackageLocks[PackageLockKey(pkg)]; ok {
+				ins := PackageInstance{
+					Name: pkgLock.PackageName,
+					ID:   pkgLock.InstanceID,
+				}
+				v.Instances = append(v.Instances, ins)
+				ld.Packages[v.Key()] = v
+				usedPkgLocks[pkgLock.Key()] = true
+			} else {
+				jirix.Logger.Debugf("Package %q is not found in jiri.lock", pkg)
+			}
+		}
+	}
+
+	for k, v := range usedPkgLocks {
+		if !v {
+			jirix.Logger.Debugf("PackageLock %v is not used", k)
+		}
+	}
+	return nil
+}
+
 // LoadManifestFile loads the manifest starting with the given file, resolving
 // remote and local imports.  Local projects are used to resolve remote imports;
 // if nil, encountering any remote import will result in an error.
@@ -473,6 +535,11 @@ func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localM
 		return nil, nil, nil, err
 	}
 	jirix.AddCleanupFunc(ld.cleanup)
+	if jirix.LockfileEnabled {
+		if err := ld.enforceLocks(jirix); err != nil {
+			return nil, nil, nil, err
+		}
+	}
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 
@@ -486,6 +553,11 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 		return nil, nil, nil, err
 	}
 	jirix.AddCleanupFunc(ld.cleanup)
+	if jirix.LockfileEnabled {
+		if err := ld.enforceLocks(jirix); err != nil {
+			return nil, nil, nil, err
+		}
+	}
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 
@@ -520,7 +592,7 @@ func resolvePackageLocks(jirix *jiri.X, pkgs Packages) (PackageLocks, error) {
 func resolveProjectLocks(jirix *jiri.X, projects Projects) (ProjectLocks, error) {
 	projectLocks := make(ProjectLocks)
 	for _, v := range projects {
-		projectLock := ProjectLock{v.Remote, v.Revision}
+		projectLock := ProjectLock{v.Remote, v.Name, v.Revision}
 		projectLocks[projectLock.Key()] = projectLock
 	}
 	return projectLocks, nil
@@ -532,11 +604,19 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	jirix.TimerPush("fetch cipd packages")
 	defer jirix.TimerPop()
 
-	ensureFilePath, err := generateEnsureFile(jirix, pkgs, true)
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, !jirix.LockfileEnabled)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(ensureFilePath)
+
+	if jirix.LockfileEnabled {
+		versionFilePath, err := generateVersionFile(jirix, ensureFilePath, pkgs)
+		if err != nil {
+			return err
+		}
+		defer os.Remove(versionFilePath)
+	}
 
 	if err := cipd.Ensure(jirix, ensureFilePath, jirix.Root, fetchTimeout); err != nil {
 		return err
@@ -558,8 +638,9 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	// to avoid hardcoding platform names in Jiri
 	var ensureFileBuf bytes.Buffer
 	if !ignoreCryptoCheck {
-		ensureFileBuf.WriteString("$VerifiedPlatform linux-amd64\n")
-		ensureFileBuf.WriteString("$VerifiedPlatform mac-amd64\n")
+		for _, plat := range cipd.DefaultPlatforms() {
+			ensureFileBuf.WriteString(fmt.Sprintf("$VerifiedPlatform %s\n", plat))
+		}
 		versionFileName := ensureFilePath[:len(ensureFilePath)-len(".ensure")] + ".version"
 		ensureFileBuf.WriteString("$ResolvedVersions " + versionFileName + "\n")
 	}
@@ -615,16 +696,11 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	return ensureFilePath, nil
 }
 
-type ArchType struct {
-	OS   string
-	ARCH string
-}
-
 func (pkg *Package) cipdDecl() (string, error) {
 	var buf bytes.Buffer
 	// Write "@Subdir" line to cipd declaration
 	subdir := pkg.Path
-	arch := ArchType{runtime.GOOS, runtime.GOARCH}
+	arch := cipd.Platform{runtime.GOOS, runtime.GOARCH}
 	tmpl, err := template.New("pack").Parse(subdir)
 	if err != nil {
 		return "", fmt.Errorf("parsing package path %q failed", subdir)
@@ -636,6 +712,23 @@ func (pkg *Package) cipdDecl() (string, error) {
 	// Write package version line to cipd declaration
 	buf.WriteString(fmt.Sprintf("%s %s\n", pkg.Name, pkg.Version))
 	return buf.String(), nil
+}
+
+func generateVersionFile(jirix *jiri.X, ensureFile string, pkgs Packages) (string, error) {
+	versionFileName := ensureFile[:len(ensureFile)-len(".ensure")] + ".version"
+
+	var versionFileBuf bytes.Buffer
+	// Just pour everything in pkgLocks into version file without matching package
+	// names. cipd will do the matching for us.
+	for _, pkg := range pkgs {
+		jirix.Logger.Debugf("Generate version file using %+v", pkg)
+		for _, ins := range pkg.Instances {
+			decl := fmt.Sprintf("\n%s\n\t%s\n\t%s\n", ins.Name, pkg.Version, ins.ID)
+			versionFileBuf.WriteString(decl)
+		}
+	}
+	jirix.Logger.Debugf("Generated version file content:\n%v", versionFileBuf.String())
+	return versionFileName, ioutil.WriteFile(versionFileName, versionFileBuf.Bytes(), 0655)
 }
 
 // RunHooks runs all given hooks.

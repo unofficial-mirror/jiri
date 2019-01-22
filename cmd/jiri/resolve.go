@@ -13,6 +13,8 @@ import (
 var resolveFlags struct {
 	lockFilePath      string
 	localManifestFlag bool
+	enablePackageLock bool
+	enableProjectLock bool
 }
 
 var cmdResolve = &cmdline.Command{
@@ -31,6 +33,8 @@ func init() {
 	flags := &cmdResolve.Flags
 	flags.StringVar(&resolveFlags.lockFilePath, "output", "jiri.lock", "Path to the generated lockfile")
 	flags.BoolVar(&resolveFlags.localManifestFlag, "local-manifest", false, "Use local manifest")
+	flags.BoolVar(&resolveFlags.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
+	flags.BoolVar(&resolveFlags.enableProjectLock, "enable-project-lock", true, "Enable resolving projects in lockfile")
 }
 
 func runResolve(jirix *jiri.X, args []string) error {
@@ -43,5 +47,5 @@ func runResolve(jirix *jiri.X, args []string) error {
 			manifestFiles = append(manifestFiles, m)
 		}
 	}
-	return project.GenerateJiriLockFile(jirix, manifestFiles, resolveFlags.lockFilePath, resolveFlags.localManifestFlag)
+	return project.GenerateJiriLockFile(jirix, manifestFiles, resolveFlags.lockFilePath, resolveFlags.enableProjectLock, resolveFlags.enablePackageLock, resolveFlags.localManifestFlag)
 }

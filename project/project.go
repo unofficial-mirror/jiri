@@ -17,7 +17,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +41,7 @@ const (
 	JiriProject     = "release.go.jiri"
 	JiriName        = "jiri"
 	JiriPackage     = "fuchsia.googlesource.com/jiri"
-	ManifestVersion = "1.0"
+	ManifestVersion = "1.1"
 )
 
 // Project represents a jiri project.
@@ -243,6 +245,7 @@ func (p *Project) update(other *Project) {
 // ProjectLock describes locked version information for a jiri managed project.
 type ProjectLock struct {
 	Remote   string `json:"repository_url"`
+	Name     string `json:"name"`
 	Revision string `json:"revision"`
 }
 
@@ -253,7 +256,7 @@ type ProjectLockKey string
 type ProjectLocks map[ProjectLockKey]ProjectLock
 
 func (p ProjectLock) Key() ProjectLockKey {
-	return ProjectLockKey(p.Remote)
+	return ProjectLockKey(p.Name + KeySeparator + p.Remote)
 }
 
 // PackageLock describes locked version information for a jiri managed package.
@@ -308,7 +311,12 @@ func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
 			if !ok {
 				return nil, nil, fmt.Errorf("project revision %+v is not a valid string", entryMap["revision"])
 			}
-			projectLock := ProjectLock{repoURL, revision}
+			name, ok := entryMap["name"].(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("project name %+v is not a valid string", entryMap["name"])
+			}
+
+			projectLock := ProjectLock{repoURL, name, revision}
 			if v, ok := projectLocks[projectLock.Key()]; ok {
 				if v != projectLock {
 					return nil, nil, fmt.Errorf("package %q has more than 1 revision lock %q, %q", repoURL, v.Revision, revision)
@@ -325,13 +333,36 @@ func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
 // json format data.
 func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byte, error) {
 	entries := make([]interface{}, len(projectLocks)+len(pkgLocks))
+	projEntries := make([]ProjectLock, len(projectLocks))
+	pkgEntries := make([]PackageLock, len(pkgLocks))
 
 	i := 0
 	for _, v := range projectLocks {
+		projEntries[i] = v
+		i++
+	}
+	sort.Slice(projEntries, func(i, j int) bool {
+		if projEntries[i].Remote == projEntries[j].Remote {
+			return projEntries[i].Name < projEntries[j].Name
+		}
+		return projEntries[i].Remote < projEntries[j].Remote
+	})
+
+	i = 0
+	for _, v := range pkgLocks {
+		pkgEntries[i] = v
+		i++
+	}
+	sort.Slice(pkgEntries, func(i, j int) bool {
+		return pkgEntries[i].PackageName < pkgEntries[j].PackageName
+	})
+
+	i = 0
+	for _, v := range projEntries {
 		entries[i] = v
 		i++
 	}
-	for _, v := range pkgLocks {
+	for _, v := range pkgEntries {
 		entries[i] = v
 		i++
 	}
@@ -541,6 +572,13 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks, fetchPkgs bo
 // LoadSnapshotFile loads the specified snapshot manifest.  If the snapshot
 // manifest contains a remote import, an error will be returned.
 func LoadSnapshotFile(jirix *jiri.X, snapshot string) (Projects, Hooks, Packages, error) {
+	// Snapshot files already have pinned Project revisions and Package instance IDs.
+	// They will cause conflicts with current lockfiles. Disable the lockfile for now.
+	enableLockfile := jirix.LockfileEnabled
+	jirix.LockfileEnabled = false
+	defer func() {
+		jirix.LockfileEnabled = enableLockfile
+	}()
 	if _, err := os.Stat(snapshot); err != nil {
 		if !os.IsNotExist(err) {
 			return nil, nil, nil, fmtError(err)
@@ -739,10 +777,15 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 }
 
 func loadManifestFiles(jirix *jiri.X, manifestFiles []string, localManifest bool) (Projects, Packages, error) {
-	localProjects, err := LocalProjects(jirix, FullScan)
+	localProjects, err := LocalProjects(jirix, FastScan)
 	if err != nil {
 		return nil, nil, err
 	}
+	jirix.Logger.Debugf("Print local projects: ")
+	for _, v := range localProjects {
+		jirix.Logger.Debugf("entry: %+v", v)
+	}
+	jirix.Logger.Debugf("Print local projects ends")
 	allProjects := make(Projects)
 	allPkgs := make(Packages)
 
@@ -763,7 +806,7 @@ func loadManifestFiles(jirix *jiri.X, manifestFiles []string, localManifest bool
 	addPkg := func(pkgs Packages) error {
 		for _, pkg := range pkgs {
 			if existingPkg, ok := allPkgs[pkg.Key()]; ok {
-				if existingPkg != pkg {
+				if !reflect.DeepEqual(existingPkg, pkg) {
 					return fmt.Errorf("package: %v conflicts with package: %v", existingPkg, pkg)
 				}
 				continue
@@ -816,24 +859,28 @@ func writeLockFile(jirix *jiri.X, lockfilePath string, projectLocks ProjectLocks
 
 // GenerateJiriLockFile generates jiri lockfile to lockFilePath using
 // manifests in manifestFiles slice.
-func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, lockFilePath string, localManifest bool) error {
+func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, lockFilePath string, enableProjectLocks, enablePkgLocks, localManifest bool) error {
 	jirix.Logger.Debugf("Generate jiri lockfile for manifests %v to %q", manifestFiles, lockFilePath)
 
-	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool) (ProjectLocks, PackageLocks, error) {
+	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool) (projectLocks ProjectLocks, pkgLocks PackageLocks, err error) {
 		projects, pkgs, err := loadManifestFiles(jirix, manifestFiles, localManifest)
 		if err != nil {
 			return nil, nil, err
 		}
-		projectLocks, err := resolveProjectLocks(jirix, projects)
-		if err != nil {
-			return nil, nil, err
+		if enableProjectLocks {
+			projectLocks, err = resolveProjectLocks(jirix, projects)
+			if err != nil {
+				return
+			}
 		}
-		pkgLocks, err := resolvePackageLocks(jirix, pkgs)
-		if err != nil {
-			return nil, nil, err
+		if enablePkgLocks {
+			pkgLocks, err = resolvePackageLocks(jirix, pkgs)
+			if err != nil {
+				return
+			}
 		}
 
-		return projectLocks, pkgLocks, nil
+		return
 	}
 
 	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, localManifest)
