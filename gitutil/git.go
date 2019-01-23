@@ -41,6 +41,9 @@ func (ge GitError) Error() string {
 	result = "'git "
 	result += strings.Join(ge.Args, " ")
 	result += "' failed:\n"
+	result += "stdout:\n"
+	result += ge.Output + "\n"
+	result += "stderr:\n"
 	result += ge.ErrorOutput
 	result += "\ncommand fail error: " + ge.err.Error()
 	return result
