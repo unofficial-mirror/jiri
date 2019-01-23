@@ -119,7 +119,7 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, Multi
 	var mux sync.Mutex
 	processProject := func(proj Project) error {
 		gc := &SourceManifest_GitCheckout{
-			RepoUrl: proj.Remote,
+			RepoUrl: rewriteRemote(jirix, proj.Remote),
 		}
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(filepath.Join(jirix.Root, proj.Path)))
 		if rev, err := scm.CurrentRevision(); err != nil {
