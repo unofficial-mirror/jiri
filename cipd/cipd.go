@@ -144,7 +144,7 @@ func Bootstrap() (string, error) {
 		if err := bootstrap(); err != nil {
 			return "", err
 		}
-		return cipdPath, nil
+		return cipdBinary, nil
 	}
 	// cipd is found, do self update
 	var e error

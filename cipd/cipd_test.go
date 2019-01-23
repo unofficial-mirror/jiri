@@ -133,6 +133,23 @@ func TestSelfUpdate(t *testing.T) {
 	}
 }
 
+func TestBootsrap(t *testing.T) {
+	cipdPath, err := Bootstrap()
+	if cipdPath == "" {
+		t.Errorf("bootstrap returned an empty path")
+	}
+	fileInfo, err := os.Stat(cipdPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("bootstrap failed, cipd binary was not found at %q", cipdPath)
+		}
+		t.Errorf("bootstrap failed, could not access cipd binary at %q due to error %v", cipdPath, err)
+	}
+	if fileInfo.Mode()&0111 == 0 {
+		t.Errorf("bootstrap failed, cipd binary at %q is not executable", cipdBinary)
+	}
+}
+
 func TestEnsure(t *testing.T) {
 	cipdPath, err := Bootstrap()
 	if err != nil {
