@@ -53,6 +53,7 @@ type Config struct {
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	// version user has opted-in to
 	AnalyticsVersion string `xml:"analytics>version,omitempty"`
+	KeepGitHooks     bool   `xml:"keepGitHooks,omitempty"`
 
 	XMLName struct{} `xml:"config"`
 }
@@ -97,6 +98,7 @@ type X struct {
 	Cache             string
 	Shared            bool
 	Jobs              uint
+	KeepGitHooks      bool
 	RewriteSsoToHttps bool
 	SsoCookiePath     string
 	Color             color.Color
@@ -224,6 +226,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 		return nil, err
 	}
 	if x.config != nil {
+		x.KeepGitHooks = x.config.KeepGitHooks
 		x.RewriteSsoToHttps = x.config.RewriteSsoToHttps
 		x.SsoCookiePath = x.config.SsoCookiePath
 	}

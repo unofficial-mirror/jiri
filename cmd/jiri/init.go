@@ -41,6 +41,7 @@ var (
 	analyticsOptFlag      string
 	rewriteSsoToHttpsFlag string
 	ssoCookieFlag         string
+	keepGitHooks          string
 )
 
 func init() {
@@ -50,6 +51,7 @@ func init() {
 	cmdInit.Flags.StringVar(&analyticsOptFlag, "analytics-opt", "", "Opt in/out of analytics collection. Takes true/false")
 	cmdInit.Flags.StringVar(&rewriteSsoToHttpsFlag, "rewrite-sso-to-https", "", "Rewrites sso fetches, clones, etc to https. Takes true/false.")
 	cmdInit.Flags.StringVar(&ssoCookieFlag, "sso-cookie-path", "", "Path to master SSO cookie file.")
+	cmdInit.Flags.StringVar(&keepGitHooks, "keep-git-hooks", "", "Whether to keep current git hooks in '.git/hooks' when doing 'jiri update'. Takes true/false.")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -119,6 +121,14 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if cacheFlag != "" {
 		config.CachePath = cacheFlag
+	}
+
+	if keepGitHooks != "" {
+		if val, err := strconv.ParseBool(keepGitHooks); err != nil {
+			return fmt.Errorf("'keep-git-hooks' flag should be true or false")
+		} else {
+			config.KeepGitHooks = val
+		}
 	}
 
 	if rewriteSsoToHttpsFlag != "" {

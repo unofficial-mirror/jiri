@@ -1721,7 +1721,11 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		}
 	}
 
-	return applyGitHooks(jirix, ops)
+	if !jirix.KeepGitHooks {
+		return applyGitHooks(jirix, ops)
+	}
+	jirix.Logger.Warningf("Git hooks are not updated. If you would like to update git hooks for all projects, please run 'jiri init -keep-git-hooks=false'.")
+	return nil
 }
 
 type ProjectStatus struct {
