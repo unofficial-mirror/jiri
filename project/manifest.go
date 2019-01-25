@@ -13,6 +13,7 @@ import (
 	"hash/fnv"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,7 @@ import (
 	"fuchsia.googlesource.com/jiri/envvar"
 	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/retry"
+	"golang.org/x/net/publicsuffix"
 )
 
 // Manifest represents a setting used for updating the universe.
@@ -96,6 +98,10 @@ var (
 	endElemSoloBytes    = []byte("/>")
 
 	errGitHookNotRequired = errors.New("git hooks are not required")
+)
+
+const (
+	fuchsiaGerritHost = "https://fuchsia-review.googlesource.com"
 )
 
 // deepCopy returns a deep copy of Manifest.
@@ -751,16 +757,53 @@ func (f commitMsgFetcher) fetch(jirix *jiri.X, gerritHost, path string) ([]byte,
 				// Network or disk IO error, halt jiri
 				return nil, err
 			}
-			// gerritHost require SSO login, try SSO
+			// gerritHost require SSO login
 			if jirix.RewriteSsoToHttps {
 				// Gerrit host require SSO but jiri has rewritesso flag turned on
 				// In this case git hooks are useless, stop fetching git hooks
 				return nil, errGitHookNotRequired
 			}
-			jirix.Logger.Debugf("%q require SSO login, try again using SSO credentials", gerritHost+"/tools/hooks/commit-msg")
-			data, err = gerrit.FetchFileSSO(jirix, gerritHost, "/tools/hooks/commit-msg")
-			if err != nil {
-				return nil, err
+
+			// Use commit-msg in cache if the domain has same eTLD and SLD.
+			for k, v := range f {
+				urlK, err := url.Parse(k)
+				if err != nil {
+					// This should not happen as this url is already downloaded before.
+					return nil, fmt.Errorf("download commit-msg hook for host %q failed due to error %v", gerritHost, err)
+				}
+				urlG, err := url.Parse(gerritHost)
+				if err != nil {
+					// This should not happen either as gerritHost will be parsed by gerrit.FetchFile
+					return nil, fmt.Errorf("download commit-msg hook from host %q failed due to error %v", gerritHost, err)
+				}
+				etpoK, err := publicsuffix.EffectiveTLDPlusOne(urlK.Hostname())
+				if err != nil {
+					// This should not happen as Both SLD and TLD should exist.
+					return nil, fmt.Errorf("download commit-msg hook from host %q failed due to error %v", gerritHost, err)
+				}
+				etpoG, err := publicsuffix.EffectiveTLDPlusOne(urlG.Hostname())
+				if err != nil {
+					// This should not happen as Both SLD and TLD should exist.
+					return nil, fmt.Errorf("download commit-msg hook from host %q failed due to error %v", gerritHost, err)
+				}
+
+				if etpoK == etpoG {
+					jirix.Logger.Debugf("use commit-msg hook from host %q for host %q due to access limitations", k, gerritHost)
+					data = v
+					err = nil
+					break
+				}
+			}
+
+			if data == nil {
+				// Could not find commit-msg in cache from domains with same eTLD and SLD.
+				// Fetch commit-msg from fuchsia's gerrit server.
+				data, err = gerrit.FetchFile(fuchsiaGerritHost, "/tools/hooks/commit-msg")
+				if err != nil {
+					// This will only happen if configuration error occured on fuchsia gerrit server
+					return nil, fmt.Errorf("download commit-msg hook from host %q failed due to error %v", fuchsiaGerritHost, err)
+				}
+				jirix.Logger.Debugf("fallback to commit-msg from host %q for host %q due to access limitations", fuchsiaGerritHost, gerritHost)
 			}
 		}
 		f[gerritHost] = data
@@ -784,9 +827,8 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 				}
 				bytes, err := commitMsgFetcher.fetch(jirix, op.Project().GerritHost, "/tools/hooks/commit-msg")
 				if err != nil {
-					if err != gerrit.ErrSSOPathNotSet || err != errGitHookNotRequired {
-						jirix.Logger.Warningf("fetching \"%s%s\" using sso failed due to error: %v",
-							op.Project().GerritHost, "/tools/hooks/commit-msg", err)
+					if err != errGitHookNotRequired {
+						jirix.Logger.Debugf("%v", err)
 					}
 					commitHook.Close()
 					os.Remove(hookPath)
