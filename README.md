@@ -110,7 +110,7 @@ Execute the `jiri_bootstrap` script, which will fetch and build the jiri tool,
 and initialize the root directory.
 
 ```
-curl -s https://raw.githubusercontent.com/fuchsia-mirror/jiri/master/scripts/bootstrap_jiri | bash -s "$MY_ROOT"
+curl -s https://fuchsia.googlesource.com/jiri/+/master/scripts/bootstrap_jiri?format=TEXT | base64 --decode | bash -s "$MY_ROOT"
 ```
 
 The `jiri` command line tool will be installed in

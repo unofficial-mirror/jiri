@@ -30,7 +30,7 @@ Usage:
 
 A typical bootstrap workflow looks like this:
 
-$ curl -s https://raw.githubusercontent.com/fuchsia-mirror/jiri/master/scripts/bootstrap_jiri | bash -s myroot
+$ curl -s https://fuchsia.googlesource.com/jiri/+/master/scripts/bootstrap_jiri?format=TEXT | base64 --decode | bash -s myroot
 $ export PATH=myroot/.jiri_root/bin:$PATH
 $ cd myroot
 $ jiri import manifest https://example.com/manifest
@@ -108,6 +108,13 @@ chmod 755 "${BIN_DIR}/jiri"
 if [ "$ARCH" == "arm64" ]; then
   echo "WARNING: Jiri doesn't support timely updates for arch '$HOST_ARCH'. This or future binaries of Jiri might be out of date."
 fi
+
+# Install cipd, which is frequently needed to use manifests.
+if ! "${BIN_DIR}/jiri" bootstrap cipd; then
+  echo "Running jiri bootstrap failed." 1>&2
+  exit 1
+fi
+
 echo "Please add ${BIN_DIR} to your PATH"
 
 trap - EXIT
