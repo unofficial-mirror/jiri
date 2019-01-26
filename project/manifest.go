@@ -473,11 +473,11 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 				if v.Revision == "" {
 					v.Revision = projectLock.Revision
 					ld.Projects[v.Key()] = v
+				} else if v.Revision != projectLock.Revision {
+					s := fmt.Sprintf("project %+v has conflicting revisions in manifest and jiri.lock: %s:%s", v, v.Revision, projectLock.Revision)
+					jirix.Logger.Debugf(s)
+					err = errors.New(s)
 				}
-			} else if v.Revision != projectLock.Revision {
-				s := fmt.Sprintf("project %+v has conflicting revisions in manifest and jiri.lock: %s:%s", v, v.Revision, projectLock.Revision)
-				jirix.Logger.Debugf(s)
-				err = errors.New(s)
 			}
 		}
 		return
