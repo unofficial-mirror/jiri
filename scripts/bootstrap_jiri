@@ -110,10 +110,13 @@ if [ "$ARCH" == "arm64" ]; then
 fi
 
 # Install cipd, which is frequently needed to use manifests.
+pushd "${BIN_DIR}"
 if ! "${BIN_DIR}/jiri" bootstrap cipd; then
   echo "Running jiri bootstrap failed." 1>&2
+  popd
   exit 1
 fi
+popd
 
 echo "Please add ${BIN_DIR} to your PATH"
 
