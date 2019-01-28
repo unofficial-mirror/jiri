@@ -148,8 +148,11 @@ func updateRevision(manifestContent, tag, currentRevision, newRevision, name str
 	return updateRevisionOrVersionAttr(manifestContent, tag, newRevision, name, "revision")
 }
 
-func updateVersion(manifestContent, tag, newVersion, name string) (string, error) {
-	return updateRevisionOrVersionAttr(manifestContent, tag, newVersion, name, "version")
+func updateVersion(manifestContent, tag string, pc packageChanges) (string, error) {
+	if pc.OldVer != "" && pc.OldVer != "HEAD" {
+		return strings.Replace(manifestContent, pc.OldVer, pc.NewVer, 1), nil
+	}
+	return updateRevisionOrVersionAttr(manifestContent, tag, pc.NewVer, pc.Name, "version")
 }
 
 func updateRevisionOrVersionAttr(manifestContent, tag, newAttrValue, name, attr string) (string, error) {
@@ -264,15 +267,16 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports, packa
 		if newVersion == "" || p.Version == newVersion {
 			continue
 		}
-		manifestContent, err = updateVersion(manifestContent, "package", newVersion, p.Name)
-		if err != nil {
-			return err
-		}
-		ec.Packages = append(ec.Packages, packageChanges{
+		pc := packageChanges{
 			Name:   p.Name,
 			OldVer: p.Version,
 			NewVer: newVersion,
-		})
+		}
+		manifestContent, err = updateVersion(manifestContent, "package", pc)
+		if err != nil {
+			return err
+		}
+		ec.Packages = append(ec.Packages, pc)
 	}
 	if editFlags.jsonOutput != "" {
 		if err := ec.toFile(editFlags.jsonOutput); err != nil {
