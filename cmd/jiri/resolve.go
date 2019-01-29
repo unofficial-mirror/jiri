@@ -34,7 +34,7 @@ func init() {
 	flags.StringVar(&resolveFlags.lockFilePath, "output", "jiri.lock", "Path to the generated lockfile")
 	flags.BoolVar(&resolveFlags.localManifestFlag, "local-manifest", false, "Use local manifest")
 	flags.BoolVar(&resolveFlags.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
-	flags.BoolVar(&resolveFlags.enableProjectLock, "enable-project-lock", true, "Enable resolving projects in lockfile")
+	flags.BoolVar(&resolveFlags.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
 }
 
 func runResolve(jirix *jiri.X, args []string) error {
