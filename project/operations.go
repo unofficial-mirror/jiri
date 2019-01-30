@@ -88,12 +88,26 @@ func (op createOperation) Kind() string {
 func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	var err error
 	remote := rewriteRemote(jirix, op.project.Remote)
-	// Shallow clones can not be used as as local git reference
-	if op.project.HistoryDepth > 0 && cache != "" {
-		err = clone(jirix, cache, op.destination, gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+	// Hack to make fuchsia.git happen
+	if op.destination == jirix.Root {
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
+		if err = scm.Init(op.destination); err != nil {
+			return err
+		}
+		if err = scm.AddRemote("origin", remote); err != nil {
+			return err
+		}
+		if err = scm.Fetch(remote); err != nil {
+			return err
+		}
 	} else {
-		err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(cache),
-			gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+		// Shallow clones can not be used as as local git reference
+		if op.project.HistoryDepth > 0 && cache != "" {
+			err = clone(jirix, cache, op.destination, gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+		} else {
+			err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(cache),
+				gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+		}
 	}
 	if err != nil {
 		return err
@@ -135,24 +149,26 @@ func (op createOperation) Run(jirix *jiri.X) (e error) {
 	path, perm := filepath.Dir(op.destination), os.FileMode(0755)
 
 	// Check the local file system.
-	if _, err := os.Stat(op.destination); err != nil {
-		if !os.IsNotExist(err) {
-			return fmtError(err)
-		}
-	} else {
-		if isEmpty, err := isEmpty(op.destination); err != nil {
-			return err
-		} else if !isEmpty {
-			return fmt.Errorf("cannot create %q as it already exists and is not empty", op.destination)
+	if op.destination != jirix.Root {
+		if _, err := os.Stat(op.destination); err != nil {
+			if !os.IsNotExist(err) {
+				return fmtError(err)
+			}
 		} else {
-			if err := os.RemoveAll(op.destination); err != nil {
-				return fmt.Errorf("Not able to delete %q", op.destination)
+			if isEmpty, err := isEmpty(op.destination); err != nil {
+				return err
+			} else if !isEmpty {
+				return fmt.Errorf("cannot create %q as it already exists and is not empty", op.destination)
+			} else {
+				if err := os.RemoveAll(op.destination); err != nil {
+					return fmt.Errorf("Not able to delete %q", op.destination)
+				}
 			}
 		}
-	}
 
-	if err := os.MkdirAll(path, perm); err != nil {
-		return fmtError(err)
+		if err := os.MkdirAll(path, perm); err != nil {
+			return fmtError(err)
+		}
 	}
 
 	cache, err := op.project.CacheDirPath(jirix)
