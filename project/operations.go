@@ -97,7 +97,9 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		if err = scm.AddRemote("origin", remote); err != nil {
 			return err
 		}
-		if err = scm.Fetch(remote); err != nil {
+		// We must specify a refspec here in order for patch to be able to set
+		// upstream to 'origin/master'.
+		if err = scm.FetchRefspec(remote, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
 			return err
 		}
 	} else {
