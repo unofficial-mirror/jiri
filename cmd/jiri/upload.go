@@ -81,9 +81,9 @@ func runUpload(jirix *jiri.X, args []string) error {
 		return fmt.Errorf("os.Getwd() failed: %s", err)
 	}
 	var p *project.Project
-	// Walk up the path until we find a project at that path, or hit the jirix.Root.
+	// Walk up the path until we find a project at that path, or hit the jirix.Root parent.
 	// Note that we can't just compare path prefixes because of soft links.
-	for dir != jirix.Root && dir != string(filepath.Separator) {
+	for dir != filepath.Dir(jirix.Root) && dir != string(filepath.Separator) {
 		if isLocal, err := project.IsLocalProject(jirix, dir); err != nil {
 			return fmt.Errorf("Error while checking for local project at path %q: %s", dir, err)
 		} else if !isLocal {
