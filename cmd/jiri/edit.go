@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -35,7 +36,14 @@ var editFlags struct {
 	imports    arrayFlag
 	packages   arrayFlag
 	jsonOutput string
+	editMode   string
 }
+
+const (
+	manifest = "manifest"
+	lockfile = "lockfile"
+	both     = "both"
+)
 
 type projectChanges struct {
 	Name   string `json:"name"`
@@ -97,12 +105,19 @@ func init() {
 	flags.Var(&editFlags.imports, "import", "List of imports to update. It is of form <import-name>=<revision> where revision is optional. It can be specified multiple times.")
 	flags.Var(&editFlags.packages, "package", "List of packages to update. It is of form <package-name>=<version>. It can be specified multiple times.")
 	flags.StringVar(&editFlags.jsonOutput, "json-output", "", "File to print changes to, in json format.")
+	flags.StringVar(&editFlags.editMode, "edit-mode", "both", "Edit mode. It can be 'manifest' for updating project revisions in manifest only, 'lockfile' for updating project revisions in lockfile only or 'both' for updating project revisions in both files.")
 }
 
 func runEdit(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("Wrong number of args")
 	}
+
+	editFlags.editMode = strings.ToLower(editFlags.editMode)
+	if editFlags.editMode != manifest && editFlags.editMode != lockfile && editFlags.editMode != both {
+		return fmt.Errorf("unsupported edit-mode: %q", editFlags.editMode)
+	}
+
 	manifestPath, err := filepath.Abs(args[0])
 	if err != nil {
 		return err
@@ -139,6 +154,101 @@ func runEdit(jirix *jiri.X, args []string) error {
 	}
 
 	return updateManifest(jirix, manifestPath, projects, imports, packages)
+}
+
+func writeManifest(jirix *jiri.X, manifestPath, manifestContent string, projects map[string]string) error {
+	// Create a temp dir to save backedup lockfiles
+	tempDir, err := ioutil.TempDir("", "jiri_lockfile")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tempDir)
+
+	// map "backup" stores the mapping between updated lockfile with backups
+	backup := make(map[string]string)
+	rewind := func() {
+		for k, v := range backup {
+			if err := os.Rename(v, k); err != nil {
+				jirix.Logger.Errorf("failed to revert changes to lockfile %q", k)
+			} else {
+				jirix.Logger.Debugf("reverted lockfile %q", k)
+			}
+		}
+	}
+
+	isLockfileDir := func(jirix *jiri.X, s string) bool {
+		switch s {
+		case "", ".", jirix.Root, string(filepath.Separator):
+			return false
+		}
+		return true
+	}
+
+	if len(projects) != 0 && jirix.LockfileEnabled && (editFlags.editMode == lockfile || editFlags.editMode == both) {
+		// Search lockfiles and update
+		dir := manifestPath
+		for ; isLockfileDir(jirix, dir); dir = path.Dir(dir) {
+			lockfile := path.Join(path.Dir(dir), jirix.LockfileName)
+
+			if _, err := os.Stat(lockfile); err != nil {
+				jirix.Logger.Debugf("lockfile could not be accessed at %q due to error %v", lockfile, err)
+				continue
+			}
+			if err := updateLocks(jirix, tempDir, lockfile, backup, projects); err != nil {
+				rewind()
+				return err
+			}
+		}
+	}
+
+	if err := ioutil.WriteFile(manifestPath, []byte(manifestContent), os.ModePerm); err != nil {
+		rewind()
+		return err
+	}
+	return nil
+}
+
+func updateLocks(jirix *jiri.X, tempDir, lockfile string, backup, projects map[string]string) error {
+	jirix.Logger.Debugf("try updating lockfile %q", lockfile)
+	bin, err := ioutil.ReadFile(lockfile)
+	if err != nil {
+		return err
+	}
+
+	projectLocks, packageLocks, err := project.UnmarshalLockEntries(bin)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for k, v := range projectLocks {
+		if newRev, ok := projects[string(k)]; ok {
+			v.Revision = newRev
+			projectLocks[k] = v
+			found = true
+		}
+	}
+
+	if found {
+		// backup original lockfile
+		info, err := os.Stat(lockfile)
+		if err != nil {
+			return err
+		}
+		backupName := path.Join(tempDir, path.Base(lockfile))
+		if err := ioutil.WriteFile(backupName, bin, info.Mode()); err != nil {
+			return err
+		}
+		backup[lockfile] = backupName
+		ebin, err := project.MarshalLockEntries(projectLocks, packageLocks)
+		if err != nil {
+			return err
+		}
+		jirix.Logger.Debugf("updated lockfile %q", lockfile)
+		return ioutil.WriteFile(lockfile, ebin, info.Mode())
+	}
+	jirix.Logger.Debugf("skipped lockfile %q, no matching projects", lockfile)
+	return nil
 }
 
 func updateRevision(manifestContent, tag, currentRevision, newRevision, name string) (string, error) {
@@ -189,6 +299,7 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports, packa
 		return err
 	}
 	manifestContent := string(content)
+	editedProjects := make(map[string]string)
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(filepath.Dir(manifestPath)))
 	for _, p := range m.Projects {
 		newRevision := ""
@@ -211,10 +322,13 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports, packa
 		if p.Revision == newRevision {
 			continue
 		}
-		manifestContent, err = updateRevision(manifestContent, "project", p.Revision, newRevision, p.Name)
-		if err != nil {
-			return err
+		if editFlags.editMode == manifest || editFlags.editMode == both {
+			manifestContent, err = updateRevision(manifestContent, "project", p.Revision, newRevision, p.Name)
+			if err != nil {
+				return err
+			}
 		}
+		editedProjects[string(p.Key())] = newRevision
 		ec.Projects = append(ec.Projects, projectChanges{
 			Name:   p.Name,
 			Remote: p.Remote,
@@ -284,5 +398,5 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports, packa
 		}
 	}
 
-	return ioutil.WriteFile(manifestPath, []byte(manifestContent), os.ModePerm)
+	return writeManifest(jirix, manifestPath, manifestContent, editedProjects)
 }

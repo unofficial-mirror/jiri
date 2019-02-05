@@ -201,8 +201,8 @@ func (ld *loader) loadLockfile(jirix *jiri.X, dir, lockFileName string) error {
 		return nil
 	}
 
-	if !(dir == "" || dir == "." || dir == jirix.Root) {
-		if err := ld.loadLockfile(jirix, path.Join(path.Dir(dir)), lockFileName); err != nil {
+	if !(dir == "" || dir == "." || dir == jirix.Root || dir == string(filepath.Separator)) {
+		if err := ld.loadLockfile(jirix, path.Dir(dir), lockFileName); err != nil {
 			return err
 		}
 	}
