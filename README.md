@@ -16,7 +16,22 @@ Jiri is open-source.
 
 ## Manually build jiri
 We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
-order to build jiri manually use these [instructions][build jiri].
+order to fetch latest jiri source code and build jiri manually, latest version
+of [Go](https://golang.org) should be installed. After setting up environment
+variable GOPATH, you can build jiri from its latest source code using command:
+
+```
+go get fuchsia.googlesource.com/jiri/cmd/jiri
+```
+
+The source of jiri will be cloned into
+`$GOPATH/src/fuchsia.googlesource.com/jiri`
+directory. If you make any modification to your local source and would like to
+rebuild jiri, you can use following command:
+
+```
+go install fuchsia.googlesource.com/jiri/cmd/jiri
+```
 
 ## Jiri Behaviour
 [See this][behaviour]
@@ -469,6 +484,5 @@ see [Jiri local update][hacking doc]
 [filesystem doc]:/filesystem.md "Jiri filesystem"
 [hacking doc]:/HACKING.md "Jiri local updates"
 [behaviour]:/behaviour.md
-[build jiri]:/BUILD.md "Build jiri"
 [how do i]:/howdoi.md
 [vanadium]: https://v.io/
