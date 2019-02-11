@@ -36,6 +36,8 @@ const (
 // environment; typically it is run as a defer function.
 func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	jirix, cleanup := NewX(t)
+	// Disable lockfile in tests
+	jirix.LockfileEnabled = false
 	fake := &FakeJiriRoot{
 		X:        jirix,
 		Projects: map[string]string{},
