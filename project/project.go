@@ -419,6 +419,23 @@ func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 	}
 }
 
+func (p *Project) setupDefaultPushTarget(jirix *jiri.X) error {
+	if p.GerritHost == "" {
+		// Skip projects w/o gerrit host
+		return nil
+	}
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
+	if err := scm.Config("--get", "remote.origin.push"); err == nil {
+		// Default already set, skip
+		return nil
+	}
+	if err := scm.Config("remote.origin.push", "HEAD:refs/for/master"); err != nil {
+		return fmt.Errorf("not able to set remote.origin.push for project %s(%s) due to error: %v", p.Name, p.Path, err)
+	}
+	jirix.Logger.Debugf("set remote.origin.push to \"HEAD:refs/for/master\" for project %s(%s)", p.Name, p.Path)
+	return nil
+}
+
 func (p *Project) IsOnJiriHead(jirix *jiri.X) (bool, error) {
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
 	jiriHead := "refs/remotes/origin/master"
@@ -1727,6 +1744,9 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	for _, project := range remoteProjects {
 		if !(project.LocalConfig.Ignore || project.LocalConfig.NoUpdate) {
 			project.writeJiriRevisionFiles(jirix)
+			if err := project.setupDefaultPushTarget(jirix); err != nil {
+				jirix.Logger.Debugf("set up default push target failed due to error: %v", err)
+			}
 		}
 	}
 	jirix.TimerPop()
