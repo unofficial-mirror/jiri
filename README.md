@@ -18,16 +18,16 @@ Jiri is open-source.
 We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
 order to fetch latest jiri source code and build jiri manually, latest version
 of [Go](https://golang.org) should be installed. After setting up environment
-variable GOPATH, you can build jiri from its latest source code using command:
+variable GOPATH, you can fetch the latest jiri source code by using the
+command:
 
 ```
-go get fuchsia.googlesource.com/jiri/cmd/jiri
+git clone https://fuchsia.googlesource.com/jiri $GOPATH/src/fuchsia.googlesource.com/jiri
 ```
 
 The source of jiri will be cloned into
 `$GOPATH/src/fuchsia.googlesource.com/jiri`
-directory. If you make any modification to your local source and would like to
-rebuild jiri, you can use following command:
+directory. To build or rebuild jiri, simply type the following command:
 
 ```
 go install fuchsia.googlesource.com/jiri/cmd/jiri
