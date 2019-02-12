@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 
 	"fuchsia.googlesource.com/jiri"
@@ -21,9 +22,9 @@ func currentProject(jirix *jiri.X) (project.Project, error) {
 		return project.Project{}, fmt.Errorf("os.Getwd() failed: %s", err)
 	}
 
-	// Walk up the path until we find a project at that path, or hit the jirix.Root.
+	// Walk up the path until we find a project at that path, or hit the jirix.Root parent.
 	// Note that we can't just compare path prefixes because of soft links.
-	for dir != jirix.Root && dir != string(filepath.Separator) {
+	for dir != path.Dir(jirix.Root) && dir != string(filepath.Separator) {
 		if isLocal, err := project.IsLocalProject(jirix, dir); err != nil {
 			return project.Project{}, fmt.Errorf("Error while checking for local project at path %q: %s", dir, err)
 		} else if !isLocal {
