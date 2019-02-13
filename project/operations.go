@@ -94,7 +94,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		if err = scm.Init(op.destination); err != nil {
 			return err
 		}
-		if err = scm.AddRemote("origin", remote); err != nil {
+		if err = scm.AddOrReplaceRemote("origin", remote); err != nil {
 			return err
 		}
 		// We must specify a refspec here in order for patch to be able to set
