@@ -428,6 +428,7 @@ type Package struct {
 	Version   string            `xml:"version,attr"`
 	Path      string            `xml:"path,attr,omitempty"`
 	Internal  bool              `xml:"internal,attr,omitempty"`
+	Platforms string            `xml:"platforms,attr,omitempty"`
 	Instances []PackageInstance `xml:"instance"`
 	XMLName   struct{}          `xml:"package"`
 }
@@ -436,14 +437,49 @@ type PackageKey string
 
 type Packages map[PackageKey]Package
 
-func (pkg Package) Key() PackageKey {
-	return PackageKey(pkg.Name)
+func (p Package) Key() PackageKey {
+	return PackageKey(p.Name)
 }
 
 type PackageInstance struct {
 	Name    string   `xml:"name,attr"`
 	ID      string   `xml:"id,attr"`
 	XMLName struct{} `xml:"instance"`
+}
+
+// FillDefaults function fills default platforms information into
+// Package struct if it is not defined and path is using template.
+func (p *Package) FillDefaults() error {
+	if cipd.MustExpand(p.Name) && p.Platforms == "" {
+		for _, v := range cipd.DefaultPlatforms() {
+			p.Platforms += v.String() + ","
+		}
+		if p.Platforms[len(p.Platforms)-1] == ',' {
+			p.Platforms = p.Platforms[:len(p.Platforms)-1]
+		}
+	}
+	return nil
+}
+
+// GetPlatforms returns the platforms information of
+// this Package struct.
+func (p *Package) GetPlatforms() ([]cipd.Platform, error) {
+	if err := p.FillDefaults(); err != nil {
+		return nil, err
+	}
+	retList := make([]cipd.Platform, 0)
+	platStrs := strings.Split(p.Platforms, ",")
+	for _, platStr := range platStrs {
+		if platStr == "" {
+			continue
+		}
+		plat, err := cipd.NewPlatform(platStr)
+		if err != nil {
+			return nil, err
+		}
+		retList = append(retList, plat)
+	}
+	return retList, nil
 }
 
 // LoadManifest loads the manifest, starting with the .jiri_manifest file,
@@ -637,7 +673,25 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	// to avoid hardcoding platform names in Jiri
 	var ensureFileBuf bytes.Buffer
 	if !ignoreCryptoCheck {
+		// Collect platforms used by this project
+		allPlats := make(map[string]cipd.Platform)
+		// CIPD ensure-file-resolve requires $VerifiedPlatform to be present
+		// even if the package name is not using ${platform} template.
+		// Put DefaultPlatforms into header to walkaround this issue.
 		for _, plat := range cipd.DefaultPlatforms() {
+			allPlats[plat.String()] = plat
+		}
+		for _, pkg := range pkgs {
+			plats, err := pkg.GetPlatforms()
+			if err != nil {
+				return "", err
+			}
+			for _, plat := range plats {
+				allPlats[plat.String()] = plat
+			}
+		}
+
+		for _, plat := range allPlats {
 			ensureFileBuf.WriteString(fmt.Sprintf("$VerifiedPlatform %s\n", plat))
 		}
 		versionFileName := ensureFilePath[:len(ensureFilePath)-len(".ensure")] + ".version"
@@ -695,10 +749,10 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	return ensureFilePath, nil
 }
 
-func (pkg *Package) cipdDecl() (string, error) {
+func (p *Package) cipdDecl() (string, error) {
 	var buf bytes.Buffer
 	// Write "@Subdir" line to cipd declaration
-	subdir := pkg.Path
+	subdir := p.Path
 	tmpl, err := template.New("pack").Parse(subdir)
 	if err != nil {
 		return "", fmt.Errorf("parsing package path %q failed", subdir)
@@ -708,7 +762,15 @@ func (pkg *Package) cipdDecl() (string, error) {
 	subdir = subdirBuf.String()
 	buf.WriteString(fmt.Sprintf("@Subdir %s\n", subdir))
 	// Write package version line to cipd declaration
-	buf.WriteString(fmt.Sprintf("%s %s\n", pkg.Name, pkg.Version))
+	plats, err := p.GetPlatforms()
+	if err != nil {
+		return "", err
+	}
+	cipdPath, err := cipd.Decl(p.Name, plats)
+	if err != nil {
+		return "", err
+	}
+	buf.WriteString(fmt.Sprintf("%s %s\n", cipdPath, p.Version))
 	return buf.String(), nil
 }
 
