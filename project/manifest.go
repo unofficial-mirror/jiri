@@ -17,7 +17,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"text/template"
@@ -700,13 +699,12 @@ func (pkg *Package) cipdDecl() (string, error) {
 	var buf bytes.Buffer
 	// Write "@Subdir" line to cipd declaration
 	subdir := pkg.Path
-	arch := cipd.Platform{runtime.GOOS, runtime.GOARCH}
 	tmpl, err := template.New("pack").Parse(subdir)
 	if err != nil {
 		return "", fmt.Errorf("parsing package path %q failed", subdir)
 	}
 	var subdirBuf bytes.Buffer
-	tmpl.Execute(&subdirBuf, arch)
+	tmpl.Execute(&subdirBuf, cipd.CipdPlatform)
 	subdir = subdirBuf.String()
 	buf.WriteString(fmt.Sprintf("@Subdir %s\n", subdir))
 	// Write package version line to cipd declaration

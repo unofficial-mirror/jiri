@@ -114,7 +114,7 @@ func TestSelfUpdate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	// Bootstrap cipd to version A
 	cipdPath := path.Join(tmpDir, "cipd")
-	if err := fetchBinary(cipdPath, cipdPlatform, cipdVersionForTestA, digestMapA[cipdPlatform]); err != nil {
+	if err := fetchBinary(cipdPath, CipdPlatform.String(), cipdVersionForTestA, digestMapA[CipdPlatform.String()]); err != nil {
 		t.Errorf("failed to bootstrap cipd with version %q: %v", cipdVersionForTestA, err)
 	}
 	// Perform cipd self update to version B
@@ -126,9 +126,9 @@ func TestSelfUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to read self-updated cipd binary: %v", err)
 	}
-	verified, err := verifyDigest(cipdData, digestMapB[cipdPlatform])
+	verified, err := verifyDigest(cipdData, digestMapB[CipdPlatform.String()])
 	if err != nil {
-		t.Errorf("digest failed verification for platform %q on version %q", cipdPlatform, cipdVersionForTestB)
+		t.Errorf("digest failed verification for platform %q on version %q", CipdPlatform.String(), cipdVersionForTestB)
 	}
 	if !verified {
 		t.Errorf("self-updated cipd failed integrity test")

@@ -56,7 +56,8 @@ windows-amd64   sha256  a117e3984c111c68698faf91815c4b7d374404fa82dff318aadb9f2f
 )
 
 var (
-	cipdPlatform   string
+	// CipdPlatform represents the current runtime platform in cipd platform notation.
+	CipdPlatform   Platform
 	cipdOS         string
 	cipdArch       string
 	cipdBinary     string
@@ -79,7 +80,7 @@ func init() {
 	if cipdArch == "arm" {
 		cipdArch = "armv6l"
 	}
-	cipdPlatform = cipdOS + "-" + cipdArch
+	CipdPlatform = Platform{cipdOS, cipdArch}
 
 	jiriPath, err := osutil.Executable()
 	if err != nil {
@@ -114,7 +115,7 @@ func fetchBinary(binaryPath, platform, version, digest string) error {
 func Bootstrap() (string, error) {
 	bootstrap := func() error {
 		// Fetch cipd digest
-		cipdDigest, _, err := fetchDigest(cipdPlatform)
+		cipdDigest, _, err := fetchDigest(CipdPlatform.String())
 		if err != nil {
 			return err
 		}
@@ -124,7 +125,7 @@ func Bootstrap() (string, error) {
 		if err != nil {
 			return err
 		}
-		return fetchBinary(cipdBinary, cipdPlatform, cipdVersion, cipdDigest)
+		return fetchBinary(cipdBinary, CipdPlatform.String(), cipdVersion, cipdDigest)
 	}
 
 	getCipd := func() (string, error) {
