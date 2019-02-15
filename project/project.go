@@ -367,7 +367,7 @@ func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byt
 		i++
 	}
 
-	jsonData, err := json.MarshalIndent(&entries, "", "\t")
+	jsonData, err := json.MarshalIndent(&entries, "", "    ")
 	if err != nil {
 		return nil, err
 	}
