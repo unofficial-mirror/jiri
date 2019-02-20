@@ -438,7 +438,7 @@ type PackageKey string
 type Packages map[PackageKey]Package
 
 func (p Package) Key() PackageKey {
-	return PackageKey(p.Name)
+	return PackageKey(p.Path + KeySeparator + p.Name)
 }
 
 type PackageInstance struct {
