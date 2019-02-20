@@ -567,6 +567,7 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, loca
 // CheckoutSnapshot updates project state to the state specified in the given
 // snapshot file.  Note that the snapshot file must not contain remote imports.
 func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks, fetchPkgs bool, runHookTimeout, fetchTimeout uint) error {
+	jirix.UsingSnapshot = true
 	// Find all local projects.
 	scanMode := FastScan
 	if gc {

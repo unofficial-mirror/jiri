@@ -522,12 +522,15 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 		return err
 	}
 
-	plats := cipd.DefaultPlatforms()
 	usedPkgLocks := make(map[PackageLockKey]bool)
 	for k := range ld.PackageLocks {
 		usedPkgLocks[k] = false
 	}
 	for _, v := range ld.Packages {
+		plats, err := v.GetPlatforms()
+		if err != nil {
+			return err
+		}
 		pkgs, err := cipd.Expand(v.Name, plats)
 		if err != nil {
 			return err
@@ -639,13 +642,13 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	jirix.TimerPush("fetch cipd packages")
 	defer jirix.TimerPop()
 
-	ensureFilePath, err := generateEnsureFile(jirix, pkgs, !jirix.LockfileEnabled)
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, !jirix.LockfileEnabled || jirix.UsingSnapshot)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(ensureFilePath)
 
-	if jirix.LockfileEnabled {
+	if jirix.LockfileEnabled && !jirix.UsingSnapshot {
 		versionFilePath, err := generateVersionFile(jirix, ensureFilePath, pkgs)
 		if err != nil {
 			return err
@@ -722,7 +725,7 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 			hasSkippedPkgs = true
 			continue
 		}
-		cipdDecl, err := pkg.cipdDecl()
+		cipdDecl, err := pkg.cipdDecl(jirix.UsingSnapshot)
 		if err != nil {
 			return "", err
 		}
@@ -749,7 +752,7 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	return ensureFilePath, nil
 }
 
-func (p *Package) cipdDecl() (string, error) {
+func (p *Package) cipdDecl(usingSnapshot bool) (string, error) {
 	var buf bytes.Buffer
 	// Write "@Subdir" line to cipd declaration
 	subdir := p.Path
@@ -766,11 +769,28 @@ func (p *Package) cipdDecl() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cipdPath, err := cipd.Decl(p.Name, plats)
-	if err != nil {
-		return "", err
+	var cipdPath, version string
+	version = p.Version
+	if usingSnapshot {
+		candPath, err := cipd.Expand(p.Name, []cipd.Platform{cipd.CipdPlatform})
+		if err != nil {
+			return "", err
+		}
+		// since err != nil, candPath cannot be empty
+		cipdPath = candPath[0]
+		for _, inst := range p.Instances {
+			if inst.Name == cipdPath {
+				version = inst.ID
+				break
+			}
+		}
+	} else {
+		cipdPath, err = cipd.Decl(p.Name, plats)
+		if err != nil {
+			return "", err
+		}
 	}
-	buf.WriteString(fmt.Sprintf("%s %s\n", cipdPath, p.Version))
+	buf.WriteString(fmt.Sprintf("%s %s\n", cipdPath, version))
 	return buf.String(), nil
 }
 

@@ -105,6 +105,7 @@ type X struct {
 	LockfileEnabled   bool
 	LockfileName      string
 	SsoCookiePath     string
+	UsingSnapshot     bool
 	Color             color.Color
 	Logger            *log.Logger
 	failures          uint32
