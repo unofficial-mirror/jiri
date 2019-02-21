@@ -47,5 +47,13 @@ func runResolve(jirix *jiri.X, args []string) error {
 			manifestFiles = append(manifestFiles, m)
 		}
 	}
+	// While revision pins for projects can be updated by 'jiri edit',
+	// instance IDs of packages can only be updated by 'jiri resolve' due
+	// to the way how cipd works. Since roller is using 'jiri resolve'
+	// to update a single jiri.lock file each time, it will cause conflicting
+	// instance ids between updated 'jiri.lock' and un-updated 'jiri.lock' files.
+	// Jiri will halt when detecting conflicts in locks. So to make it work,
+	// we need to temporarily disable the conflicts detection.
+	jirix.IgnoreLockConflicts = true
 	return project.GenerateJiriLockFile(jirix, manifestFiles, resolveFlags.lockFilePath, resolveFlags.enableProjectLock, resolveFlags.enablePackageLock, resolveFlags.localManifestFlag)
 }

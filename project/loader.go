@@ -247,7 +247,9 @@ func (ld *loader) parseLockData(jirix *jiri.X, data []byte) error {
 
 	for k, v := range pkgLocks {
 		if pkgLock, ok := ld.PackageLocks[k]; ok {
-			if pkgLock != v {
+			// Only package locks may conflict during a normal 'jiri resolve'.
+			// Treating conflicts as errors in all other scenarios.
+			if pkgLock != v && !jirix.IgnoreLockConflicts {
 				return fmt.Errorf("conflicting package lock entries %+v with %+v", pkgLock, v)
 			}
 		} else {

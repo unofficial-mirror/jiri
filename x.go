@@ -94,24 +94,25 @@ func ConfigFromFile(filename string) (*Config, error) {
 // including the manifest and related operations.
 type X struct {
 	*tool.Context
-	Root              string
-	Usage             func(format string, args ...interface{}) error
-	config            *Config
-	Cache             string
-	Shared            bool
-	Jobs              uint
-	KeepGitHooks      bool
-	RewriteSsoToHttps bool
-	LockfileEnabled   bool
-	LockfileName      string
-	SsoCookiePath     string
-	UsingSnapshot     bool
-	Color             color.Color
-	Logger            *log.Logger
-	failures          uint32
-	Attempts          uint
-	cleanupFuncs      []func()
-	AnalyticsSession  *analytics_util.AnalyticsSession
+	Root                string
+	Usage               func(format string, args ...interface{}) error
+	config              *Config
+	Cache               string
+	Shared              bool
+	Jobs                uint
+	KeepGitHooks        bool
+	RewriteSsoToHttps   bool
+	LockfileEnabled     bool
+	LockfileName        string
+	SsoCookiePath       string
+	UsingSnapshot       bool
+	IgnoreLockConflicts bool
+	Color               color.Color
+	Logger              *log.Logger
+	failures            uint32
+	Attempts            uint
+	cleanupFuncs        []func()
+	AnalyticsSession    *analytics_util.AnalyticsSession
 }
 
 func (jirix *X) IncrementFailures() {

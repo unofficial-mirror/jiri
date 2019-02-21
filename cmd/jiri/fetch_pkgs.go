@@ -44,6 +44,9 @@ func runFetchPkgs(jirix *jiri.X, args []string) error {
 
 	// Get pkgs.
 	_, _, pkgs, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, fetchPkgsFlags.localManifest)
+	if err != nil {
+		return err
+	}
 	if len(pkgs) > 0 {
 		return project.FetchPackages(jirix, pkgs, fetchPkgsFlags.fetchPkgsTimeout)
 	}
