@@ -33,8 +33,8 @@ import (
 var (
 	errVersionMismatch    = errors.New("snapshot file version mismatch")
 	ssoRe                 = regexp.MustCompile("^sso://(.*?)/")
-	DefaultHookTimeout    = uint(5) // DefaultHookTimeout is the time in minutes to wait for a hook to timeout.
-	DefaultPackageTimeout = uint(5) // DefaultPackageTimeout is the time in minutes to wait for cipd fetching packages.
+	DefaultHookTimeout    = uint(5)  // DefaultHookTimeout is the time in minutes to wait for a hook to timeout.
+	DefaultPackageTimeout = uint(20) // DefaultPackageTimeout is the time in minutes to wait for cipd fetching packages.
 )
 
 const (
