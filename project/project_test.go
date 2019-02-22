@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
 	"fuchsia.googlesource.com/jiri/project"
@@ -2264,4 +2265,32 @@ func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
 		}
 	}
 
+}
+
+func TestGetPath(t *testing.T) {
+	testPkgs := []project.Package{
+		project.Package{Name: "test0", Version: "version", Path: "A/test0"},
+		project.Package{Name: "test1/${platform}", Version: "version", Path: ""},
+		project.Package{Name: "test2/${os}-${arch}", Version: "version", Path: ""},
+		project.Package{Name: "test3/${platform=linux-armv6l}", Version: "version", Path: ""},
+	}
+	testResults := []string{
+		"A/test0",
+		"prebuilt/test1/",
+		"prebuilt/test2/",
+		"prebuilt",
+	}
+
+	for i, v := range testPkgs {
+		defaultPath, err := v.GetPath()
+		if err != nil {
+			t.Errorf("TestGetPath failed due to error: %v", err)
+		}
+		if strings.HasSuffix(testResults[i], "/") {
+			testResults[i] += cipd.CipdPlatform.String()
+		}
+		if testResults[i] != defaultPath {
+			t.Errorf("expecting %q, got %q", testResults[i], defaultPath)
+		}
+	}
 }

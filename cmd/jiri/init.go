@@ -44,6 +44,7 @@ var (
 	keepGitHooks          string
 	enableLockfileFlag    string
 	lockfileNameFlag      string
+	prebuiltJSON          string
 )
 
 func init() {
@@ -56,6 +57,7 @@ func init() {
 	cmdInit.Flags.StringVar(&keepGitHooks, "keep-git-hooks", "", "Whether to keep current git hooks in '.git/hooks' when doing 'jiri update'. Takes true/false.")
 	cmdInit.Flags.StringVar(&enableLockfileFlag, "enable-lockfile", "", "Enable lockfile enforcement")
 	cmdInit.Flags.StringVar(&lockfileNameFlag, "lockfile-name", "", "Set up filename of lockfile")
+	cmdInit.Flags.StringVar(&prebuiltJSON, "prebuilt-json", "", "Set up filename for prebuilt json file")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -149,6 +151,10 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if lockfileNameFlag != "" {
 		config.LockfileName = lockfileNameFlag
+	}
+
+	if prebuiltJSON != "" {
+		config.PrebuiltJSON = prebuiltJSON
 	}
 
 	if enableLockfileFlag != "" {

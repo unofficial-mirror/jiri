@@ -7,6 +7,7 @@ package project
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -441,6 +443,35 @@ func (p Package) Key() PackageKey {
 	return PackageKey(p.Path + KeySeparator + p.Name)
 }
 
+// FilterACL returns a new Packages map without any inaccessible packages.
+func (p *Packages) FilterACL(jirix *jiri.X) (Packages, bool, error) {
+	// Perform ACL checks on internal projects
+	pkgACLMap := make(map[string]bool)
+	pkgVersionMap := make(map[string]string)
+	hasInternal := false
+	for _, pkg := range *p {
+		pkg.Name = strings.TrimRight(pkg.Name, "/")
+		if pkg.Internal {
+			hasInternal = true
+			pkgACLMap[pkg.Name] = false
+			pkgVersionMap[pkg.Name] = pkg.Version
+		}
+	}
+	if len(pkgACLMap) != 0 {
+		if err := cipd.CheckPackageACL(jirix, pkgACLMap, pkgVersionMap); err != nil {
+			return nil, false, err
+		}
+	}
+	retPkgs := make(Packages)
+	for _, pkg := range *p {
+		if val, ok := pkgACLMap[pkg.Name]; ok && !val {
+			continue
+		}
+		retPkgs[pkg.Key()] = pkg
+	}
+	return retPkgs, hasInternal, nil
+}
+
 type PackageInstance struct {
 	Name    string   `xml:"name,attr"`
 	ID      string   `xml:"id,attr"`
@@ -459,6 +490,35 @@ func (p *Package) FillDefaults() error {
 		}
 	}
 	return nil
+}
+
+// GetPath returns the relative path that Package p should be
+// downloaded to.
+func (p *Package) GetPath() (string, error) {
+	if p.Path == "" {
+		cipdPath := p.Name
+		// Replace template with current platform information.
+		// If failed, skip filling in default path.
+		if cipd.MustExpand(cipdPath) {
+			expanded, err := cipd.Expand(cipdPath, []cipd.Platform{cipd.CipdPlatform})
+			if err != nil {
+				return "", err
+			}
+			if len(expanded) > 0 {
+				cipdPath = expanded[0]
+			}
+		}
+		if !cipd.MustExpand(cipdPath) {
+			base := path.Base(cipdPath)
+			if _, err := cipd.NewPlatform(base); err == nil {
+				// base is the name for a platform
+				base = filepath.Join(path.Base(path.Dir(cipdPath)), base)
+			}
+			return filepath.Join("prebuilt", base), nil
+		}
+		return "prebuilt", nil
+	}
+	return p.Path, nil
 }
 
 // GetPlatforms returns the platforms information of
@@ -605,6 +665,11 @@ func resolvePackageLocks(jirix *jiri.X, pkgs Packages) (PackageLocks, error) {
 	jirix.TimerPush("resove instance id for cipd packages")
 	defer jirix.TimerPop()
 
+	pkgs, _, err := pkgs.FilterACL(jirix)
+	if err != nil {
+		return nil, err
+	}
+
 	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false)
 	if err != nil {
 		return nil, err
@@ -642,7 +707,12 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	jirix.TimerPush("fetch cipd packages")
 	defer jirix.TimerPop()
 
-	ensureFilePath, err := generateEnsureFile(jirix, pkgs, !jirix.LockfileEnabled || jirix.UsingSnapshot)
+	pkgsWAccess, hasInternalPkgs, err := pkgs.FilterACL(jirix)
+	if err != nil {
+		return err
+	}
+
+	ensureFilePath, err := generateEnsureFile(jirix, pkgsWAccess, !jirix.LockfileEnabled || jirix.UsingSnapshot)
 	if err != nil {
 		return err
 	}
@@ -660,7 +730,40 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 		return err
 	}
 
+	if hasInternalPkgs {
+		if err := writePackageJSON(jirix, len(pkgs) == len(pkgsWAccess)); err != nil {
+			return err
+		}
+	}
+
+	if len(pkgs) > len(pkgsWAccess) {
+		cipdLoggedIn, err := cipd.CheckLoggedIn(jirix)
+		if err != nil {
+			return err
+		}
+		if !cipdLoggedIn {
+			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"cipd auth-login\" and try again")
+		}
+	}
 	return nil
+}
+
+// GenerateJSON generates a json file which contains fetched
+// packages.
+func writePackageJSON(jirix *jiri.X, access bool) error {
+	var internalAccess struct {
+		Access bool `json:"internal_access"`
+	}
+	internalAccess.Access = access
+	jsonData, err := json.MarshalIndent(&internalAccess, "", "    ")
+	if err != nil {
+		return err
+	}
+	if jirix.PrebuiltJSON == "" {
+		// Skip json file creation if PrebuiltJSON is not set.
+		return nil
+	}
+	return ioutil.WriteFile(filepath.Join(jirix.RootMetaDir(), jirix.PrebuiltJSON), jsonData, 0644)
 }
 
 func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (string, error) {
@@ -703,28 +806,8 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	ensureFileBuf.WriteString("$ParanoidMode CheckPresence\n")
 	ensureFileBuf.WriteString("\n")
 
-	// Perform ACL checks on internal projects
-	pkgACLMap := make(map[string]bool)
-	pkgVersionMap := make(map[string]string)
 	for _, pkg := range pkgs {
-		pkg.Name = strings.TrimRight(pkg.Name, "/")
-		if pkg.Internal {
-			pkgACLMap[pkg.Name] = false
-			pkgVersionMap[pkg.Name] = pkg.Version
-		}
-	}
-	if len(pkgACLMap) != 0 {
-		if err := cipd.CheckPackageACL(jirix, pkgACLMap, pkgVersionMap); err != nil {
-			return "", err
-		}
-	}
 
-	hasSkippedPkgs := false
-	for _, pkg := range pkgs {
-		if val, ok := pkgACLMap[pkg.Name]; ok && !val {
-			hasSkippedPkgs = true
-			continue
-		}
 		cipdDecl, err := pkg.cipdDecl(jirix.UsingSnapshot)
 		if err != nil {
 			return "", err
@@ -740,22 +823,17 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 	if err := ensureFile.Sync(); err != nil {
 		return "", err
 	}
-	if hasSkippedPkgs {
-		cipdLoggedIn, err := cipd.CheckLoggedIn(jirix)
-		if err != nil {
-			return "", err
-		}
-		if !cipdLoggedIn {
-			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"cipd auth-login\" and try again")
-		}
-	}
+
 	return ensureFilePath, nil
 }
 
 func (p *Package) cipdDecl(usingSnapshot bool) (string, error) {
 	var buf bytes.Buffer
 	// Write "@Subdir" line to cipd declaration
-	subdir := p.Path
+	subdir, err := p.GetPath()
+	if err != nil {
+		return "", err
+	}
 	tmpl, err := template.New("pack").Parse(subdir)
 	if err != nil {
 		return "", fmt.Errorf("parsing package path %q failed", subdir)
