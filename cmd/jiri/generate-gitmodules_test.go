@@ -94,7 +94,7 @@ func TestPrefixTree(t *testing.T) {
 }
 
 func TestGitModules(t *testing.T) {
-	goldenScript := []byte(`#/!bin/sh
+	goldenScript := []byte(`#!/bin/sh
 git update-index --add --cacheinfo 160000 87326c54332e5be21eda2173bb001aaee73a9ab7 "manifest"
 git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed28 "path-0"
 git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed28 "path-1"

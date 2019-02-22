@@ -209,7 +209,7 @@ func writeGitModules(jirix *jiri.X, projects project.Projects, outputPath string
 	// Start creating .gitmodule and set up script.
 	var gitmoduleBuf bytes.Buffer
 	var commandBuf bytes.Buffer
-	commandBuf.WriteString("#/!bin/sh\n")
+	commandBuf.WriteString("#!/bin/sh\n")
 
 	// Special hack for fuchsia.git
 	// When -redir-root is set to true, fuchsia.git will be added as submodule
