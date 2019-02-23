@@ -61,22 +61,20 @@ if [[ $# -ne 1 ]]; then
   fatal "need <root_dir> argument"
 fi
 
-# Ensure <root_dir> doesn't already exist: this is important since we trap this script and
-# rm -rf <root_dir> if anything fails.
-mkdir -p "$(dirname $1)"
 readonly ROOT_DIR="$(toabs $1)"
-if [[ -e "${ROOT_DIR}" ]]; then
-  if ! [[ -z "$(ls -A "$ROOT_DIR")" ]]; then
-    fatal "${ROOT_DIR} is not empty"
-  fi
+readonly BIN_DIR="${ROOT_DIR}/.jiri_root/bin"
+
+# If ROOT_DIR doesn't already exist, we will destroy it during the exit trap,
+# otherwise we will only destroy the BIN_DIR
+if [[ -d "${ROOT_DIR}" ]]; then
+  CLEANUP_DIR="${BIN_DIR}"
+else
+  CLEANUP_DIR="${ROOT_DIR}"
 fi
+mkdir -p "${BIN_DIR}"
 
 # Remove the root_dir if this script fails so as to not leave the environment in a strange half-state.
-trap "rm -rf ${ROOT_DIR}" INT TERM EXIT
-
-# Make the output directories.
-readonly BIN_DIR="${ROOT_DIR}/.jiri_root/bin"
-mkdir -p "${BIN_DIR}"
+trap "rm -rf -- \"${CLEANUP_DIR}\"" INT TERM EXIT
 
 # Determine and validate the version of jiri.
 readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
