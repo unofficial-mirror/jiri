@@ -8,13 +8,12 @@ import (
 	"fmt"
 	"strings"
 
-	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/cmdline"
 )
 
 var cmdBootstrap = &cmdline.Command{
-	Runner: jiri.RunnerFunc(runBootstrap),
+	Runner: cmdline.RunnerFunc(runBootstrap),
 	Name:   "bootstrap",
 	Short:  "Bootstrap essential packages",
 	Long: `
@@ -24,7 +23,7 @@ Bootstrap essential packages such as cipd.
 	ArgsLong: "<package ...> is a list of packages that can be bootstraped by jiri. If the list is empty, jiri will list supported packages.",
 }
 
-func runBootstrap(jirix *jiri.X, args []string) error {
+func runBootstrap(env *cmdline.Env, args []string) error {
 	if len(args) == 0 {
 		// Currently it only supports cipd. We may add more packages from buildtools in the future.
 		fmt.Printf("Supported package(s):\n\tcipd\n")
