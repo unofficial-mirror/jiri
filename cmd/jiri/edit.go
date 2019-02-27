@@ -184,7 +184,7 @@ func writeManifest(jirix *jiri.X, manifestPath, manifestContent string, projects
 		return true
 	}
 
-	if len(projects) != 0 && jirix.LockfileEnabled && (editFlags.editMode == lockfile || editFlags.editMode == both) {
+	if len(projects) != 0 && (editFlags.editMode == lockfile || editFlags.editMode == both) {
 		// Search lockfiles and update
 		dir := manifestPath
 		for ; isLockfileDir(jirix, dir); dir = path.Dir(dir) {
