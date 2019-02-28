@@ -20,16 +20,16 @@ func init() {
 	if runtime.GOOS == "darwin" {
 		var rLimit syscall.Rlimit
 		err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit)
-		if err != nil {
-			fmt.Println("Unable to obtain rlimit: ", err)
-		}
-		if rLimit.Cur < rLimit.Max {
-			rLimit.Max = 999999
-			rLimit.Cur = 999999
-			err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
-			if err != nil {
-				fmt.Println("Unable to increase rlimit: ", err)
+		if err == nil {
+			if rLimit.Cur < rLimit.Max {
+				rLimit.Cur = rLimit.Max
+				err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
+				if err != nil {
+					fmt.Println("Unable to increase rlimit: ", err)
+				}
 			}
+		} else {
+			fmt.Println("Unable to obtain rlimit: ", err)
 		}
 	}
 	cmdRoot = newCmdRoot()
