@@ -8,14 +8,12 @@ import (
 	"bytes"
 	"fmt"
 
-	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/version"
 )
 
-
 var cmdVersion = &cmdline.Command{
-	Runner: jiri.RunnerFunc(runVersion),
+	Runner: cmdline.RunnerFunc(runVersion),
 	Name:   "version",
 	Short:  "Print the jiri version",
 	Long: `
@@ -23,7 +21,7 @@ Print the Git commit revision jiri was built from and the build date.
 `,
 }
 
-func runVersion(jirix *jiri.X, args []string) error {
+func runVersion(env *cmdline.Env, args []string) error {
 	var versionString bytes.Buffer
 	fmt.Fprintf(&versionString, "Jiri")
 
