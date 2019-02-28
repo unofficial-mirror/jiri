@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -167,7 +168,13 @@ func (showRootFlag) Set(string) error {
 	return nil
 }
 
+var DefaultJobs = uint(runtime.NumCPU() * 2)
+
 func init() {
+	// Cap jobs at 50 to avoid flooding Gerrit with too many requests
+	if DefaultJobs > 50 {
+		DefaultJobs = 50
+	}
 	flag.StringVar(&rootFlag, "root", "", "Jiri root directory")
 	flag.UintVar(&jobsFlag, "j", DefaultJobs, "Number of jobs (commands) to run simultaneously")
 	flag.StringVar(&colorFlag, "color", "auto", "Use color to format output. Values can be always, never and auto")
@@ -272,8 +279,6 @@ func NewX(env *cmdline.Env) (*X, error) {
 	}
 	return x, nil
 }
-
-const DefaultJobs = 25
 
 func cleanPath(path string) (string, error) {
 	result, err := filepath.EvalSymlinks(path)
