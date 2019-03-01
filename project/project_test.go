@@ -2294,3 +2294,47 @@ func TestGetPath(t *testing.T) {
 		}
 	}
 }
+
+func TestWritePackageFlags(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+
+	testPkgsWAS := []project.Package{
+		project.Package{Name: "test0", Version: "version", Flag: "flagfile0|internal = true|internal = false"},
+		project.Package{Name: "test1", Version: "version", Flag: "flagfile1|{\"internal\" = true}|{\"internal\" = false}"},
+	}
+	testPkgsWoAS := []project.Package{
+		project.Package{Name: "test2", Version: "version", Flag: "flagfile2|internal = true|internal = false"},
+		project.Package{Name: "test3", Version: "version", Flag: "flagfile3|{\"internal\" = true}|{\"internal\" = false}"},
+	}
+	expected := map[string]string{
+		"flagfile0": "internal = true",
+		"flagfile1": "{\"internal\" = true}",
+		"flagfile2": "internal = false",
+		"flagfile3": "{\"internal\" = false}",
+	}
+
+	testPkgs := make(project.Packages)
+	testPkgsWA := make(project.Packages)
+	for _, v := range testPkgsWAS {
+		testPkgs[v.Key()] = v
+		testPkgsWA[v.Key()] = v
+	}
+	for _, v := range testPkgsWoAS {
+		testPkgs[v.Key()] = v
+	}
+
+	if err := project.WritePackageFlags(jirix, testPkgs, testPkgsWA); err != nil {
+		t.Errorf("WritePackageFlags failed due to error: %v", err)
+	}
+
+	for k, v := range expected {
+		data, err := ioutil.ReadFile(filepath.Join(jirix.Root, k))
+		if err != nil {
+			t.Errorf("read flag file %q failed due error: %v", k, err)
+		}
+		if string(data) != v {
+			t.Errorf("expecting flag %q from file %q, got %q", v, k, string(data))
+		}
+	}
+}

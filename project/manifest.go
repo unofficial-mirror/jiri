@@ -431,6 +431,7 @@ type Package struct {
 	Path      string            `xml:"path,attr,omitempty"`
 	Internal  bool              `xml:"internal,attr,omitempty"`
 	Platforms string            `xml:"platforms,attr,omitempty"`
+	Flag      string            `xml:"flag,attr,omitempty"`
 	Instances []PackageInstance `xml:"instance"`
 	XMLName   struct{}          `xml:"package"`
 }
@@ -734,6 +735,11 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 		}
 	}
 
+	// Write explict flags.
+	if err := WritePackageFlags(jirix, pkgs, pkgsWAccess); err != nil {
+		return err
+	}
+
 	if len(pkgs) > len(pkgsWAccess) {
 		cipdLoggedIn, err := cipd.CheckLoggedIn(jirix)
 		if err != nil {
@@ -742,6 +748,61 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 		if !cipdLoggedIn {
 			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"cipd auth-login\" and try again")
 		}
+	}
+	return nil
+}
+
+// WritePackageFlags write flag files into project directory using in "flag"
+// attribute from pkgs.
+func WritePackageFlags(jirix *jiri.X, pkgs, pkgsWA Packages) error {
+	// The flag attribute has a format of $FILE_NAME|$FLAG_SUCCESSFUL|$FLAG_FAILED
+	// When a package is successfully downloaded, jiri will write $FLAG_SUCCESSFUL
+	// to $FILE_NAME. If the package is not downloaded due to access reasons,
+	// jiri will write $FLAG_FAILED to $FILE_NAME.
+	// '|' is a forbidden symbol in Windows path, which is unlikely
+	// to be used by path.
+
+	flagMap := make(map[string]string)
+	fill := func(file, flag string) error {
+		if v, ok := flagMap[file]; ok {
+			if v != flag {
+				return fmt.Errorf("encountered conflicting flags for file %q: %q conflicts with %q", file, v, flag)
+			}
+		} else {
+			flagMap[file] = flag
+		}
+		return nil
+	}
+
+	for k, v := range pkgs {
+		if v.Flag == "" {
+			continue
+		}
+		fields := strings.Split(v.Flag, "|")
+		if len(fields) != 3 {
+			return fmt.Errorf("unknown package flag format found in package %+v", v)
+		}
+		if _, ok := pkgsWA[k]; ok {
+			// package is successfully fetched, write successful flag.
+			if err := fill(fields[0], fields[1]); err != nil {
+				return err
+			}
+		} else {
+			// package is failed to fetched, write failed flag.
+			if err := fill(fields[0], fields[2]); err != nil {
+				return err
+			}
+		}
+	}
+
+	var writeErrorBuf bytes.Buffer
+	for k, v := range flagMap {
+		if err := ioutil.WriteFile(filepath.Join(jirix.Root, k), []byte(v), 0644); err != nil {
+			writeErrorBuf.WriteString(fmt.Sprintf("write package flag %q to file %q failed due to error: %v\n", v, k, err))
+		}
+	}
+	if writeErrorBuf.Len() > 0 {
+		return errors.New(writeErrorBuf.String())
 	}
 	return nil
 }
