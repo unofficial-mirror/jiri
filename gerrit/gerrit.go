@@ -61,6 +61,8 @@ type CLOpts struct {
 	// Edit determines if the user should be prompted to edit the commit
 	// message when the CL is exported to Gerrit.
 	Edit bool
+	// GitOptions pass through additional git options
+	GitOptions string
 	// Remote identifies the Gerrit remote that this CL will be pushed to
 	Remote string
 	// Presubmit determines what presubmit tests to run.
@@ -588,6 +590,9 @@ func Push(jirix *jiri.X, dir string, clOpts CLOpts) error {
 	} else {
 		args = append(args, "--no-verify")
 	}
+	if clOpts.GitOptions != "" {
+		args = append(args, strings.Fields(clOpts.GitOptions)...)
+	}
 	var stdout, stderr bytes.Buffer
 	command := exec.Command("git", args...)
 	command.Dir = dir
@@ -596,6 +601,7 @@ func Push(jirix *jiri.X, dir string, clOpts CLOpts) error {
 	command.Stderr = &stderr
 	env := jirix.Env()
 	command.Env = envvar.MapToSlice(env)
+	jirix.Logger.Debugf("invoking git with \"%v\"", args)
 	if err := command.Run(); err != nil {
 		return PushError{args, stdout.String(), stderr.String()}
 	}

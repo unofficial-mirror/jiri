@@ -28,6 +28,7 @@ var (
 	uploadMultipartFlag    bool
 	uploadBranchFlag       string
 	uploadRemoteBranchFlag string
+	uploadGitOptions       string
 )
 
 type uploadError string
@@ -63,6 +64,7 @@ func init() {
 	cmdUpload.Flags.StringVar(&uploadBranchFlag, "branch", "", `Used when multipart flag is true and this command is executed from root folder`)
 	cmdUpload.Flags.StringVar(&uploadRemoteBranchFlag, "remoteBranch", "", `Remote branch to upload change to. If this is not specified and branch is untracked,
 change would be uploaded to branch in project manifest`)
+	cmdUpload.Flags.StringVar(&uploadGitOptions, "git-options", "", `Passthrough git options`)
 }
 
 // runUpload is a wrapper that pushes the changes to gerrit for review.
@@ -207,6 +209,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 
 		opts := gerrit.CLOpts{
 			Ccs:          parseEmails(uploadCcsFlag),
+			GitOptions:   uploadGitOptions,
 			Presubmit:    gerrit.PresubmitTestType(uploadPresubmitFlag),
 			RemoteBranch: remoteBranch,
 			Remote:       "origin",

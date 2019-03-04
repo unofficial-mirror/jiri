@@ -112,6 +112,7 @@ func assertUploadFilesNotPushedToRef(t *testing.T, jirix *jiri.X, gerritPath, pu
 
 func resetFlags() {
 	uploadCcsFlag = ""
+	uploadGitOptions = ""
 	uploadPresubmitFlag = string(gerrit.PresubmitTestTypeAll)
 	uploadReviewersFlag = ""
 	uploadTopicFlag = ""
@@ -527,6 +528,40 @@ func TestUploadUntrackedBranch(t *testing.T) {
 	expectedRef = fmt.Sprintf("refs/for/%s", uploadRemoteBranchFlag)
 
 	assertUploadPushedFilesToRef(t, fake.X, gerritPath, expectedRef, files)
+}
+
+func TestGitOptions(t *testing.T) {
+	defer resetFlags()
+	fake, localProjects, cleanup := setupUploadTest(t)
+	defer cleanup()
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("failed to retrieve current directory due to error: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Errorf("failed to change current directory due to error: %v", err)
+		}
+	}()
+	if err := os.Chdir(localProjects[1].Path); err != nil {
+		t.Errorf("failed to change current working directory due to error: %v", err)
+	}
+	// Create "refs/for/master" on remote
+	files := []string{"file1"}
+	commitFiles(t, fake.X, files)
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Errorf("upload failed due to error: %v", err)
+	}
+	// Test passing through "--dry-run" git option
+	uploadGitOptions = "--dry-run"
+	files = []string{"file2"}
+	commitFiles(t, fake.X, files)
+	if err := runUpload(fake.X, []string{}); err != nil {
+		t.Errorf("upload failed due to error: %v", err)
+	}
+	expectedRef := "refs/for/master"
+	gerritPath := fake.Projects[localProjects[1].Name]
+	assertUploadFilesNotPushedToRef(t, fake.X, gerritPath, expectedRef, files)
 }
 
 // commitFile commits a file with the specified content into a branch
