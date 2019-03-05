@@ -32,7 +32,7 @@ func init() {
 	cmdFetchPkgs.Flags.UintVar(&fetchPkgsFlags.attempts, "attempts", 1, "Number of attempts before failing.")
 }
 
-func runFetchPkgs(jirix *jiri.X, args []string) error {
+func runFetchPkgs(jirix *jiri.X, args []string) (err error) {
 	localProjects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return err
@@ -43,7 +43,12 @@ func runFetchPkgs(jirix *jiri.X, args []string) error {
 	jirix.Attempts = fetchPkgsFlags.attempts
 
 	// Get pkgs.
-	_, _, pkgs, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, fetchPkgsFlags.localManifest)
+	var pkgs project.Packages
+	if !fetchPkgsFlags.localManifest {
+		_, _, pkgs, err = project.LoadUpdatedManifest(jirix, localProjects, fetchPkgsFlags.localManifest)
+	} else {
+		_, _, pkgs, err = project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, fetchPkgsFlags.localManifest)
+	}
 	if err != nil {
 		return err
 	}

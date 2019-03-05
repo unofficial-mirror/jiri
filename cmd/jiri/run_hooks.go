@@ -34,7 +34,7 @@ func init() {
 	cmdRunHooks.Flags.BoolVar(&runHooksFlags.fetchPackages, "fetch-packages", true, "Use fetching packages using jiri.")
 }
 
-func runHooks(jirix *jiri.X, args []string) error {
+func runHooks(jirix *jiri.X, args []string) (err error) {
 	localProjects, err := project.LocalProjects(jirix, project.FastScan)
 	if err != nil {
 		return err
@@ -45,7 +45,13 @@ func runHooks(jirix *jiri.X, args []string) error {
 	jirix.Attempts = runHooksFlags.attempts
 
 	// Get hooks.
-	_, hooks, pkgs, err := project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
+	var hooks project.Hooks
+	var pkgs project.Packages
+	if !runHooksFlags.localManifest {
+		_, hooks, pkgs, err = project.LoadUpdatedManifest(jirix, localProjects, runHooksFlags.localManifest)
+	} else {
+		_, hooks, pkgs, err = project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
+	}
 	if err != nil {
 		return err
 	}
