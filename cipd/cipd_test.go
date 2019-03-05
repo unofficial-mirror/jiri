@@ -204,10 +204,7 @@ func TestCheckACL(t *testing.T) {
 	pkgMap := make(map[string]bool)
 	pkgMap[cipdPkgPathA] = false
 	pkgMap[cipdPkgPathB] = false
-	versionMap := make(map[string]string)
-	versionMap[cipdPkgPathA] = cipdPkgVersionA
-	versionMap[cipdPkgPathB] = cipdPkgVersionB
-	if err := CheckPackageACL(nil, pkgMap, versionMap); err != nil {
+	if err := CheckPackageACL(nil, pkgMap); err != nil {
 		t.Errorf("CheckPackageACL failed due to error: %v", err)
 	}
 

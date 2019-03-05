@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -259,15 +260,24 @@ type packageACL struct {
 	access bool
 }
 
-func checkPackageACL(jirix *jiri.X, path, version string, c chan<- packageACL) {
+func checkPackageACL(jirix *jiri.X, cipdPath, jsonDir string, c chan<- packageACL) {
 	// cipd should be already bootstrapped before this go routine.
 	// Silently return a false just in case if cipd is not found.
 	if cipdBinary == "" {
-		c <- packageACL{path: path, access: false}
+		c <- packageACL{path: cipdPath, access: false}
 		return
 	}
 
-	args := []string{"resolve", path, "-version", version}
+	jsonFile, err := ioutil.TempFile(jsonDir, "cipd*.json")
+	if err != nil {
+		jirix.Logger.Warningf("Error while creating temporary file for cipd")
+		c <- packageACL{path: cipdPath, access: false}
+		return
+	}
+	jsonFileName := jsonFile.Name()
+	jsonFile.Close()
+
+	args := []string{"acl-check", "-reader", "-json-output", jsonFileName, cipdPath}
 	if jirix != nil {
 		jirix.Logger.Debugf("Invoke cipd with %v", args)
 	}
@@ -275,25 +285,43 @@ func checkPackageACL(jirix *jiri.X, path, version string, c chan<- packageACL) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	command.Stdout = &stdoutBuf
 	command.Stderr = &stderrBuf
-	// Return false if cipd cannot be executed or cipd returned a non-zero
-	// return code, which usually means the package cannot be found due to
-	// access control.
+	// Return false if cipd cannot be executed or output jsonfile contains false.
 	if err := command.Run(); err != nil {
 		if jirix != nil {
 			jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stderrBuf.String())
 		}
-		c <- packageACL{path: path, access: false}
+		c <- packageACL{path: cipdPath, access: false}
 		return
 	}
-	// cipd returned zero. Package can be accessed.
-	c <- packageACL{path: path, access: true}
+
+	jsonData, err := ioutil.ReadFile(jsonFileName)
+	if err != nil {
+		c <- packageACL{path: cipdPath, access: false}
+		return
+	}
+
+	var result struct {
+		Result bool `json:"result"`
+	}
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		c <- packageACL{path: cipdPath, access: false}
+		return
+	}
+
+	if !result.Result {
+		c <- packageACL{path: cipdPath, access: false}
+		return
+	}
+
+	// Package can be accessed.
+	c <- packageACL{path: cipdPath, access: true}
 	return
 }
 
 // CheckPackageACL checks cipd's access to packages in map "pkgs". The package
 // names in "pkgs" should have trailing '/' removed before calling this
 // function.
-func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool, versions map[string]string) error {
+func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool) error {
 	// Not declared as CheckPackageACL(jirix *jiri.X, pkgs map[*package.Package]bool)
 	// due to import cycles. Package jiri/package imports jiri/cipd so here we cannot
 	// import jiri/package.
@@ -301,9 +329,15 @@ func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool, versions map[string]st
 		return err
 	}
 
+	jsonDir, err := ioutil.TempDir("", "jiri_cipd")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(jsonDir)
+
 	c := make(chan packageACL)
 	for key := range pkgs {
-		go checkPackageACL(jirix, key, versions[key], c)
+		go checkPackageACL(jirix, key, jsonDir, c)
 	}
 
 	for i := 0; i < len(pkgs); i++ {

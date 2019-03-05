@@ -447,18 +447,16 @@ func (p Package) Key() PackageKey {
 func (p *Packages) FilterACL(jirix *jiri.X) (Packages, bool, error) {
 	// Perform ACL checks on internal projects
 	pkgACLMap := make(map[string]bool)
-	pkgVersionMap := make(map[string]string)
 	hasInternal := false
 	for _, pkg := range *p {
 		pkg.Name = strings.TrimRight(pkg.Name, "/")
 		if pkg.Internal {
 			hasInternal = true
 			pkgACLMap[pkg.Name] = false
-			pkgVersionMap[pkg.Name] = pkg.Version
 		}
 	}
 	if len(pkgACLMap) != 0 {
-		if err := cipd.CheckPackageACL(jirix, pkgACLMap, pkgVersionMap); err != nil {
+		if err := cipd.CheckPackageACL(jirix, pkgACLMap); err != nil {
 			return nil, false, err
 		}
 	}
