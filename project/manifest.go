@@ -564,7 +564,7 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 	enforceProjLocks := func(jirix *jiri.X) (err error) {
 		for _, v := range ld.Projects {
 			if projectLock, ok := ld.ProjectLocks[ProjectLockKey(v.Key())]; ok {
-				if v.Revision == "" {
+				if v.Revision == "" || v.Revision == "HEAD" {
 					v.Revision = projectLock.Revision
 					ld.Projects[v.Key()] = v
 				} else if v.Revision != projectLock.Revision {

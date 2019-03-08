@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -193,39 +192,59 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 	return nil
 }
 
-// loadLockfile will only report errors on lockfiles such as unknown format or confliting data.
+// loadLockFile will recursively load lockfiles from dir to its parent directories until it
+// reaches $JIRI_ROOT. It will only report errors on lockfiles such as unknown format or confliting data.
 // All I/O related errors will be ignored.
-func (ld *loader) loadLockfile(jirix *jiri.X, dir, lockFileName string) error {
-	lockfile := path.Join(dir, lockFileName)
-	if ld.lockfiles[lockfile] {
+func (ld *loader) loadLockFile(jirix *jiri.X, repoPath, dir, lockFileName, ref string) error {
+	lockfile := filepath.Join(dir, lockFileName)
+	lockKey := lockfile
+	if repoPath != "" {
+		lockKey = filepath.Join(repoPath, lockfile) + ":" + ref
+	}
+	if ld.lockfiles[lockKey] {
 		return nil
 	}
 
 	if !(dir == "" || dir == "." || dir == jirix.Root || dir == string(filepath.Separator)) {
-		if err := ld.loadLockfile(jirix, path.Dir(dir), lockFileName); err != nil {
+		if err := ld.loadLockFile(jirix, repoPath, filepath.Dir(dir), lockFileName, ref); err != nil {
 			return err
 		}
 	}
-	if _, err := os.Stat(lockfile); err != nil {
-		if os.IsNotExist(err) {
-			jirix.Logger.Debugf("could not find %q file at %q", lockFileName, lockfile)
-		} else {
-			jirix.Logger.Debugf("could not access %q file at %q due to error %v", lockFileName, lockfile, err)
+
+	var data []byte
+	if repoPath != "" {
+		s, err := gitutil.New(jirix, gitutil.RootDirOpt(repoPath)).Show(ref, lockfile)
+		if err != nil {
+			// It's fine if jiri.lock cannot be find, skip this jiri.lock
+			jirix.Logger.Debugf("Could not find %q in repository %q for ref %q", lockfile, repoPath, ref)
+			return nil
 		}
-		// Supress I/O errors as it is OK if a lockfile cannot be accessed.
-		return nil
+		data = []byte(s)
+	} else {
+		if _, err := os.Stat(lockfile); err != nil {
+			if os.IsNotExist(err) {
+				jirix.Logger.Debugf("could not find %q file at %q", lockFileName, lockfile)
+			} else {
+				jirix.Logger.Debugf("could not access %q file at %q due to error %v", lockFileName, lockfile, err)
+			}
+			return nil
+		}
+		temp, err := ioutil.ReadFile(lockfile)
+		if err != nil {
+			// Supress I/O errors as it is OK if a lockfile cannot be accessed.
+			return nil
+		}
+		data = temp
 	}
-	data, err := ioutil.ReadFile(lockfile)
-	if err != nil {
-		jirix.Logger.Debugf("could not read %q file at %q due to error %v", lockFileName, lockfile, err)
-		// Supress I/O errors as it is OK if a lockfile cannot be accessed.
-		return nil
-	}
-	if err = ld.parseLockData(jirix, data); err != nil {
+	if err := ld.parseLockData(jirix, data); err != nil {
 		return err
 	}
-	jirix.Logger.Debugf("loaded lockfile at %s", lockfile)
-	ld.lockfiles[lockfile] = true
+	if repoPath == "" {
+		jirix.Logger.Debugf("loaded lockfile at %s", lockfile)
+	} else {
+		jirix.Logger.Debugf("loaded lockfile at %q in repository %q for ref %q", lockfile, repoPath, ref)
+	}
+	ld.lockfiles[lockKey] = true
 	return nil
 }
 
@@ -277,7 +296,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 				return nil, fmt.Errorf("Error reading from manifest file %s %s:%s:error(%s)", repoPath, ref, file, err)
 			}
 			if jirix.LockfileEnabled {
-				if err := ld.loadLockfile(jirix, path.Dir(file), jirix.LockfileName); err != nil {
+				if err := ld.loadLockFile(jirix, repoPath, filepath.Dir(file), jirix.LockfileName, ref); err != nil {
 					return nil, err
 				}
 			}
@@ -293,15 +312,8 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 			return nil, fmt.Errorf("Error reading from manifest file %s %s:%s:error(%s)", repoPath, ref, file, err)
 		}
 		if jirix.LockfileEnabled {
-			lockfile := path.Join(path.Dir(file), jirix.LockfileName)
-			if s, err = gitutil.New(jirix, gitutil.RootDirOpt(repoPath)).Show(ref, lockfile); err != nil {
-				// It's fine if jiri.lock cannot be read, skip the jiri.lock
-				jirix.Logger.Debugf("Could not find jiri.lock at %s/%s", repoPath, lockfile)
-			} else {
-				if err = ld.parseLockData(jirix, []byte(s)); err != nil {
-					return nil, err
-				}
-				jirix.Logger.Debugf("loaded lockfile at %s/%s", repoPath, lockfile)
+			if err := ld.loadLockFile(jirix, repoPath, filepath.Dir(file), jirix.LockfileName, ref); err != nil {
+				return nil, err
 			}
 		}
 		return m, nil
