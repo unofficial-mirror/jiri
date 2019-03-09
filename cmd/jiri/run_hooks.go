@@ -55,12 +55,13 @@ func runHooks(jirix *jiri.X, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := project.RunHooks(jirix, hooks, runHooksFlags.hookTimeout); err != nil {
+	if err = project.RunHooks(jirix, hooks, runHooksFlags.hookTimeout); err != nil {
 		return err
 	}
 	// Get packages if the fetchPackages is true
 	if runHooksFlags.fetchPackages && len(pkgs) > 0 {
-		return project.FetchPackages(jirix, pkgs, runHooksFlags.hookTimeout)
+		// Extend timeout for packages to be 5 times the timeout of a single hook.
+		return project.FetchPackages(jirix, pkgs, runHooksFlags.hookTimeout*5)
 	}
 	return nil
 }

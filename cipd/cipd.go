@@ -404,7 +404,11 @@ func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 
-	return command.Run()
+	err = command.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		err = ctx.Err()
+	}
+	return err
 }
 
 // TODO: Using PackageLock in project package directly will cause an import
