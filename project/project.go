@@ -892,7 +892,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, lockFilePath st
 			}
 		}
 		if enablePkgLocks {
-			pkgLocks, err = resolvePackageLocks(jirix, pkgs)
+			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgs)
 			if err != nil {
 				return
 			}
@@ -1778,7 +1778,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	}
 
 	if shouldFetchPkgs && len(pkgs) > 0 {
-		if err := FetchPackages(jirix, pkgs, fetchTimeout); err != nil {
+		if err := FetchPackages(jirix, remoteProjects, pkgs, fetchTimeout); err != nil {
 			return err
 		}
 	}

@@ -2338,3 +2338,61 @@ func TestWritePackageFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestPackageVersionTemplate(t *testing.T) {
+	jirix, cleanup := jiritest.NewX(t)
+	defer cleanup()
+
+	testProjs := []project.Project{
+		project.Project{
+			Name:       "testTP0",
+			Path:       "testTP0",
+			Remote:     "https://example.com/testTP0",
+			Revision:   "acf8ae59e121b3922bc8ac979323a531da418cc5",
+			GerritHost: "https://example.com",
+		},
+		project.Project{
+			Name:       "testTP1",
+			Path:       "testTP1",
+			Remote:     "https://example.com/testTP1",
+			Revision:   "1e4aee79b472a6939ac26811c5dee8a132c29fef",
+			GerritHost: "https://example.com",
+		},
+	}
+
+	testPkgs := []project.Package{
+		project.Package{
+			Name:    "test0",
+			Version: "git_revision:{{(index .Projects \"testTP0\").Revision}}",
+			Path:    "test0",
+		},
+		project.Package{
+			Name:    "test1",
+			Version: "git_revision:{{(index .Projects \"testTP1\").Revision}}",
+			Path:    "test0",
+		},
+	}
+
+	projects := make(project.Projects)
+	pkgs := make(project.Packages)
+	verificationMap := make(map[string]project.Project)
+	for i, v := range testPkgs {
+		projects[testProjs[i].Key()] = testProjs[i]
+		pkgs[v.Key()] = v
+		verificationMap[v.Name] = testProjs[i]
+	}
+
+	pkgs, err := project.ResolveImplicitPackageVersions(jirix, projects, pkgs)
+	if err != nil {
+		t.Errorf("ResolveImplicitPackageVersions failed due to error: %v", err)
+	}
+	for _, v := range pkgs {
+		if proj, ok := verificationMap[v.Name]; ok {
+			if proj.Revision != v.Version[len("git_revision:"):] {
+				t.Errorf("expecting \"git_revision:%s\", got %q", proj.Revision, v.Version)
+			}
+		} else {
+			t.Errorf("unexpected package %+v", v)
+		}
+	}
+}
