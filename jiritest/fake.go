@@ -35,9 +35,8 @@ const (
 // closure must be run to cleanup temporary directories and restore the original
 // environment; typically it is run as a defer function.
 func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
+	// lockfiles are disabled in tests by defaults
 	jirix, cleanup := NewX(t)
-	// Disable lockfile in tests
-	jirix.LockfileEnabled = false
 	fake := &FakeJiriRoot{
 		X:        jirix,
 		Projects: map[string]string{},
@@ -115,6 +114,19 @@ func (fake FakeJiriRoot) AddHook(hook project.Hook) error {
 		return err
 	}
 	manifest.Hooks = append(manifest.Hooks, hook)
+	if err := fake.WriteRemoteManifest(manifest); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AddPackage adds the given package to a remote manifest.
+func (fake FakeJiriRoot) AddPackage(pkg project.Package) error {
+	manifest, err := fake.ReadRemoteManifest()
+	if err != nil {
+		return err
+	}
+	manifest.Packages = append(manifest.Packages, pkg)
 	if err := fake.WriteRemoteManifest(manifest); err != nil {
 		return err
 	}

@@ -72,6 +72,11 @@ type Project struct {
 	// this project.
 	GitHooks string `xml:"githooks,attr,omitempty"`
 
+	// Attributes is a list of attributes for a project seperated by comma that
+	// will be helpful to group projects with similar purposes together. By
+	// default, jiri will use the directory name as attribute.
+	Attributes string `xml:"attributes,attr,omitempty"`
+
 	XMLName struct{} `xml:"project"`
 
 	// This is used to store computed key. This is useful when remote and
@@ -80,6 +85,10 @@ type Project struct {
 
 	// This stores the local configuration file for the project
 	LocalConfig LocalConfig `xml:"-"`
+
+	// ComputedAttributes stores computed attributes object
+	// which is easiler to perform matching and comparing.
+	ComputedAttributes attributes `xml:"-"`
 }
 
 // ProjectsByPath implements the Sort interface. It sorts Projects by
@@ -240,6 +249,58 @@ func (p *Project) update(other *Project) {
 	if other.GitHooks != "" {
 		p.GitHooks = other.GitHooks
 	}
+}
+
+type attributes map[string]bool
+
+// newAttributes will create a new attributes object
+// which is used in Project and Package objects.
+func newAttributes(attrs string) attributes {
+	retMap := make(attributes)
+	if strings.HasPrefix(attrs, "+") {
+		attrs = attrs[1:]
+	}
+	for _, v := range strings.Split(attrs, ",") {
+		key := strings.TrimSpace(v)
+		if key != "" {
+			retMap[key] = true
+		}
+	}
+	return retMap
+}
+
+func (m attributes) IsEmpty() bool {
+	return len(m) == 0
+}
+
+func (m attributes) Add(other attributes) {
+	for k := range other {
+		if _, ok := m[k]; !ok {
+			m[k] = true
+		}
+	}
+}
+
+func (m attributes) Match(other attributes) bool {
+	for k := range other {
+		if _, ok := m[k]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (m attributes) String() string {
+	var buf bytes.Buffer
+	first := true
+	for k := range m {
+		if !first {
+			buf.WriteString(",")
+		}
+		buf.WriteString(k)
+		first = false
+	}
+	return buf.String()
 }
 
 // ProjectLock describes locked version information for a jiri managed project.
@@ -527,8 +588,12 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, loca
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
-	// Create a new Manifest with a Jiri version pinned to each snapshot
-	manifest := Manifest{Version: ManifestVersion}
+	// Create a new Manifest with a Jiri version and current attributes
+	// pinned to each snapshot
+	manifest := Manifest{
+		Version:    ManifestVersion,
+		Attributes: jirix.FetchingAttrs,
+	}
 
 	// Add all local projects to manifest.
 	localProjects, err := LocalProjects(jirix, FullScan)
@@ -810,7 +875,7 @@ func loadManifestFiles(jirix *jiri.X, manifestFiles []string, localManifest bool
 	addProject := func(projects Projects) error {
 		for _, project := range projects {
 			if existingProject, ok := allProjects[project.Key()]; ok {
-				if existingProject != project {
+				if !reflect.DeepEqual(existingProject, project) {
 					return fmt.Errorf("project: %v conflicts with project: %v", existingProject, project)
 				}
 				continue
@@ -1678,9 +1743,46 @@ func fetchLocalProjects(jirix *jiri.X, localProjects, remoteProjects Projects) e
 	return nil
 }
 
+// FilterOptionalProjectsPackages removes projects and packages in place if the Optional field is true and
+// attributes in attrs does not match the Attributes field. Currently "match" means the intersection of
+// both attributes is not empty.
+func FilterOptionalProjectsPackages(jirix *jiri.X, attrs string, projects Projects, pkgs Packages) error {
+	allowedAttrs := newAttributes(attrs)
+
+	for k, v := range projects {
+		if !v.ComputedAttributes.IsEmpty() {
+			if v.ComputedAttributes == nil {
+				return fmt.Errorf("project %+v should have valid ComputedAttributes, but it is nil", v)
+			}
+			if !allowedAttrs.Match(v.ComputedAttributes) {
+				jirix.Logger.Debugf("project %q is filtered (%s:%s)", v.Name, v.ComputedAttributes, allowedAttrs)
+				delete(projects, k)
+			}
+		}
+	}
+
+	for k, v := range pkgs {
+		if !v.ComputedAttributes.IsEmpty() {
+			if v.ComputedAttributes == nil {
+				return fmt.Errorf("package %+v should have valid ComputedAttributes, but it is nil", v)
+			}
+			if !allowedAttrs.Match(v.ComputedAttributes) {
+				jirix.Logger.Debugf("package %q is filtered (%s:%s)", v.Name, v.ComputedAttributes, allowedAttrs)
+				delete(pkgs, k)
+			}
+		}
+	}
+	return nil
+}
+
 func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks Hooks, pkgs Packages, gc bool, runHookTimeout, fetchTimeout uint, rebaseTracked, rebaseUntracked, rebaseAll, snapshot, shouldRunHooks, shouldFetchPkgs bool) error {
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
+
+	// filter optional projects
+	if err := FilterOptionalProjectsPackages(jirix, jirix.FetchingAttrs, remoteProjects, pkgs); err != nil {
+		return err
+	}
 
 	if err := updateCache(jirix, remoteProjects); err != nil {
 		return err

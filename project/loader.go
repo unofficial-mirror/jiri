@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"fuchsia.googlesource.com/jiri"
@@ -324,6 +325,12 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		return err
 	}
 
+	if jirix.UsingSnapshot {
+		// using attributes defined in snapshot file instead of
+		// using predefined ones in jiri init.
+		jirix.FetchingAttrs = m.Attributes
+	}
+
 	// Process remote imports.
 	for _, remote := range m.Imports {
 		nextRoot := filepath.Join(root, remote.Root)
@@ -377,6 +384,9 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 
 	// Collect projects.
 	for _, project := range m.Projects {
+		// normalize project attributes
+		project.ComputedAttributes = newAttributes(project.Attributes)
+		project.Attributes = project.ComputedAttributes.String()
 		// Make paths absolute by prepending <root>.
 		project.absolutizePaths(filepath.Join(jirix.Root, root))
 
@@ -401,7 +411,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 			}
 		}
 
-		if dup, ok := ld.Projects[key]; ok && dup != project {
+		if dup, ok := ld.Projects[key]; ok && !reflect.DeepEqual(dup, project) {
 			// TODO(toddw): Tell the user the other conflicting file.
 			return fmt.Errorf("duplicate project %q found in %q", key, shortFileName(jirix.Root, repoPath, file, ref))
 		}
@@ -442,6 +452,9 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 	}
 
 	for _, pkg := range m.Packages {
+		// normalize package attributes.
+		pkg.ComputedAttributes = newAttributes(pkg.Attributes)
+		pkg.Attributes = pkg.ComputedAttributes.String()
 		key := pkg.Key()
 		ld.Packages[key] = pkg
 	}

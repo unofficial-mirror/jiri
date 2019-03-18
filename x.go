@@ -53,6 +53,7 @@ type Config struct {
 	LockfileEnabled   bool   `xml:"lockfile>enabled,omitempty"`
 	LockfileName      string `xml:"lockfile>name,omitempty"`
 	PrebuiltJSON      string `xml:"prebuilt>JSON,omitempty"`
+	FetchingAttrs     string `xml:"fetchingAttrs,omitempty"`
 	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	// version user has opted-in to
@@ -108,6 +109,7 @@ type X struct {
 	LockfileName        string
 	SsoCookiePath       string
 	PrebuiltJSON        string
+	FetchingAttrs       string
 	UsingSnapshot       bool
 	IgnoreLockConflicts bool
 	Color               color.Color
@@ -247,6 +249,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 		x.LockfileEnabled = x.config.LockfileEnabled
 		x.LockfileName = x.config.LockfileName
 		x.PrebuiltJSON = x.config.PrebuiltJSON
+		x.FetchingAttrs = x.config.FetchingAttrs
 		if x.LockfileName == "" {
 			x.LockfileName = "jiri.lock"
 		}

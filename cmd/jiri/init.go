@@ -45,6 +45,11 @@ var (
 	enableLockfileFlag    string
 	lockfileNameFlag      string
 	prebuiltJSON          string
+	optionalAttrs         string
+)
+
+const (
+	optionalAttrsNotSet = "[ATTRIBUTES_NOT_SET]"
 )
 
 func init() {
@@ -58,6 +63,9 @@ func init() {
 	cmdInit.Flags.StringVar(&enableLockfileFlag, "enable-lockfile", "", "Enable lockfile enforcement")
 	cmdInit.Flags.StringVar(&lockfileNameFlag, "lockfile-name", "", "Set up filename of lockfile")
 	cmdInit.Flags.StringVar(&prebuiltJSON, "prebuilt-json", "", "Set up filename for prebuilt json file")
+	// Empty string is not used as default value for optionalAttrs as we
+	// use empty string to clear existing saved attributes.
+	cmdInit.Flags.StringVar(&optionalAttrs, "fetch-optional", optionalAttrsNotSet, "Set up attributes of optional projects and packages that should be fetched by jiri.")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -143,6 +151,10 @@ func runInit(env *cmdline.Env, args []string) error {
 		} else {
 			config.RewriteSsoToHttps = val
 		}
+	}
+
+	if optionalAttrs != optionalAttrsNotSet {
+		config.FetchingAttrs = optionalAttrs
 	}
 
 	if ssoCookieFlag != "" {

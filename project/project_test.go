@@ -2396,3 +2396,116 @@ func TestPackageVersionTemplate(t *testing.T) {
 		}
 	}
 }
+
+func TestOptionalProjectsAndPackages(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Set up projects and packages with explict attributes
+	numProjects := 3
+	numOptionalProjects := 2
+	localProjects := []project.Project{}
+
+	createRemoteProj := func(i int, attributes string) {
+		name := projectName(i)
+		path := fmt.Sprintf("path-%d", i)
+		if err := fake.CreateRemoteProject(name); err != nil {
+			t.Errorf("failed to create remote project due to error: %v", err)
+		}
+		p := project.Project{
+			Name:       name,
+			Path:       filepath.Join(fake.X.Root, path),
+			Remote:     fake.Projects[name],
+			Attributes: attributes,
+		}
+		localProjects = append(localProjects, p)
+		if err := fake.AddProject(p); err != nil {
+			t.Errorf("failed to add a project to manifest due to error: %v", err)
+		}
+	}
+
+	for i := 0; i < numProjects; i++ {
+		createRemoteProj(i, "")
+	}
+
+	for i := numProjects; i < numProjects+numOptionalProjects; i++ {
+		createRemoteProj(i, "optional,debug")
+	}
+
+	// Create initial commit in each repo.
+	for _, remoteProjectDir := range fake.Projects {
+		writeReadme(t, fake.X, remoteProjectDir, "initial readme")
+	}
+	pkg0 := project.Package{
+		Name:       "gn/gn/${platform}",
+		Path:       "path-pkg0",
+		Version:    "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
+		Attributes: "debug,testing",
+	}
+	pkg1 := project.Package{
+		Name:       "fuchsia/tools/jiri/${platform}",
+		Path:       "path-pkg1",
+		Version:    "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
+		Attributes: "",
+	}
+
+	fake.AddPackage(pkg0)
+	fake.AddPackage(pkg1)
+
+	pathExists := func(projPath string) bool {
+		if _, err := os.Stat(projPath); err != nil {
+			if os.IsNotExist(err) {
+				return false
+			}
+			t.Errorf("failed to access path due to error: %v", err)
+		}
+		return true
+	}
+	assertExist := func(localPath string) {
+		if !pathExists(localPath) {
+			t.Errorf("expecting path %q exists, but it does not", localPath)
+		}
+	}
+	assertNotExist := func(localPath string) {
+		if pathExists(localPath) {
+			t.Errorf("expecting path %q does not exist, but it does", localPath)
+		}
+	}
+
+	// Try default mode
+	fake.X.FetchingAttrs = ""
+	fake.UpdateUniverse(true)
+	// The optional projects should not be fetched
+	for i := 0; i < numProjects; i++ {
+		assertExist(localProjects[i].Path)
+	}
+	for i := numProjects; i < numOptionalProjects+numProjects; i++ {
+		assertNotExist(localProjects[i].Path)
+	}
+	assertNotExist(filepath.Join(fake.X.Root, pkg0.Path))
+	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
+
+	// Try setting attributes to "optional, testing"
+	fake.X.FetchingAttrs = "optional, testing"
+	fake.UpdateUniverse(true)
+	for i := 0; i < numProjects; i++ {
+		assertExist(localProjects[i].Path)
+	}
+	for i := numProjects; i < numOptionalProjects+numProjects; i++ {
+		assertExist(localProjects[i].Path)
+	}
+	assertExist(filepath.Join(fake.X.Root, pkg0.Path))
+	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
+
+	// Reset optional attributes
+	fake.X.FetchingAttrs = "nonexist"
+	fake.UpdateUniverse(true)
+	for i := 0; i < numProjects; i++ {
+		assertExist(localProjects[i].Path)
+	}
+	for i := numProjects; i < numOptionalProjects+numProjects; i++ {
+		assertNotExist(localProjects[i].Path)
+	}
+	assertNotExist(filepath.Join(fake.X.Root, pkg0.Path))
+	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
+}
