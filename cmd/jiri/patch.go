@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
@@ -28,6 +29,7 @@ var (
 	cherryPickFlag   bool
 	detachedHeadFlag bool
 	patchProjectFlag string
+	rebaseFailures   uint32
 )
 
 func init() {
@@ -41,6 +43,12 @@ func init() {
 	cmdPatch.Flags.BoolVar(&cherryPickFlag, "cherry-pick", false, `Cherry-pick patches instead of checking out.`)
 	cmdPatch.Flags.BoolVar(&detachedHeadFlag, "no-branch", false, `Don't create the branch for the patch.`)
 }
+
+// Use a special exit code to signal that we failed due to a rebase error.
+// The recipes will use this to detect when the failure should be considered
+// an infrastructure failure vs a failure that is addressable by the user.
+// Rebase errors are addressable by the user.
+const rebaseFailedErr = cmdline.ErrExitCode(24)
 
 // cmdPatch represents the "jiri patch" command.
 var cmdPatch = &cmdline.Command{
@@ -190,6 +198,7 @@ func rebaseProject(jirix *jiri.X, project project.Project, remoteBranch string) 
 		}
 		jirix.Logger.Errorf("Cannot rebase the change: %s", err)
 		jirix.IncrementFailures()
+		atomic.AddUint32(&rebaseFailures, 1)
 		return nil
 	}
 	jirix.Logger.Infof("Project rebased\n")
@@ -448,7 +457,11 @@ func runPatch(jirix *jiri.X, args []string) error {
 			}
 		}
 	}
-	if jirix.Failures() != 0 {
+	// In the case where jiri is called programatically by a recipe,
+	// we want to make it clear to the recipe if all failures were rebase errors.
+	if rebaseFailures != 0 && rebaseFailures == jirix.Failures() {
+		return rebaseFailedErr
+	} else if jirix.Failures() != 0 {
 		return fmt.Errorf("Patch failed")
 	}
 	return nil
