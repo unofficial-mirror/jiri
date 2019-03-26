@@ -63,6 +63,8 @@ type CLOpts struct {
 	Edit bool
 	// GitOptions pass through additional git options
 	GitOptions string
+	// Labels records a list of labels needs to pass through gerrit.
+	Labels []string
 	// Remote identifies the Gerrit remote that this CL will be pushed to
 	Remote string
 	// Presubmit determines what presubmit tests to run.
@@ -549,6 +551,7 @@ func Reference(opts CLOpts) string {
 		ref = "refs/for/" + opts.RemoteBranch
 	}
 	var params []string
+	params = append(params, formatParams(opts.Labels, "l")...)
 	params = append(params, formatParams(opts.Reviewers, "r")...)
 	params = append(params, formatParams(opts.Ccs, "cc")...)
 	if opts.Topic != "" {

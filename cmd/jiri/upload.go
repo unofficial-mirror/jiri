@@ -28,6 +28,7 @@ var (
 	uploadMultipartFlag    bool
 	uploadBranchFlag       string
 	uploadRemoteBranchFlag string
+	uploadLabelsFlag       string
 	uploadGitOptions       string
 )
 
@@ -56,6 +57,7 @@ func init() {
 	cmdUpload.Flags.StringVar(&uploadPresubmitFlag, "presubmit", string(gerrit.PresubmitTestTypeAll),
 		fmt.Sprintf("The type of presubmit tests to run. Valid values: %s.", strings.Join(gerrit.PresubmitTestTypes(), ",")))
 	cmdUpload.Flags.StringVar(&uploadReviewersFlag, "r", "", `Comma-separated list of emails or LDAPs to request review.`)
+	cmdUpload.Flags.StringVar(&uploadLabelsFlag, "l", "", `Comma-separated list of review labels.`)
 	cmdUpload.Flags.StringVar(&uploadTopicFlag, "topic", "", `CL topic. Default is <username>-<branchname>. If this flag is set, upload will ignore -set-topic and will set a topic.`)
 	cmdUpload.Flags.BoolVar(&uploadSetTopicFlag, "set-topic", false, `Set topic. This flag would be ignored if -topic passed.`)
 	cmdUpload.Flags.BoolVar(&uploadVerifyFlag, "verify", true, `Run pre-push git hooks.`)
@@ -214,6 +216,7 @@ func runUpload(jirix *jiri.X, args []string) error {
 			RemoteBranch: remoteBranch,
 			Remote:       "origin",
 			Reviewers:    parseEmails(uploadReviewersFlag),
+			Labels:       parseLabels(uploadLabelsFlag),
 			Verify:       uploadVerifyFlag,
 			Topic:        topic,
 			RefToUpload:  refToUpload,
@@ -278,4 +281,19 @@ func parseEmails(value string) []string {
 		emails = append(emails, token)
 	}
 	return emails
+}
+
+// parseLabels input a list of comma separated tokens and outputs a
+// list of tokens without whitespaces
+func parseLabels(value string) []string {
+	var ret []string
+	tokens := strings.Split(value, ",")
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		ret = append(ret, token)
+	}
+	return ret
 }
