@@ -942,7 +942,7 @@ func generateEnsureFile(jirix *jiri.X, projects Projects, pkgs Packages, ignoreC
 
 	for _, pkg := range pkgs {
 
-		cipdDecl, err := pkg.cipdDecl(jirix.UsingSnapshot)
+		cipdDecl, err := pkg.cipdDecl(jirix)
 		if err != nil {
 			return "", err
 		}
@@ -961,7 +961,7 @@ func generateEnsureFile(jirix *jiri.X, projects Projects, pkgs Packages, ignoreC
 	return ensureFilePath, nil
 }
 
-func (p *Package) cipdDecl(usingSnapshot bool) (string, error) {
+func (p *Package) cipdDecl(jirix *jiri.X) (string, error) {
 	var buf bytes.Buffer
 	// Write "@Subdir" line to cipd declaration
 	subdir, err := p.GetPath()
@@ -983,23 +983,30 @@ func (p *Package) cipdDecl(usingSnapshot bool) (string, error) {
 	}
 	var cipdPath, version string
 	version = p.Version
-	if usingSnapshot {
+	cipdPath, err = cipd.Decl(p.Name, plats)
+	if err != nil {
+		return "", err
+	}
+	if jirix.UsingSnapshot && len(p.Instances) != 0 {
 		candPath, err := cipd.Expand(p.Name, []cipd.Platform{cipd.CipdPlatform})
 		if err != nil {
 			return "", err
 		}
-		// since err != nil, candPath cannot be empty
-		cipdPath = candPath[0]
-		for _, inst := range p.Instances {
-			if inst.Name == cipdPath {
-				version = inst.ID
-				break
+		if len(candPath) > 0 {
+			for _, inst := range p.Instances {
+				if inst.Name == candPath[0] {
+					cipdPath = candPath[0]
+					version = inst.ID
+					break
+				}
 			}
-		}
-	} else {
-		cipdPath, err = cipd.Decl(p.Name, plats)
-		if err != nil {
-			return "", err
+		} else {
+			// cipd.Expand failed expand
+			// This may happen if the cipdPath does not allow platform
+			// in cipd.CipdPlatform. E.g.
+			// "example/linux-${arch=amd64}" expanded with "linux-arm64".
+			// Leave a log in Debug log.
+			jirix.Logger.Debugf("cipd.Expand failed to expand cipd path %q using platforms %v", p.Name, cipd.CipdPlatform)
 		}
 	}
 	buf.WriteString(fmt.Sprintf("%s %s\n", cipdPath, version))

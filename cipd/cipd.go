@@ -638,7 +638,8 @@ func (t Expander) Expand(template string) (pkg string, err error) {
 }
 
 // Expand method expands a cipdPath that contains templates such as ${platform}
-// into concrete full paths.
+// into concrete full paths. It might return an empty slice if platforms
+// do not match the requirements in cipdPath.
 func Expand(cipdPath string, platforms []Platform) ([]string, error) {
 	output := make([]string, 0)
 	//expanders := make([]Expander, 0)
