@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -50,7 +51,7 @@ type Config struct {
 	Shared            bool   `xml:"cache>shared,omitempty"`
 	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
 	SsoCookiePath     string `xml:"SsoCookiePath,omitempty"`
-	LockfileEnabled   bool   `xml:"lockfile>enabled,omitempty"`
+	LockfileEnabled   string `xml:"lockfile>enabled,omitempty"`
 	LockfileName      string `xml:"lockfile>name,omitempty"`
 	PrebuiltJSON      string `xml:"prebuilt>JSON,omitempty"`
 	FetchingAttrs     string `xml:"fetchingAttrs,omitempty"`
@@ -246,7 +247,15 @@ func NewX(env *cmdline.Env) (*X, error) {
 		x.KeepGitHooks = x.config.KeepGitHooks
 		x.RewriteSsoToHttps = x.config.RewriteSsoToHttps
 		x.SsoCookiePath = x.config.SsoCookiePath
-		x.LockfileEnabled = x.config.LockfileEnabled
+		if x.config.LockfileEnabled == "" {
+			x.LockfileEnabled = true
+		} else {
+			if val, err := strconv.ParseBool(x.config.LockfileEnabled); err != nil {
+				return nil, fmt.Errorf("'config>lockfile>enable' flag should be true or false")
+			} else {
+				x.LockfileEnabled = val
+			}
+		}
 		x.LockfileName = x.config.LockfileName
 		x.PrebuiltJSON = x.config.PrebuiltJSON
 		x.FetchingAttrs = x.config.FetchingAttrs
