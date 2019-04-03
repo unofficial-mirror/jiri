@@ -605,43 +605,57 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 		return
 	}
 
+	enforcePkgLocks := func(jirix *jiri.X) (err error) {
+		usedPkgLocks := make(map[PackageLockKey]bool)
+		for k := range ld.PackageLocks {
+			usedPkgLocks[k] = false
+		}
+		for _, v := range ld.Packages {
+			plats, err := v.GetPlatforms()
+			if err != nil {
+				return err
+			}
+			pkgs, err := cipd.Expand(v.Name, plats)
+			if err != nil {
+				return err
+			}
+			for _, pkg := range pkgs {
+				if pkgLock, ok := ld.PackageLocks[PackageLockKey(pkg)]; ok {
+					if pkgLock.VersionTag != "" && pkgLock.VersionTag != v.Version && !jirix.IgnoreLockConflicts {
+						// Package version conflicts detected. Treated it as an error.
+						s := fmt.Sprintf("package %q has conflicting version in manifest and jiri.lock: %s:%s", v.Name, v.Version, pkgLock.VersionTag)
+						jirix.Logger.Debugf(s)
+						err = errors.New(s)
+					}
+					ins := PackageInstance{
+						Name: pkgLock.PackageName,
+						ID:   pkgLock.InstanceID,
+					}
+					v.Instances = append(v.Instances, ins)
+					ld.Packages[v.Key()] = v
+					usedPkgLocks[pkgLock.Key()] = true
+				} else {
+					jirix.Logger.Debugf("Package %q is not found in jiri.lock", pkg)
+				}
+			}
+			if err != nil {
+				return err
+			}
+		}
+		for k, v := range usedPkgLocks {
+			if !v {
+				jirix.Logger.Debugf("PackageLock %v is not used", k)
+			}
+		}
+		return
+	}
+
 	if err := enforceProjLocks(jirix); err != nil {
 		return err
 	}
 
-	usedPkgLocks := make(map[PackageLockKey]bool)
-	for k := range ld.PackageLocks {
-		usedPkgLocks[k] = false
-	}
-	for _, v := range ld.Packages {
-		plats, err := v.GetPlatforms()
-		if err != nil {
-			return err
-		}
-		pkgs, err := cipd.Expand(v.Name, plats)
-		if err != nil {
-			return err
-		}
-
-		for _, pkg := range pkgs {
-			if pkgLock, ok := ld.PackageLocks[PackageLockKey(pkg)]; ok {
-				ins := PackageInstance{
-					Name: pkgLock.PackageName,
-					ID:   pkgLock.InstanceID,
-				}
-				v.Instances = append(v.Instances, ins)
-				ld.Packages[v.Key()] = v
-				usedPkgLocks[pkgLock.Key()] = true
-			} else {
-				jirix.Logger.Debugf("Package %q is not found in jiri.lock", pkg)
-			}
-		}
-	}
-
-	for k, v := range usedPkgLocks {
-		if !v {
-			jirix.Logger.Debugf("PackageLock %v is not used", k)
-		}
+	if err := enforcePkgLocks(jirix); err != nil {
+		return err
 	}
 	return nil
 }
@@ -754,7 +768,11 @@ func resolvePackageLocks(jirix *jiri.X, projects Projects, pkgs Packages) (Packa
 	// layout that doesn't cause import cycles
 	pkgLocks := make(PackageLocks)
 	for _, val := range pkgInstances {
-		pkgLock := PackageLock{val.PackageName, val.InstanceID}
+		pkgLock := PackageLock{
+			PackageName: val.PackageName,
+			VersionTag:  val.VersionTag,
+			InstanceID:  val.InstanceID,
+		}
 		pkgLocks[pkgLock.Key()] = pkgLock
 	}
 

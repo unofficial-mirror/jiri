@@ -323,6 +323,7 @@ func (p ProjectLock) Key() ProjectLockKey {
 // PackageLock describes locked version information for a jiri managed package.
 type PackageLock struct {
 	PackageName string `json:"package"`
+	VersionTag  string `json:"version,omitempty"`
 	InstanceID  string `json:"instance_id"`
 }
 
@@ -334,6 +335,16 @@ type PackageLocks map[PackageLockKey]PackageLock
 
 func (p PackageLock) Key() PackageLockKey {
 	return PackageLockKey(p.PackageName)
+}
+
+// ResolveConfig interface provides the configuration
+// for jiri resolve command.
+type ResolveConfig interface {
+	LockFilePath() string
+	LocalManifest() bool
+	EnablePackageLock() bool
+	EnableProjectLock() bool
+	EnablePackageVersion() bool
 }
 
 // UnmarshalLockEntries unmarshals project locks and package locks from
@@ -356,7 +367,19 @@ func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
 			if !ok {
 				return nil, nil, fmt.Errorf("package instance_id %+v is not a valid string", entryMap["instance_id"])
 			}
-			pkgLock := PackageLock{pkgName, id}
+			version, ok := entryMap["version"].(string)
+			if !ok {
+				// Either "version" is not found or not valid,
+				// treated it as empty.
+				// TODO: haowei, once all lockfiles contains
+				// versions, change this case into an error.
+				version = ""
+			}
+			pkgLock := PackageLock{
+				PackageName: pkgName,
+				VersionTag:  version,
+				InstanceID:  id,
+			}
 			if v, ok := pkgLocks[pkgLock.Key()]; ok {
 				if v != pkgLock {
 					return nil, nil, fmt.Errorf("package %q has more than 1 version lock %q, %q", pkgName, v.InstanceID, id)
@@ -942,21 +965,21 @@ func writeLockFile(jirix *jiri.X, lockfilePath string, projectLocks ProjectLocks
 
 // GenerateJiriLockFile generates jiri lockfile to lockFilePath using
 // manifests in manifestFiles slice.
-func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, lockFilePath string, enableProjectLocks, enablePkgLocks, localManifest bool) error {
-	jirix.Logger.Debugf("Generate jiri lockfile for manifests %v to %q", manifestFiles, lockFilePath)
+func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig ResolveConfig) error {
+	jirix.Logger.Debugf("Generate jiri lockfile for manifests %v to %q", manifestFiles, resolveConfig.LockFilePath())
 
 	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool) (projectLocks ProjectLocks, pkgLocks PackageLocks, err error) {
 		projects, pkgs, err := loadManifestFiles(jirix, manifestFiles, localManifest)
 		if err != nil {
 			return nil, nil, err
 		}
-		if enableProjectLocks {
+		if resolveConfig.EnableProjectLock() {
 			projectLocks, err = resolveProjectLocks(jirix, projects)
 			if err != nil {
 				return
 			}
 		}
-		if enablePkgLocks {
+		if resolveConfig.EnablePackageLock() {
 			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgs)
 			if err != nil {
 				return
@@ -966,12 +989,20 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, lockFilePath st
 		return
 	}
 
-	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, localManifest)
+	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, resolveConfig.LocalManifest())
 	if err != nil {
 		return err
 	}
 
-	return writeLockFile(jirix, lockFilePath, projectLocks, pkgLocks)
+	// purge version tags if enablePackageVersion is false.
+	if !resolveConfig.EnablePackageVersion() {
+		for k, v := range pkgLocks {
+			v.VersionTag = ""
+			pkgLocks[k] = v
+		}
+	}
+
+	return writeLockFile(jirix, resolveConfig.LockFilePath(), projectLocks, pkgLocks)
 }
 
 // UpdateUniverse updates all local projects and tools to match the remote

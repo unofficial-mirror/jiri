@@ -10,12 +10,35 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
-var resolveFlags struct {
-	lockFilePath      string
-	localManifestFlag bool
-	enablePackageLock bool
-	enableProjectLock bool
+type resolveFlags struct {
+	lockFilePath         string
+	localManifestFlag    bool
+	enablePackageLock    bool
+	enableProjectLock    bool
+	enablePackageVersion bool
 }
+
+func (r *resolveFlags) LockFilePath() string {
+	return r.lockFilePath
+}
+
+func (r *resolveFlags) LocalManifest() bool {
+	return r.localManifestFlag
+}
+
+func (r *resolveFlags) EnablePackageLock() bool {
+	return r.enablePackageLock
+}
+
+func (r *resolveFlags) EnableProjectLock() bool {
+	return r.enableProjectLock
+}
+
+func (r *resolveFlags) EnablePackageVersion() bool {
+	return r.enablePackageVersion
+}
+
+var resolveFlag resolveFlags
 
 var cmdResolve = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runResolve),
@@ -31,10 +54,11 @@ provided, jiri will use .jiri_manifest by default.
 
 func init() {
 	flags := &cmdResolve.Flags
-	flags.StringVar(&resolveFlags.lockFilePath, "output", "jiri.lock", "Path to the generated lockfile")
-	flags.BoolVar(&resolveFlags.localManifestFlag, "local-manifest", false, "Use local manifest")
-	flags.BoolVar(&resolveFlags.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
-	flags.BoolVar(&resolveFlags.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
+	flags.StringVar(&resolveFlag.lockFilePath, "output", "jiri.lock", "Path to the generated lockfile")
+	flags.BoolVar(&resolveFlag.localManifestFlag, "local-manifest", false, "Use local manifest")
+	flags.BoolVar(&resolveFlag.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
+	flags.BoolVar(&resolveFlag.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
+	flags.BoolVar(&resolveFlag.enablePackageVersion, "enable-package-version", false, "Enable version tag for packages in lockfile")
 }
 
 func runResolve(jirix *jiri.X, args []string) error {
@@ -55,5 +79,5 @@ func runResolve(jirix *jiri.X, args []string) error {
 	// Jiri will halt when detecting conflicts in locks. So to make it work,
 	// we need to temporarily disable the conflicts detection.
 	jirix.IgnoreLockConflicts = true
-	return project.GenerateJiriLockFile(jirix, manifestFiles, resolveFlags.lockFilePath, resolveFlags.enableProjectLock, resolveFlags.enablePackageLock, resolveFlags.localManifestFlag)
+	return project.GenerateJiriLockFile(jirix, manifestFiles, &resolveFlag)
 }

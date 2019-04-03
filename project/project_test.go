@@ -2215,7 +2215,10 @@ func TestProjectToFromFile(t *testing.T) {
 func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
 
 	projectLock0 := project.ProjectLock{"https://dart.googlesource.com/web_socket_channel.git", "dart", "1.0.9"}
-	pkgLock0 := project.PackageLock{"fuchsia/go/mac-amd64", "3c33b55c1a75b900536c91181805bb8668857341"}
+	pkgLock0 := project.PackageLock{
+		PackageName: "fuchsia/go/mac-amd64",
+		InstanceID:  "3c33b55c1a75b900536c91181805bb8668857341",
+	}
 
 	testProjectLocks0 := project.ProjectLocks{
 		projectLock0.Key(): projectLock0,
