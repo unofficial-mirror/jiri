@@ -27,6 +27,7 @@ import (
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/osutil"
 	"fuchsia.googlesource.com/jiri/version"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -536,6 +537,169 @@ func parseVersions(file string) ([]PackageInstance, error) {
 		}
 	}
 	return output, nil
+}
+
+type packageFloatingRef struct {
+	pkg      PackageInstance
+	err      error
+	floating bool
+}
+
+// CheckFloatingRefs determines if pkgs contains a floating ref which shouldn't
+// be used normally.
+func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool) error {
+	if _, err := Bootstrap(); err != nil {
+		return err
+	}
+
+	jsonDir, err := ioutil.TempDir("", "jiri_cipd")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(jsonDir)
+
+	c := make(chan packageFloatingRef)
+	sem := semaphore.NewWeighted(10)
+	var errBuf bytes.Buffer
+	for k := range pkgs {
+		go checkFloatingRefs(jirix, k, jsonDir, sem, c)
+	}
+
+	for i := 0; i < len(pkgs); i++ {
+		floatingRef := <-c
+		pkgs[floatingRef.pkg] = floatingRef.floating
+		if floatingRef.err != nil {
+			errBuf.WriteString(err.Error())
+			errBuf.WriteByte('\n')
+		}
+	}
+
+	if errBuf.Len() != 0 {
+		// Remote trailing '\n'
+		errBuf.Truncate(errBuf.Len() - 1)
+		return errors.New(errBuf.String())
+	}
+	return nil
+}
+
+type describeJSON struct {
+	Refs []refsJSON `json:"refs,omitempty"`
+}
+
+type refsJSON struct {
+	Ref string `json:"ref,omitempty"`
+}
+
+func checkFloatingRefs(jirix *jiri.X, pkg PackageInstance, jsonDir string, sem *semaphore.Weighted, c chan<- packageFloatingRef) {
+	// cipd should already bootstrapped before calling
+	// this function.
+	sem.Acquire(context.Background(), 1)
+	defer sem.Release(1)
+	if cipdBinary == "" {
+		c <- packageFloatingRef{
+			pkg:      pkg,
+			err:      errors.New("cipd is not bootstrapped when calling checkFloatingRefs"),
+			floating: false,
+		}
+		return
+	}
+	// jsonFile will be cleaned up by caller.
+	jsonFile, err := ioutil.TempFile(jsonDir, "cipd*.json")
+	if err != nil {
+		c <- packageFloatingRef{
+			pkg:      pkg,
+			err:      err,
+			floating: false,
+		}
+		return
+	}
+	jsonFileName := jsonFile.Name()
+	jsonFile.Close()
+
+	args := []string{"describe", pkg.PackageName, "-version", pkg.VersionTag, "-json-output", jsonFileName}
+	if jirix != nil {
+		jirix.Logger.Debugf("Invoke cipd with %v", args)
+	}
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	command := exec.Command(cipdBinary, args...)
+	command.Env = append(os.Environ(), "CIPD_HTTP_USER_AGENT_PREFIX="+getUserAgent())
+	command.Stdin = os.Stdin
+	command.Stdout = &stdoutBuf
+	command.Stderr = &stderrBuf
+
+	if err := command.Run(); err != nil {
+		c <- packageFloatingRef{
+			pkg:      pkg,
+			err:      fmt.Errorf("cipd describe failed due to error: %v, stdout: %s\n, stderr: %s", err, stdoutBuf.String(), stderrBuf.String()),
+			floating: false,
+		}
+		return
+	}
+
+	jsonData, err := ioutil.ReadFile(jsonFileName)
+	if err != nil {
+		c <- packageFloatingRef{
+			pkg:      pkg,
+			err:      err,
+			floating: false,
+		}
+		return
+	}
+	// Example of generated JSON:
+	// {
+	// 	"result": {
+	// 	  "pin": {
+	// 		"package": "gn/gn/linux-amd64",
+	// 		"instance_id": "4usiirrra6WbnCKgplRoiJ8EcAsCuqCOd_7tpf_yXrAC"
+	// 	  },
+	// 	  "registered_by": "user:infra-internal-gn-builder@chops-service-accounts.iam.gserviceaccount.com",
+	// 	  "registered_ts": 1554328925,
+	// 	  "refs": [
+	// 		{
+	// 		  "ref": "latest",
+	// 		  "instance_id": "4usiirrra6WbnCKgplRoiJ8EcAsCuqCOd_7tpf_yXrAC",
+	// 		  "modified_by": "user:infra-internal-gn-builder@chops-service-accounts.iam.gserviceaccount.com",
+	// 		  "modified_ts": 1554328926
+	// 		}
+	// 	  ],
+	// 	  "tags": [
+	// 		{
+	// 		  "tag": "git_repository:https://gn.googlesource.com/gn",
+	// 		  "registered_by": "user:infra-internal-gn-builder@chops-service-accounts.iam.gserviceaccount.com",
+	// 		  "registered_ts": 1554328925
+	// 		},
+	// 		{
+	// 		  "tag": "git_revision:64b846c96daeb3eaf08e26d8a84d8451c6cb712b",
+	// 		  "registered_by": "user:infra-internal-gn-builder@chops-service-accounts.iam.gserviceaccount.com",
+	// 		  "registered_ts": 1554328925
+	// 		}
+	// 	  ]
+	// 	}
+	// }
+	// Only "refs" is needed.
+
+	var result struct {
+		Result describeJSON `json:"result"`
+	}
+
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		c <- packageFloatingRef{
+			pkg:      pkg,
+			err:      err,
+			floating: false,
+		}
+		return
+	}
+
+	for _, v := range result.Result.Refs {
+		if v.Ref == pkg.VersionTag {
+			c <- packageFloatingRef{pkg: pkg, err: nil, floating: true}
+			return
+		}
+	}
+	c <- packageFloatingRef{pkg: pkg, err: nil, floating: false}
+	return
 }
 
 // Platform contains the parameters for a "${platform}" template.

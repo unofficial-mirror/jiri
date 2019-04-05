@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/retry"
@@ -343,6 +344,7 @@ func (p PackageLock) Key() PackageLockKey {
 // ResolveConfig interface provides the configuration
 // for jiri resolve command.
 type ResolveConfig interface {
+	AllowFloatingRefs() bool
 	LockFilePath() string
 	LocalManifest() bool
 	EnablePackageLock() bool
@@ -983,12 +985,34 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 			}
 		}
 		if resolveConfig.EnablePackageLock() {
+			if !resolveConfig.AllowFloatingRefs() {
+				pkgsForRefCheck := make(map[cipd.PackageInstance]bool)
+				for _, v := range pkgs {
+					pkgInstance := cipd.PackageInstance{
+						PackageName: v.Name,
+						VersionTag:  v.Version,
+					}
+					pkgsForRefCheck[pkgInstance] = false
+				}
+				if err := cipd.CheckFloatingRefs(jirix, pkgsForRefCheck); err != nil {
+					return nil, nil, err
+				}
+				for k, v := range pkgsForRefCheck {
+					var errBuf bytes.Buffer
+					if v {
+						errBuf.WriteString(fmt.Sprintf("package %q used floating ref %q, which is not allowed\n", k.PackageName, k.VersionTag))
+					}
+					if errBuf.Len() != 0 {
+						errBuf.Truncate(errBuf.Len() - 1)
+						return nil, nil, errors.New(errBuf.String())
+					}
+				}
+			}
 			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgs)
 			if err != nil {
 				return
 			}
 		}
-
 		return
 	}
 

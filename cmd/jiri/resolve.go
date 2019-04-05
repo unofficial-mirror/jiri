@@ -16,6 +16,11 @@ type resolveFlags struct {
 	enablePackageLock    bool
 	enableProjectLock    bool
 	enablePackageVersion bool
+	allowFloatingRefs    bool
+}
+
+func (r *resolveFlags) AllowFloatingRefs() bool {
+	return r.allowFloatingRefs
 }
 
 func (r *resolveFlags) LockFilePath() string {
@@ -59,6 +64,7 @@ func init() {
 	flags.BoolVar(&resolveFlag.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
 	flags.BoolVar(&resolveFlag.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
 	flags.BoolVar(&resolveFlag.enablePackageVersion, "enable-package-version", false, "Enable version tag for packages in lockfile")
+	flags.BoolVar(&resolveFlag.allowFloatingRefs, "allow-floating-refs", false, "Allow packages to be pinned to floating refs such as \"latest\"")
 }
 
 func runResolve(jirix *jiri.X, args []string) error {

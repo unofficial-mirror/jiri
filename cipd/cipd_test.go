@@ -331,3 +331,32 @@ func TestDecl(t *testing.T) {
 		}
 	}
 }
+
+func TestFloatingRefs(t *testing.T) {
+	testExpects := map[PackageInstance]bool{
+		PackageInstance{
+			PackageName: "gn/gn/${platform}",
+			VersionTag:  "latest",
+		}: true,
+		PackageInstance{
+			PackageName: "gn/gn/${platform}",
+			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
+		}: false,
+	}
+
+	tests := make(map[PackageInstance]bool)
+	for k, v := range testExpects {
+		tests[k] = v
+	}
+
+	if err := CheckFloatingRefs(nil, tests); err != nil {
+		t.Errorf("CheckFloatingRefs failed due to error: %v", err)
+		return
+	}
+
+	for k, v := range tests {
+		if v != testExpects[k] {
+			t.Errorf("expecting %v, got %v for test %q", testExpects[k], v, k.PackageName)
+		}
+	}
+}
