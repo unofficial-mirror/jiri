@@ -89,6 +89,9 @@ type Project struct {
 	// ComputedAttributes stores computed attributes object
 	// which is easiler to perform matching and comparing.
 	ComputedAttributes attributes `xml:"-"`
+
+	// ManifestPath stores the absolute path of the manifest.
+	ManifestPath string `xml:"-"`
 }
 
 // ProjectsByPath implements the Sort interface. It sorts Projects by

@@ -462,15 +462,24 @@ type Package struct {
 	// ComputedAttributes stores computed attributes object
 	// which is easiler to perform matching and comparing.
 	ComputedAttributes attributes `xml:"-"`
+
+	// ManifestPath stores the absolute path of the manifest.
+	ManifestPath string `xml:"-"`
 }
 
 type PackageKey string
 
 type Packages map[PackageKey]Package
 
+type PackageKeys []PackageKey
+
 func (p Package) Key() PackageKey {
 	return PackageKey(p.Path + KeySeparator + p.Name)
 }
+
+func (pks PackageKeys) Len() int           { return len(pks) }
+func (pks PackageKeys) Less(i, j int) bool { return string(pks[i]) < string(pks[j]) }
+func (pks PackageKeys) Swap(i, j int)      { pks[i], pks[j] = pks[j], pks[i] }
 
 // FilterACL returns a new Packages map without any inaccessible packages.
 func (p *Packages) FilterACL(jirix *jiri.X) (Packages, bool, error) {
