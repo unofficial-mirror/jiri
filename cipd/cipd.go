@@ -172,6 +172,26 @@ func Bootstrap() (string, error) {
 	return cipdPath, nil
 }
 
+// FuchsiaPlatform returns a Platform struct which can be used in
+// determing the correct path for prebuilt packages. It replace
+// the os and arch names from cipd format to a format used by
+// Fuchsia developers.
+func FuchsiaPlatform(plat Platform) Platform {
+	retPlat := Platform{
+		OS:   plat.OS,
+		Arch: plat.Arch,
+	}
+	// Currently cipd use "amd64" for x86_64 while fuchsia use "x64",
+	// replace "amd64" with "x64".
+	// There might be other differences that need to be addressed in
+	// the future.
+	switch retPlat.Arch {
+	case "amd64":
+		retPlat.Arch = "x64"
+	}
+	return retPlat
+}
+
 func fetchDigest(platform string) (digest, method string, err error) {
 	var digestBuf bytes.Buffer
 	digestBuf.Write([]byte(cipdVersionDigest))
@@ -569,7 +589,7 @@ func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool) error {
 		floatingRef := <-c
 		pkgs[floatingRef.pkg] = floatingRef.floating
 		if floatingRef.err != nil {
-			errBuf.WriteString(err.Error())
+			errBuf.WriteString(floatingRef.err.Error())
 			errBuf.WriteByte('\n')
 		}
 	}

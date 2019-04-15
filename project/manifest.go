@@ -1000,7 +1000,9 @@ func (p *Package) cipdDecl(jirix *jiri.X) (string, error) {
 		return "", fmt.Errorf("parsing package path %q failed", subdir)
 	}
 	var subdirBuf bytes.Buffer
-	tmpl.Execute(&subdirBuf, cipd.CipdPlatform)
+	// subdir is using fuchsia platform format instead of
+	// using cipd platform format
+	tmpl.Execute(&subdirBuf, cipd.FuchsiaPlatform(cipd.CipdPlatform))
 	subdir = subdirBuf.String()
 	buf.WriteString(fmt.Sprintf("@Subdir %s\n", subdir))
 	// Write package version line to cipd declaration

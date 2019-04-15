@@ -96,7 +96,9 @@ func runPackageInfo(jirix *jiri.X, args []string) error {
 			return fmt.Errorf("parsing package path %q failed", pkgPath)
 		}
 		var subdirBuf bytes.Buffer
-		tmpl.Execute(&subdirBuf, cipd.CipdPlatform)
+		// subdir is using fuchsia platform format instead of
+		// using cipd platform format
+		tmpl.Execute(&subdirBuf, cipd.FuchsiaPlatform(cipd.CipdPlatform))
 		pkgPath = filepath.Join(jirix.Root, subdirBuf.String())
 
 		info = append(info, packageInfoOutput{
