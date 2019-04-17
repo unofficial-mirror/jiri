@@ -327,7 +327,7 @@ func (p ProjectLock) Key() ProjectLockKey {
 // PackageLock describes locked version information for a jiri managed package.
 type PackageLock struct {
 	PackageName string `json:"package"`
-	VersionTag  string `json:"version,omitempty"`
+	VersionTag  string `json:"version"`
 	InstanceID  string `json:"instance_id"`
 }
 
@@ -374,11 +374,7 @@ func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
 			}
 			version, ok := entryMap["version"].(string)
 			if !ok {
-				// Either "version" is not found or not valid,
-				// treated it as empty.
-				// TODO: haowei, once all lockfiles contains
-				// versions, change this case into an error.
-				version = ""
+				return nil, nil, fmt.Errorf("package version %+v is not a valid string", entryMap["version"])
 			}
 			pkgLock := PackageLock{
 				PackageName: pkgName,
@@ -1019,14 +1015,6 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, resolveConfig.LocalManifest())
 	if err != nil {
 		return err
-	}
-
-	// purge version tags if enablePackageVersion is false.
-	if !resolveConfig.EnablePackageVersion() {
-		for k, v := range pkgLocks {
-			v.VersionTag = ""
-			pkgLocks[k] = v
-		}
 	}
 
 	return writeLockFile(jirix, resolveConfig.LockFilePath(), projectLocks, pkgLocks)

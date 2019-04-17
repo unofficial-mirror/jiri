@@ -2217,6 +2217,7 @@ func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
 	projectLock0 := project.ProjectLock{"https://dart.googlesource.com/web_socket_channel.git", "dart", "1.0.9"}
 	pkgLock0 := project.PackageLock{
 		PackageName: "fuchsia/go/mac-amd64",
+		VersionTag:  "git_revision:b8bd7d94a2ae6c80ab8b6ed5900d3eeba8a777c3",
 		InstanceID:  "3c33b55c1a75b900536c91181805bb8668857341",
 	}
 

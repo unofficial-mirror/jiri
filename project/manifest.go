@@ -630,7 +630,7 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 			}
 			for _, pkg := range pkgs {
 				if pkgLock, ok := ld.PackageLocks[PackageLockKey(pkg)]; ok {
-					if pkgLock.VersionTag != "" && pkgLock.VersionTag != v.Version && !jirix.IgnoreLockConflicts {
+					if pkgLock.VersionTag != v.Version && !jirix.IgnoreLockConflicts {
 						// Package version conflicts detected. Treated it as an error.
 						s := fmt.Sprintf("package %q has conflicting version in manifest and jiri.lock: %s:%s", v.Name, v.Version, pkgLock.VersionTag)
 						jirix.Logger.Debugf(s)

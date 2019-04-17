@@ -63,7 +63,8 @@ func init() {
 	flags.BoolVar(&resolveFlag.localManifestFlag, "local-manifest", false, "Use local manifest")
 	flags.BoolVar(&resolveFlag.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
 	flags.BoolVar(&resolveFlag.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
-	flags.BoolVar(&resolveFlag.enablePackageVersion, "enable-package-version", false, "Enable version tag for packages in lockfile")
+	// TODO: Remove this placeholder flag after all references are deleted.
+	flags.BoolVar(&resolveFlag.enablePackageVersion, "enable-package-version", true, "Enable version tag for packages in lockfile")
 	flags.BoolVar(&resolveFlag.allowFloatingRefs, "allow-floating-refs", false, "Allow packages to be pinned to floating refs such as \"latest\"")
 }
 
