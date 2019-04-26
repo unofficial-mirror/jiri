@@ -112,6 +112,7 @@ type X struct {
 	PrebuiltJSON        string
 	FetchingAttrs       string
 	UsingSnapshot       bool
+	OverrideOptional    bool
 	IgnoreLockConflicts bool
 	Color               color.Color
 	Logger              *log.Logger

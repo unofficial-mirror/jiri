@@ -325,7 +325,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		return err
 	}
 
-	if jirix.UsingSnapshot {
+	if jirix.UsingSnapshot && !jirix.OverrideOptional {
 		// using attributes defined in snapshot file instead of
 		// using predefined ones in jiri init.
 		jirix.FetchingAttrs = m.Attributes

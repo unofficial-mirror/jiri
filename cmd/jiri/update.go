@@ -29,6 +29,7 @@ var (
 	rebaseTrackedFlag    bool
 	runHooksFlag         bool
 	fetchPkgsFlag        bool
+	overrideOptionalFlag bool
 )
 
 const (
@@ -50,6 +51,7 @@ func init() {
 	cmdUpdate.Flags.BoolVar(&rebaseTrackedFlag, "rebase-tracked", false, "Rebase current tracked branches instead of fast-forwarding them.")
 	cmdUpdate.Flags.BoolVar(&runHooksFlag, "run-hooks", true, "Run hooks after updating sources.")
 	cmdUpdate.Flags.BoolVar(&fetchPkgsFlag, "fetch-packages", true, "Use cipd to fetch packages.")
+	cmdUpdate.Flags.BoolVar(&overrideOptionalFlag, "override-optional", false, "Override existing optional attributes in the snapshot file with current jiri settings")
 }
 
 // cmdUpdate represents the "jiri update" command.
@@ -92,6 +94,7 @@ func runUpdate(jirix *jiri.X, args []string) error {
 	}
 
 	if len(args) > 0 {
+		jirix.OverrideOptional = overrideOptionalFlag
 		if err := project.CheckoutSnapshot(jirix, args[0], gcFlag, runHooksFlag, fetchPkgsFlag, hookTimeoutFlag, fetchPkgsTimeoutFlag); err != nil {
 			return err
 		}
