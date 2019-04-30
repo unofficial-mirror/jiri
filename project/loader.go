@@ -26,20 +26,22 @@ type importCache struct {
 }
 
 type loader struct {
-	Projects       Projects
-	ProjectLocks   ProjectLocks
-	Hooks          Hooks
-	Packages       Packages
-	PackageLocks   PackageLocks
-	TmpDir         string
-	localProjects  Projects
-	importProjects Projects
-	importCacheMap map[string]importCache
-	update         bool
-	cycleStack     []cycleInfo
-	manifests      map[string]bool
-	lockfiles      map[string]bool
-	parentFile     string
+	Projects         Projects
+	ProjectOverrides map[string]Project
+	ImportOverrides  map[string]Import
+	ProjectLocks     ProjectLocks
+	Hooks            Hooks
+	Packages         Packages
+	PackageLocks     PackageLocks
+	TmpDir           string
+	localProjects    Projects
+	importProjects   Projects
+	importCacheMap   map[string]importCache
+	update           bool
+	cycleStack       []cycleInfo
+	manifests        map[string]bool
+	lockfiles        map[string]bool
+	parentFile       string
 }
 
 func (ld *loader) cleanup() {
@@ -63,18 +65,20 @@ type cycleInfo struct {
 // directories, and added to localProjects.
 func newManifestLoader(localProjects Projects, update bool, file string) *loader {
 	return &loader{
-		Projects:       make(Projects),
-		ProjectLocks:   make(ProjectLocks),
-		Hooks:          make(Hooks),
-		Packages:       make(Packages),
-		PackageLocks:   make(PackageLocks),
-		localProjects:  localProjects,
-		importProjects: make(Projects),
-		update:         update,
-		importCacheMap: make(map[string]importCache),
-		manifests:      make(map[string]bool),
-		lockfiles:      make(map[string]bool),
-		parentFile:     file,
+		Projects:         make(Projects),
+		ProjectOverrides: make(map[string]Project),
+		ImportOverrides:  make(map[string]Import),
+		ProjectLocks:     make(ProjectLocks),
+		Hooks:            make(Hooks),
+		Packages:         make(Packages),
+		PackageLocks:     make(PackageLocks),
+		localProjects:    localProjects,
+		importProjects:   make(Projects),
+		update:           update,
+		importCacheMap:   make(map[string]importCache),
+		manifests:        make(map[string]bool),
+		lockfiles:        make(map[string]bool),
+		parentFile:       file,
 	}
 }
 
@@ -257,7 +261,7 @@ func (ld *loader) parseLockData(jirix *jiri.X, data []byte) error {
 
 	for k, v := range projectLocks {
 		if projLock, ok := ld.ProjectLocks[k]; ok {
-			if projLock != v {
+			if projLock != v && !jirix.UsingImportOverride {
 				return fmt.Errorf("conflicting project lock entries %+v with %+v", projLock, v)
 			}
 		} else {
@@ -269,7 +273,7 @@ func (ld *loader) parseLockData(jirix *jiri.X, data []byte) error {
 		if pkgLock, ok := ld.PackageLocks[k]; ok {
 			// Only package locks may conflict during a normal 'jiri resolve'.
 			// Treating conflicts as errors in all other scenarios.
-			if pkgLock != v && !jirix.IgnoreLockConflicts {
+			if pkgLock != v && !jirix.IgnoreLockConflicts && !jirix.UsingImportOverride {
 				return fmt.Errorf("conflicting package lock entries %+v with %+v", pkgLock, v)
 			}
 		} else {
@@ -331,8 +335,34 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		jirix.FetchingAttrs = m.Attributes
 	}
 
+	// Add override information
+	if parentImport == "" {
+		for _, p := range m.ProjectOverrides {
+			// Reuse the MakeProjectKey function in case it is changed
+			// in the future.
+			key := string(p.Key())
+			ld.ProjectOverrides[key] = p
+		}
+		for _, p := range m.ImportOverrides {
+			// Reuse the MakeProjectKey function in case it is changed
+			// in the future.
+			key := string(p.ProjectKey())
+			if !jirix.UsingImportOverride {
+				jirix.UsingImportOverride = true
+			}
+			ld.ImportOverrides[key] = p
+		}
+	} else if len(m.ProjectOverrides)+len(m.ImportOverrides) > 0 {
+		return fmt.Errorf("manifest %q contains overrides but was imported by %q. Overrides are allowed only in the root manifest", shortFileName(jirix.Root, repoPath, file, ref), parentImport)
+	}
+
 	// Process remote imports.
 	for _, remote := range m.Imports {
+		// Apply override if it exists.
+		remote, err := overrideImport(jirix, remote, ld.ProjectOverrides, ld.ImportOverrides)
+		if err != nil {
+			return err
+		}
 		nextRoot := filepath.Join(root, remote.Root)
 		remote.Name = filepath.Join(nextRoot, remote.Name)
 		key := remote.ProjectKey()
@@ -384,6 +414,11 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 
 	// Collect projects.
 	for _, project := range m.Projects {
+		// Apply override if it exists.
+		project, err := overrideProject(jirix, project, ld.ProjectOverrides, ld.ImportOverrides)
+		if err != nil {
+			return err
+		}
 		// normalize project attributes
 		project.ComputedAttributes = newAttributes(project.Attributes)
 		project.Attributes = project.ComputedAttributes.String()
@@ -405,7 +440,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 			if r.Revision != "" && r.Revision != "HEAD" {
 				if project.Revision == "" || project.Revision == "HEAD" {
 					project.Revision = r.Revision
-				} else {
+				} else if r.Revision != project.Revision {
 					return fmt.Errorf("project %q found in %q defines different revision than its corresponding import tag.", key, shortFileName(jirix.Root, repoPath, file, ref))
 				}
 			}
@@ -420,30 +455,6 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		project.ManifestPath = f
 
 		ld.Projects[key] = project
-	}
-
-	// Apply overrides.
-	if parentImport == "" {
-		for _, override := range m.Overrides {
-			// Make paths absolute by prepending <root>.
-			override.absolutizePaths(filepath.Join(jirix.Root, root))
-			override.Name = filepath.Join(root, override.Name)
-			key := override.Key()
-
-			if _, ok := ld.importProjects[key]; ok {
-				return fmt.Errorf("cannot override project %q because the project contains an imported manifest", key)
-			}
-
-			if _, ok := ld.Projects[key]; !ok {
-				return fmt.Errorf("failed to override %q found in %q. Original project not found in manifest", key, shortFileName(jirix.Root, repoPath, file, ref))
-			}
-
-			project := ld.Projects[key]
-			project.update(&override)
-			ld.Projects[key] = project
-		}
-	} else if len(m.Overrides) != 0 {
-		return fmt.Errorf("manifest %q contains overrides but was imported by %q. Overrides are allowed only in the root manifest.", shortFileName(jirix.Root, repoPath, file, ref), parentImport)
 	}
 
 	for _, hook := range m.Hooks {

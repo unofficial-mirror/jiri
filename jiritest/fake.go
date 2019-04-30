@@ -17,9 +17,10 @@ import (
 
 // FakeJiriRoot sets up a fake root under a tmp directory.
 type FakeJiriRoot struct {
-	X        *jiri.X
-	Projects map[string]string
-	remote   string
+	X             *jiri.X
+	Projects      map[string]string
+	ProjectHashes map[string][]string
+	remote        string
 }
 
 const (
@@ -38,8 +39,9 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	// lockfiles are disabled in tests by defaults
 	jirix, cleanup := NewX(t)
 	fake := &FakeJiriRoot{
-		X:        jirix,
-		Projects: map[string]string{},
+		X:             jirix,
+		Projects:      map[string]string{},
+		ProjectHashes: make(map[string][]string),
 	}
 
 	// Create fake remote manifest projects.
@@ -181,6 +183,12 @@ func (fake FakeJiriRoot) CreateRemoteProject(name string) error {
 	if err := git.CommitWithMessage("initial commit"); err != nil {
 		return err
 	}
+
+	hash, err := git.CurrentRevisionOfBranch("HEAD")
+	if err != nil {
+		return err
+	}
+	fake.ProjectHashes[name] = append(fake.ProjectHashes[name], hash)
 	fake.Projects[name] = projectDir
 	return nil
 }
@@ -229,5 +237,41 @@ func (fake FakeJiriRoot) writeManifest(manifest *project.Manifest, dir, path str
 	if err := git.Commit(); err != nil {
 		return err
 	}
+	hash, err := git.CurrentRevisionOfBranch("HEAD")
+	if err != nil {
+		return err
+	}
+	fake.ProjectHashes[ManifestProjectName] = append(fake.ProjectHashes[ManifestProjectName], hash)
+	return nil
+}
+
+// AddProjectOverride adds a project override into .jiri_manifest of current FakeJiriRoot.
+func (fake FakeJiriRoot) AddProjectOverride(name, remote, revision string) error {
+	m, err := fake.ReadJiriManifest()
+	if err != nil {
+		return err
+	}
+	m.ProjectOverrides = append(m.ProjectOverrides, project.Project{
+		Name:     name,
+		Remote:   remote,
+		Revision: revision,
+	})
+	fake.WriteJiriManifest(m)
+	return nil
+}
+
+// AddImportOverride adds a import override into .jiri_manifest of current FakeJiriRoot.
+func (fake FakeJiriRoot) AddImportOverride(name, remote, revision, manifest string) error {
+	m, err := fake.ReadJiriManifest()
+	if err != nil {
+		return err
+	}
+	m.ImportOverrides = append(m.ImportOverrides, project.Import{
+		Name:     name,
+		Remote:   remote,
+		Revision: revision,
+		Manifest: manifest,
+	})
+	fake.WriteJiriManifest(m)
 	return nil
 }

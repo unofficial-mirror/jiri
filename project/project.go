@@ -459,6 +459,37 @@ func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byt
 	return jsonData, nil
 }
 
+// overrideProject performs override on project if matching override declaration is found
+// in manifest. It will return the original project if no suitable match is found.
+func overrideProject(jirix *jiri.X, project Project, projectOverrides map[string]Project, importOverrides map[string]Import) (Project, error) {
+
+	key := string(project.Key())
+	if remoteOverride, ok := importOverrides[key]; ok {
+		project.Revision = remoteOverride.Revision
+		if _, ok := projectOverrides[key]; ok {
+			// It's not allowed to have both import override and project override
+			// on same project.
+			return project, fmt.Errorf("detected both import and project overrides on project \"%s:%s\", which is not allowed", project.Name, project.Remote)
+		}
+	} else if projectOverride, ok := projectOverrides[key]; ok {
+		project.update(&projectOverride)
+	}
+	return project, nil
+}
+
+// overrideImport performs override on remote import if matching override declaration is found
+// in manifest. It will return the original remote import if no suitable match is found
+func overrideImport(jirix *jiri.X, remote Import, projectOverrides map[string]Project, importOverrides map[string]Import) (Import, error) {
+	key := string(remote.ProjectKey())
+	if _, ok := projectOverrides[key]; ok {
+		return remote, fmt.Errorf("project override \"%s:%s\" cannot be used to override an import", remote.Name, remote.Remote)
+	}
+	if importOverride, ok := importOverrides[key]; ok {
+		remote.update(&importOverride)
+	}
+	return remote, nil
+}
+
 func cacheDirPathFromRemote(cacheRoot, remote string) (string, error) {
 	if cacheRoot != "" {
 		url, err := url.Parse(remote)

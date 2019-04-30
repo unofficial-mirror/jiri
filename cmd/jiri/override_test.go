@@ -26,15 +26,13 @@ type overrideTestCase struct {
 }
 
 func setDefaultOverrideFlags() {
-	//flagOverrideName = "manifest"
-	//flagOverrideRemoteBranch = "master"
-	flagOverridePath = ""
-	flagOverrideRevision = ""
-	flagOverrideGerritHost = ""
-	//flagOverrideOut = ""
-	flagOverrideDelete = false
-	flagOverrideList = false
-	flagOverrideJSONOutput = ""
+	overrideFlags.importManifest = ""
+	overrideFlags.path = ""
+	overrideFlags.revision = ""
+	overrideFlags.gerritHost = ""
+	overrideFlags.delete = false
+	overrideFlags.list = false
+	overrideFlags.JSONOutput = ""
 }
 
 func TestOverride(t *testing.T) {
@@ -65,7 +63,7 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverridePath = "bar"
+				overrideFlags.path = "bar"
 			},
 			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
@@ -80,9 +78,9 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideRevision = "bar"
+				overrideFlags.revision = "bar"
 			},
-			Args:     []string{"foo", "https://github.com/new.git"},
+			Args: []string{"foo", "https://github.com/new.git"},
 			Want: `<manifest>
   <imports>
     <import manifest="manifest" name="foo" remote="https://github.com/new.git"/>
@@ -95,8 +93,8 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideList = true
-				flagOverrideJSONOutput = "file"
+				overrideFlags.list = true
+				overrideFlags.JSONOutput = "file"
 			},
 			Exist: `<manifest>
   <imports>
@@ -119,7 +117,7 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideList = true
+				overrideFlags.list = true
 			},
 			Exist: `<manifest>
   <imports>
@@ -160,14 +158,14 @@ func TestOverride(t *testing.T) {
 		// test delete flag
 		{
 			SetFlags: func() {
-				flagOverrideDelete = true
+				overrideFlags.delete = true
 			},
 			Stderr:  `wrong number of arguments`,
 			runOnce: true,
 		},
 		{
 			SetFlags: func() {
-				flagOverrideDelete = true
+				overrideFlags.delete = true
 			},
 			Args:    []string{"a", "b", "c"},
 			Stderr:  `wrong number of arguments`,
@@ -175,8 +173,8 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideDelete = true
-				flagOverrideList = true
+				overrideFlags.delete = true
+				overrideFlags.list = true
 			},
 			Args:    []string{"a", "b"},
 			Stderr:  `cannot use -delete and -list together`,
@@ -184,7 +182,7 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideDelete = true
+				overrideFlags.delete = true
 			},
 			Args:    []string{"foo"},
 			runOnce: true,
@@ -210,7 +208,7 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideDelete = true
+				overrideFlags.delete = true
 			},
 			Args:    []string{"foo"},
 			runOnce: true,
@@ -228,7 +226,7 @@ func TestOverride(t *testing.T) {
 		},
 		{
 			SetFlags: func() {
-				flagOverrideDelete = true
+				overrideFlags.delete = true
 			},
 			Args:    []string{"foo", "https://github.com/bar.git"},
 			runOnce: true,
@@ -248,6 +246,29 @@ func TestOverride(t *testing.T) {
   </imports>
   <overrides>
     <project name="foo" remote="https://github.com/foo.git"/>
+  </overrides>
+</manifest>
+`,
+		},
+		{
+			SetFlags: func() {
+				overrideFlags.importManifest = "manifest"
+				overrideFlags.revision = "eabeadae97b1e7f97ba93206066411adfe93a509"
+			},
+			Args:    []string{"orig", "https://github.com/orig.git"},
+			runOnce: true,
+			Exist: `<manifest>
+  <imports>
+    <import manifest="manifest" name="orig" remote="https://github.com/orig.git"/>
+  </imports>
+</manifest>
+`,
+			Want: `<manifest>
+  <imports>
+    <import manifest="manifest" name="orig" remote="https://github.com/orig.git"/>
+  </imports>
+  <overrides>
+    <import manifest="manifest" name="orig" remote="https://github.com/orig.git" revision="eabeadae97b1e7f97ba93206066411adfe93a509"/>
   </overrides>
 </manifest>
 `,

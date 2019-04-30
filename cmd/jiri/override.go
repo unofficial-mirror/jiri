@@ -15,25 +15,28 @@ import (
 	"fuchsia.googlesource.com/jiri/project"
 )
 
-var (
+var overrideFlags struct {
 	// Flags configuring project attributes for overrides.
-	flagOverridePath       string
-	flagOverrideRevision   string
-	flagOverrideGerritHost string
+	importManifest string
+	gerritHost     string
+	path           string
+	revision       string
 	// Flags controlling the behavior of the command.
-	flagOverrideDelete     bool
-	flagOverrideList       bool
-	flagOverrideJSONOutput string
-)
+	delete     bool
+	list       bool
+	JSONOutput string
+}
 
 func init() {
-	cmdOverride.Flags.StringVar(&flagOverridePath, "path", "", `Path used to store the project locally.`)
-	cmdOverride.Flags.StringVar(&flagOverrideRevision, "revision", "", `Revision to check out for the remote (defaults to HEAD).`)
-	cmdOverride.Flags.StringVar(&flagOverrideGerritHost, "gerrithost", "", `The project Gerrit host.`)
+	cmdOverride.Flags.StringVar(&overrideFlags.importManifest, "import-manifest", "", "The manifest of the import override.")
 
-	cmdOverride.Flags.BoolVar(&flagOverrideDelete, "delete", false, `Delete existing override. Override is matched using <name> and <remote>, <remote> is optional.`)
-	cmdOverride.Flags.BoolVar(&flagOverrideList, "list", false, `List all the overrides from .jiri_manifest. This flag doesn't accept any arguments. -json-out flag can be used to specify json output file.`)
-	cmdOverride.Flags.StringVar(&flagOverrideJSONOutput, "json-output", "", `JSON output file from -list flag.`)
+	cmdOverride.Flags.StringVar(&overrideFlags.path, "path", "", `Path used to store the project locally.`)
+	cmdOverride.Flags.StringVar(&overrideFlags.revision, "revision", "", `Revision to check out for the remote (defaults to HEAD).`)
+	cmdOverride.Flags.StringVar(&overrideFlags.gerritHost, "gerrithost", "", `The project Gerrit host.`)
+
+	cmdOverride.Flags.BoolVar(&overrideFlags.delete, "delete", false, `Delete existing override. Override is matched using <name> and <remote>, <remote> is optional.`)
+	cmdOverride.Flags.BoolVar(&overrideFlags.list, "list", false, `List all the overrides from .jiri_manifest. This flag doesn't accept any arguments. -json-out flag can be used to specify json output file.`)
+	cmdOverride.Flags.StringVar(&overrideFlags.JSONOutput, "json-output", "", `JSON output file from -list flag.`)
 }
 
 var cmdOverride = &cmdline.Command{
@@ -56,24 +59,26 @@ Run "jiri help manifest" for details on manifests.
 `,
 }
 
-type projectInfo struct {
-	Name       string `json:"name"`
-	Path       string `json:"path,omitempty"`
-	Remote     string `json:"remote"`
-	Revision   string `json:"revision,omitempty"`
-	GerritHost string `json:"gerrithost,omitempty"`
+type overrideInfo struct {
+	Import         bool   `json:"import,omitempty"`
+	ImportManifest string `json:"import-manifest,omitempty"`
+	Name           string `json:"name"`
+	Path           string `json:"path,omitempty"`
+	Remote         string `json:"remote"`
+	Revision       string `json:"revision,omitempty"`
+	GerritHost     string `json:"gerrithost,omitempty"`
 }
 
 func runOverride(jirix *jiri.X, args []string) error {
-	if flagOverrideDelete && flagOverrideList {
+	if overrideFlags.delete && overrideFlags.list {
 		return jirix.UsageErrorf("cannot use -delete and -list together")
 	}
 
-	if flagOverrideList && len(args) != 0 {
+	if overrideFlags.list && len(args) != 0 {
 		return jirix.UsageErrorf("wrong number of arguments for the list flag")
-	} else if flagOverrideDelete && len(args) != 1 && len(args) != 2 {
+	} else if overrideFlags.delete && len(args) != 1 && len(args) != 2 {
 		return jirix.UsageErrorf("wrong number of arguments for the delete flag")
-	} else if !flagOverrideDelete && !flagOverrideList && len(args) != 2 {
+	} else if !overrideFlags.delete && !overrideFlags.list && len(args) != 2 {
 		return jirix.UsageErrorf("wrong number of arguments")
 	}
 
@@ -90,21 +95,35 @@ func runOverride(jirix *jiri.X, args []string) error {
 		return err
 	}
 
-	if flagOverrideList {
-		overrides := make([]projectInfo, len(manifest.Overrides))
-		for i, p := range manifest.Overrides {
-			overrides[i] = projectInfo{
+	if overrideFlags.list {
+		overrides := make([]overrideInfo, 0)
+		for _, p := range manifest.ProjectOverrides {
+			overrides = append(overrides, overrideInfo{
 				Name:       p.Name,
 				Path:       p.Path,
 				Remote:     p.Remote,
 				Revision:   p.Revision,
 				GerritHost: p.GerritHost,
-			}
+			})
 		}
 
-		if flagOverrideJSONOutput == "" {
+		for _, p := range manifest.ImportOverrides {
+			overrides = append(overrides, overrideInfo{
+				Import:         true,
+				ImportManifest: p.Manifest,
+				Name:           p.Name,
+				Remote:         p.Remote,
+				Revision:       p.Revision,
+			})
+		}
+
+		if overrideFlags.JSONOutput == "" {
 			for _, o := range overrides {
 				fmt.Printf("* override %s\n", o.Name)
+				if o.Import {
+					fmt.Printf("  IsImport: %v\n", o.Import)
+					fmt.Printf("  ImportManifest: %s\n", o.ImportManifest)
+				}
 				fmt.Printf("  Name:        %s\n", o.Name)
 				fmt.Printf("  Remote:      %s\n", o.Remote)
 				if o.Path != "" {
@@ -118,7 +137,7 @@ func runOverride(jirix *jiri.X, args []string) error {
 				}
 			}
 		} else {
-			file, err := os.Create(flagOverrideJSONOutput)
+			file, err := os.Create(overrideFlags.JSONOutput)
 			if err != nil {
 				return fmt.Errorf("failed to create output JSON file: %v\n", err)
 			}
@@ -133,52 +152,84 @@ func runOverride(jirix *jiri.X, args []string) error {
 	}
 
 	name := args[0]
-	if flagOverrideDelete {
-		var overrides []project.Project
-		var deleted []project.Project
-		for _, p := range manifest.Overrides {
-			if len(args) == 2 && p.Remote != args[1] {
-				overrides = append(overrides, p)
-				continue
+	if overrideFlags.delete {
+		var projectOverrides []project.Project
+		var importOverrides []project.Import
+		var deletedProjectOverrides []project.Project
+		var deletedImportOverrides []project.Import
+		if overrideFlags.importManifest != "" {
+			for _, p := range manifest.ImportOverrides {
+				if len(args) == 2 && p.Remote != args[1] {
+					importOverrides = append(importOverrides, p)
+					continue
+				}
+				if p.Name != name {
+					importOverrides = append(importOverrides, p)
+					continue
+				}
+				deletedImportOverrides = append(deletedImportOverrides, p)
 			}
-			if p.Name != name {
-				overrides = append(overrides, p)
-				continue
+		} else {
+			for _, p := range manifest.ProjectOverrides {
+				if len(args) == 2 && p.Remote != args[1] {
+					projectOverrides = append(projectOverrides, p)
+					continue
+				}
+				if p.Name != name {
+					projectOverrides = append(projectOverrides, p)
+					continue
+				}
+				deletedProjectOverrides = append(deletedProjectOverrides, p)
 			}
-			deleted = append(deleted, p)
 		}
-		if len(deleted) > 1 {
+
+		if len(deletedProjectOverrides)+len(deletedImportOverrides) > 1 {
 			return fmt.Errorf("more than one override matches")
-		} else if len(deleted) == 1 {
-			var names []string
-			for _, p := range deleted {
-				names = append(names, p.Name)
-			}
-			jirix.Logger.Infof("Deleted overrides: %s\n", strings.Join(names, " "))
 		}
-		manifest.Overrides = overrides
+		var names []string
+		for _, p := range deletedProjectOverrides {
+			names = append(names, p.Name)
+		}
+		for _, p := range deletedImportOverrides {
+			names = append(names, p.Name)
+		}
+		jirix.Logger.Infof("Deleted overrides: %s\n", strings.Join(names, " "))
+
+		manifest.ProjectOverrides = projectOverrides
+		manifest.ImportOverrides = importOverrides
 	} else {
 		remote := args[1]
-		project := project.Project{
-			Name:         name,
-			Remote:       remote,
-			Path:         flagOverridePath,
-			Revision:     flagOverrideRevision,
-			GerritHost:   flagOverrideGerritHost,
-			// We deliberately omit RemoteBranch, HistoryDepth and
-			// GitHooks. Those fields are effectively deprecated and
-			// will likely be removed in the future.
+		overrideKeys := make(map[string]bool)
+		for _, p := range manifest.ProjectOverrides {
+			overrideKeys[string(p.Key())] = true
 		}
-		match := false
-		for i, p := range manifest.Overrides {
-			if p.Name == name && p.Remote == remote {
-				manifest.Overrides[i] = project
-				match = true
-				break
+		for _, p := range manifest.ImportOverrides {
+			overrideKeys[string(p.ProjectKey())] = true
+		}
+		if _, ok := overrideKeys[string(project.MakeProjectKey(name, remote))]; !ok {
+			if overrideFlags.importManifest != "" {
+				importOverride := project.Import{
+					Name:     name,
+					Remote:   remote,
+					Manifest: overrideFlags.importManifest,
+					Revision: overrideFlags.revision,
+				}
+				manifest.ImportOverrides = append(manifest.ImportOverrides, importOverride)
+			} else {
+				projectOverride := project.Project{
+					Name:       name,
+					Remote:     remote,
+					Path:       overrideFlags.path,
+					Revision:   overrideFlags.revision,
+					GerritHost: overrideFlags.gerritHost,
+					// We deliberately omit RemoteBranch, HistoryDepth and
+					// GitHooks. Those fields are effectively deprecated and
+					// will likely be removed in the future.
+				}
+				manifest.ProjectOverrides = append(manifest.ProjectOverrides, projectOverride)
 			}
-		}
-		if !match {
-			manifest.Overrides = append(manifest.Overrides, project)
+		} else {
+			jirix.Logger.Infof("Override \"%s:%s\" is already exist, no modification will be made.", name, remote)
 		}
 	}
 

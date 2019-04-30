@@ -2513,3 +2513,50 @@ func TestOptionalProjectsAndPackages(t *testing.T) {
 	assertNotExist(filepath.Join(fake.X.Root, pkg0.Path))
 	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
 }
+
+func TestOverrideImport(t *testing.T) {
+	_, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	// override the import
+	hashes, ok := fake.ProjectHashes[jiritest.ManifestProjectName]
+	if !ok || len(hashes) < 2 {
+		t.Errorf("failed to retrieve git hashes of manifest project")
+	}
+	testHash := hashes[len(hashes)-2]
+	fake.AddImportOverride(jiritest.ManifestProjectName, fake.Projects[jiritest.ManifestProjectName], testHash, jiritest.ManifestFileName)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Errorf("Update universe failed due to error: %v", err)
+	}
+	scm := gitutil.New(fake.X, gitutil.RootDirOpt(filepath.Join(fake.X.Root, jiritest.ManifestProjectPath)))
+	currentHash, err := scm.CurrentRevision()
+	if err != nil {
+		t.Errorf("failed to get current hash due to error: %v", err)
+	}
+	if currentHash != testHash {
+		t.Errorf("expected git hash %q, got %q", testHash, currentHash)
+	}
+}
+
+func TestOverrideProject(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+
+	// override localProjects 1
+	hashes, ok := fake.ProjectHashes[localProjects[0].Name]
+	if !ok || len(hashes) == 0 {
+		t.Errorf("fail to retrieve git hashes of test project 0")
+	}
+	testHash := hashes[0]
+	fake.AddProjectOverride(localProjects[0].Name, localProjects[0].Remote, testHash)
+
+	fake.UpdateUniverse(true)
+	scm := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[0].Path))
+	currentHash, err := scm.CurrentRevision()
+	if err != nil {
+		t.Errorf("failed to get current hash due to error: %v", err)
+	}
+	if currentHash != testHash {
+		t.Errorf("expected git hash %q, got %q", testHash, currentHash)
+	}
+}

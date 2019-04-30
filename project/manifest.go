@@ -35,15 +35,16 @@ import (
 
 // Manifest represents a setting used for updating the universe.
 type Manifest struct {
-	Version      string        `xml:"version,attr,omitempty"`
-	Attributes   string        `xml:"attributes,attr,omitempty"`
-	Imports      []Import      `xml:"imports>import"`
-	LocalImports []LocalImport `xml:"imports>localimport"`
-	Projects     []Project     `xml:"projects>project"`
-	Overrides    []Project     `xml:"overrides>project"`
-	Hooks        []Hook        `xml:"hooks>hook"`
-	Packages     []Package     `xml:"packages>package"`
-	XMLName      struct{}      `xml:"manifest"`
+	Version          string        `xml:"version,attr,omitempty"`
+	Attributes       string        `xml:"attributes,attr,omitempty"`
+	Imports          []Import      `xml:"imports>import"`
+	LocalImports     []LocalImport `xml:"imports>localimport"`
+	Projects         []Project     `xml:"projects>project"`
+	ProjectOverrides []Project     `xml:"overrides>project"`
+	ImportOverrides  []Import      `xml:"overrides>import"`
+	Hooks            []Hook        `xml:"hooks>hook"`
+	Packages         []Package     `xml:"packages>package"`
+	XMLName          struct{}      `xml:"manifest"`
 }
 
 // ManifestFromBytes returns a manifest parsed from data, with defaults filled
@@ -113,7 +114,8 @@ func (m *Manifest) deepCopy() *Manifest {
 	x.Imports = append([]Import(nil), m.Imports...)
 	x.LocalImports = append([]LocalImport(nil), m.LocalImports...)
 	x.Projects = append([]Project(nil), m.Projects...)
-	x.Overrides = append([]Project(nil), m.Overrides...)
+	x.ProjectOverrides = append([]Project(nil), m.ProjectOverrides...)
+	x.ImportOverrides = append([]Import(nil), m.ImportOverrides...)
 	x.Hooks = append([]Hook(nil), m.Hooks...)
 	x.Packages = append([]Package(nil), m.Packages...)
 	x.Version = m.Version
@@ -191,8 +193,13 @@ func (m *Manifest) fillDefaults() error {
 			return err
 		}
 	}
-	for index := range m.Overrides {
-		if err := m.Overrides[index].fillDefaults(); err != nil {
+	for index := range m.ProjectOverrides {
+		if err := m.ProjectOverrides[index].fillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.ImportOverrides {
+		if err := m.ImportOverrides[index].fillDefaults(); err != nil {
 			return err
 		}
 	}
@@ -215,8 +222,13 @@ func (m *Manifest) unfillDefaults() error {
 			return err
 		}
 	}
-	for index := range m.Overrides {
-		if err := m.Overrides[index].unfillDefaults(); err != nil {
+	for index := range m.ProjectOverrides {
+		if err := m.ProjectOverrides[index].unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.ImportOverrides {
+		if err := m.ImportOverrides[index].unfillDefaults(); err != nil {
 			return err
 		}
 	}
@@ -311,6 +323,27 @@ func (i *Import) cycleKey() string {
 	//   manifest: c                      manifest: b/c
 	// In both cases, the key would be https://foo.com/a/b/c.
 	return i.Remote + " + " + i.Manifest
+}
+
+func (i *Import) update(o *Import) {
+	if o.Manifest != "" {
+		i.Manifest = o.Manifest
+	}
+	if o.Name != "" {
+		i.Name = o.Name
+	}
+	if o.Remote != "" {
+		i.Remote = o.Remote
+	}
+	if o.Revision != "" {
+		i.Revision = o.Revision
+	}
+	if o.RemoteBranch != "" {
+		i.RemoteBranch = o.RemoteBranch
+	}
+	if o.Root != "" {
+		i.Root = o.Root
+	}
 }
 
 // LocalImport represents a local manifest import.
