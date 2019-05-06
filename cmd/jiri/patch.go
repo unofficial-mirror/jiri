@@ -20,16 +20,17 @@ import (
 )
 
 var (
-	patchRebaseFlag  bool
-	patchTopicFlag   bool
-	patchBranchFlag  string
-	patchDeleteFlag  bool
-	patchHostFlag    string
-	patchForceFlag   bool
-	cherryPickFlag   bool
-	detachedHeadFlag bool
-	patchProjectFlag string
-	rebaseFailures   uint32
+	patchRebaseFlag     bool
+	patchRebaseRevision string
+	patchTopicFlag      bool
+	patchBranchFlag     string
+	patchDeleteFlag     bool
+	patchHostFlag       string
+	patchForceFlag      bool
+	cherryPickFlag      bool
+	detachedHeadFlag    bool
+	patchProjectFlag    string
+	rebaseFailures      uint32
 )
 
 func init() {
@@ -37,6 +38,7 @@ func init() {
 	cmdPatch.Flags.BoolVar(&patchDeleteFlag, "delete", false, "Delete the existing branch if already exists")
 	cmdPatch.Flags.BoolVar(&patchForceFlag, "force", false, "Use force when deleting the existing branch")
 	cmdPatch.Flags.BoolVar(&patchRebaseFlag, "rebase", false, "Rebase the change after downloading")
+	cmdPatch.Flags.StringVar(&patchRebaseRevision, "rebase-revision", "", "Rebase the change to a specific revision after downloading")
 	cmdPatch.Flags.StringVar(&patchHostFlag, "host", "", `Gerrit host to use. Defaults to gerrit host specified in manifest.`)
 	cmdPatch.Flags.StringVar(&patchProjectFlag, "project", "", `Project to apply patch to. This cannot be passed with topic flag.`)
 	cmdPatch.Flags.BoolVar(&patchTopicFlag, "topic", false, `Patch whole topic.`)
@@ -205,6 +207,33 @@ func rebaseProject(jirix *jiri.X, project project.Project, remoteBranch string) 
 	return nil
 }
 
+// rebaseProjectWRevision rebases the current branch on top of a given revision.
+func rebaseProjectWRevision(jirix *jiri.X, project project.Project, revision string) error {
+	jirix.Logger.Infof("Rebasing project %s(%s)\n", project.Name, project.Path)
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
+	name, email, err := scm.UserInfoForCommit("HEAD")
+	if err != nil {
+		return fmt.Errorf("Rebase: cannot get user info for HEAD: %s", err)
+	}
+	scm = gitutil.New(jirix, gitutil.UserNameOpt(name), gitutil.UserEmailOpt(email), gitutil.RootDirOpt(project.Path))
+	if err := scm.FetchRefspec("origin", revision); err != nil {
+		jirix.Logger.Errorf("Not able to fetch revision %q: %s", revision, err)
+		jirix.IncrementFailures()
+		return nil
+	}
+	if err := scm.Rebase(revision); err != nil {
+		if err2 := scm.RebaseAbort(); err2 != nil {
+			return err2
+		}
+		jirix.Logger.Errorf("Cannot rebase the change: %s", err)
+		jirix.IncrementFailures()
+		atomic.AddUint32(&rebaseFailures, 1)
+		return nil
+	}
+	jirix.Logger.Infof("Project rebased\n")
+	return nil
+}
+
 func findProject(jirix *jiri.X, projectName string, projects project.Projects, host string, hostUrl *url.URL, ref string) *project.Project {
 	var projectToPatch *project.Project
 	var projectToPatchNoGerritHost *project.Project
@@ -246,6 +275,10 @@ func runPatch(jirix *jiri.X, args []string) error {
 
 	if patchProjectFlag != "" && patchTopicFlag {
 		return jirix.UsageErrorf("-topic and -project flags cannot be used together")
+	}
+
+	if patchRebaseRevision != "" && (!patchRebaseFlag || patchProjectFlag == "") {
+		return jirix.UsageErrorf("-rebase-revision should only be used with -rebase and -project flag")
 	}
 
 	var cl int
@@ -328,8 +361,14 @@ func runPatch(jirix *jiri.X, args []string) error {
 			}
 		}
 		if ok && patchRebaseFlag {
-			if err := rebaseProject(jirix, *p, remoteBranch); err != nil {
-				return err
+			if patchRebaseRevision != "" {
+				if err := rebaseProjectWRevision(jirix, *p, patchRebaseRevision); err != nil {
+					return err
+				}
+			} else {
+				if err := rebaseProject(jirix, *p, remoteBranch); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
