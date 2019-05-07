@@ -5,7 +5,7 @@
 
 Jiri is a tool for multi-repo development.
 It supports:
-* syncing multiple local repos with upstream,
+* syncing multiple local GIT repos with upstream,
 * capturing the current state of all local repos in a "snapshot",
 * restoring local project state from a snapshot, and
 * facilitating sending change lists to [Gerrit][gerrit].
@@ -30,8 +30,13 @@ The source of jiri will be cloned into
 directory. To build or rebuild jiri, simply type the following command:
 
 ```
+go get golang.org/x/net/publicsuffix golang.org/x/sync/semaphore
 go install fuchsia.googlesource.com/jiri/cmd/jiri
 ```
+
+The binary will be under `$GOPATH/bin/jiri` and can be copied to any directory
+in your PATH, as long as it is writable (to support jiri bootstrapping and
+self-updates).
 
 ## Jiri Behaviour
 [See this][behaviour]
@@ -40,19 +45,25 @@ go install fuchsia.googlesource.com/jiri/cmd/jiri
 [See this][how do i]
 
 ## Jiri Basics
-Jiri organizes a set of repositories on your local filesystem according to a
-[manifest][manifests].  These repositories are referred to as "projects", and
+Jiri organizes a set of GIT repositories on your local filesystem according to
+a [manifest][manifests].  These repositories are referred to as "projects", and
 are all contained within a single directory called the "jiri root".
 
-The manifest file specifies the relative location of each project within the
-jiri root, and also includes other metadata about the project such as its
-remote url, the remote branch it should track, and more.
+Jiri also supports [CIPD][cipd] "packages", to download potentially large
+_read-only_ files, like toolchain binaries or test data, into the jiri root.
+
+The manifest file specifies the relative location of each project or package
+within the jiri root, and also includes other metadata, such as its remote url,
+the remote branch or revision it should track, and more.
 
 The `jiri update` command syncs the master branch of all local projects to the
-revision and remote branch specified in the manifest for each project.  Jiri
+revision and remote branch specified in the manifest for each project. Jiri
 will create the project locally if it does not exist, and if run with the `-gc`
 flag, jiri will "garbage collect" any projects that are not listed in the
 manifest by deleting them locally.
+
+The command will also download, update or remove CIPD packages according to
+manifest changes, if necessary.
 
 The `.jiri_manifest` file in the jiri root describes which project jiri should
 sync.  Typically the `.jiri_manifest` file will import other manifests, but it
@@ -486,3 +497,4 @@ see [Jiri local update][hacking doc]
 [behaviour]:/behaviour.md
 [how do i]:/howdoi.md
 [vanadium]: https://v.io/
+[cipd]: https://chromium.googlesource.com/infra/luci/luci-go/+/master/cipd/
