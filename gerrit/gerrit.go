@@ -405,7 +405,7 @@ func (g *Gerrit) ListChangesByCommit(commit string) (CLList, error) {
 
 // GetChange returns a Change object for the given changeId number.
 func (g *Gerrit) GetChange(changeNumber int) (*Change, error) {
-	clList, err := g.Query(fmt.Sprintf("%d", changeNumber))
+	clList, err := g.Query(fmt.Sprintf("change:%d", changeNumber))
 	if err != nil {
 		return nil, err
 	}
