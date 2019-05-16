@@ -1684,9 +1684,26 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		// Shallow cache, fetch only manifest tracked remote branch
 		refspec = fmt.Sprintf("+refs/heads/%s:refs/heads/%s", branch, branch)
 	}
-	if isPathDir(dir) {
-		if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).SetRemoteUrl("origin", remote); err != nil {
-			return err
+	errCacheCorruption := errors.New("git cache corrupted")
+	updateCache := func() error {
+		// Test if git cache is intact
+		objectsDir := filepath.Join(dir, "objects")
+		if _, err := os.Stat(objectsDir); err != nil {
+			jirix.Logger.Warningf("could not access objects directory under git cache directory %q due to error: %v", dir, err)
+			return errCacheCorruption
+		}
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(dir))
+		if err := scm.Config("--remove-section", "remote.origin"); err != nil {
+			jirix.Logger.Warningf("purge git config failed under git cache directory %q due to error: %v", dir, err)
+			return errCacheCorruption
+		}
+		if err := scm.Config("remote.origin.url", remote); err != nil {
+			jirix.Logger.Warningf("set remote.origin.url failed under git cache directory %q due to error: %v", dir, err)
+			return errCacheCorruption
+		}
+		if err := scm.Config("--replace-all", "remote.origin.fetch", refspec); err != nil {
+			jirix.Logger.Warningf("set remote.origin.fetch failed under git cache directory %q due to error: %v", dir, err)
+			return errCacheCorruption
 		}
 		// Cache already present, update it
 		// TODO : update this after implementing FetchAll using g
@@ -1704,7 +1721,10 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 			retry.AttemptsOpt(jirix.Attempts)); err != nil {
 			return err
 		}
-	} else {
+		return nil
+	}
+
+	createCache := func() error {
 		// Create cache
 		// TODO : If we in future need to support two projects with same remote url,
 		// one with shallow checkout and one with full, we should create two caches
@@ -1721,8 +1741,24 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Config("remote.origin.fetch", refspec); err != nil {
 			return err
 		}
+		return nil
 	}
-	return nil
+
+	if isPathDir(dir) {
+		if err := updateCache(); err != nil {
+			if err == errCacheCorruption {
+				jirix.Logger.Warningf("Updating git cache %q failed due to cache corruption, cache will be cleared", dir)
+				if err := os.RemoveAll(dir); err != nil {
+					return fmt.Errorf("failed to clear cache dir %q due to error: %v", dir, err)
+				}
+				return createCache()
+			}
+			return err
+		}
+		return nil
+	}
+
+	return createCache()
 }
 
 // updateCache creates the cache or updates it if already present.
