@@ -20,7 +20,7 @@ var cmdBootstrap = &cmdline.Command{
 Bootstrap essential packages such as cipd.
 `,
 	ArgsName: "<package ...>",
-	ArgsLong: "<package ...> is a list of packages that can be bootstraped by jiri. If the list is empty, jiri will list supported packages.",
+	ArgsLong: "<package ...> is a list of packages that can be bootstrapped by jiri. If the list is empty, jiri will list supported packages.",
 }
 
 func runBootstrap(env *cmdline.Env, args []string) error {
@@ -36,7 +36,7 @@ func runBootstrap(env *cmdline.Env, args []string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("cipd boostraped to path:%q\n", cipdPath)
+			fmt.Printf("cipd bootstrapped to path:%q\n", cipdPath)
 
 		default:
 			return fmt.Errorf("unsupported package %q", v)
