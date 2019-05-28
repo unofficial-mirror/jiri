@@ -99,8 +99,18 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		}
 		// We must specify a refspec here in order for patch to be able to set
 		// upstream to 'origin/master'.
-		if err = scm.FetchRefspec(remote, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
-			return err
+		if op.project.HistoryDepth > 0 && cache != "" {
+			if err = scm.FetchRefspec(cache, "+refs/heads/*:refs/remotes/origin/*", gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
+				return err
+			}
+		} else if cache != "" {
+			if err = scm.FetchRefspec(cache, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+				return err
+			}
+		} else {
+			if err = scm.FetchRefspec(remote, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+				return err
+			}
 		}
 	} else {
 		// Shallow clones can not be used as as local git reference

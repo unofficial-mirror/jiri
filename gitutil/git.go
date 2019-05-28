@@ -800,8 +800,18 @@ func (g *Git) HasUntrackedFiles() (bool, error) {
 }
 
 // Init initializes a new git repository.
-func (g *Git) Init(path string) error {
-	return g.run("init", path)
+func (g *Git) Init(path string, opts ...CloneOpt) error {
+	args := []string{"init"}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case BareOpt:
+			if typedOpt {
+				args = append(args, "--bare")
+			}
+		}
+	}
+	args = append(args, path)
+	return g.run(args...)
 }
 
 // IsFileCommitted tests whether the given file has been committed to

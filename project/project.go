@@ -26,6 +26,7 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cipd"
+	"fuchsia.googlesource.com/jiri/gerrit"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/retry"
@@ -1724,6 +1725,32 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		return nil
 	}
 
+	createCacheThroughBundle := func() error {
+		bundlePath, err := gerrit.FetchCloneBundle(jirix, remote, dir)
+		if err != nil {
+			return err
+		}
+		// Remove clone.bundle file to save space.
+		defer os.Remove(bundlePath)
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(dir))
+		if err := scm.Init(dir, gitutil.BareOpt(true)); err != nil {
+			return err
+		}
+		if err := scm.Config("remote.origin.url", remote); err != nil {
+			return err
+		}
+		if err := scm.Config("remote.origin.fetch", refspec); err != nil {
+			return err
+		}
+		if err := scm.FetchRefspec(bundlePath, refspec, gitutil.DepthOpt(depth)); err != nil {
+			return err
+		}
+		if err := scm.FetchRefspec("origin", refspec, gitutil.DepthOpt(depth)); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	createCache := func() error {
 		// Create cache
 		// TODO : If we in future need to support two projects with same remote url,
@@ -1733,6 +1760,16 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		defer task.Done()
 		t := jirix.Logger.TrackTime(msg)
 		defer t.Done()
+		// Try use clone.bundle to speed up the initialization of git cache.
+		os.MkdirAll(dir, 0755)
+		if err := createCacheThroughBundle(); err != nil {
+			jirix.Logger.Debugf("create git cache for %q through clone.bundle failed due to error: %v", remote, err)
+			os.RemoveAll(dir)
+		} else {
+			jirix.Logger.Debugf("git cache for %q created through clone.bundle", remote)
+			return nil
+		}
+
 		if err := gitutil.New(jirix).Clone(remote, dir, gitutil.BareOpt(true), gitutil.DepthOpt(depth)); err != nil {
 			return err
 		}
