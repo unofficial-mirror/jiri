@@ -26,6 +26,7 @@ Run git grep across all projects.
 }
 
 var grepFlags struct {
+	cwdRel bool
 	n bool
 	h bool
 	i bool
@@ -47,6 +48,7 @@ func init() {
 	flags.BoolVar(&grepFlags.l, "files-with-matches", false, "same as -l")
 	flags.BoolVar(&grepFlags.L, "L", false, "Instead of showing every matched line, show only the names of files that do not contain matches")
 	flags.BoolVar(&grepFlags.L, "files-without-match", false, "same as -L")
+	flags.BoolVar(&grepFlags.cwdRel, "cwd-rel", false, "Output paths relative to the current working directory (if available)")
 }
 
 func buildFlags() []string {
@@ -118,8 +120,16 @@ func doGrep(jirix *jiri.X, args []string) ([]string, error) {
 	if lenArgs == 1 {
 		query = args[0]
 	}
+
+	cwd := jirix.Root
+	if grepFlags.cwdRel {
+		if wd, err := os.Getwd(); err == nil {
+			cwd = wd
+		}
+	}
+
 	for _, project := range projects {
-		relpath, err := filepath.Rel(jirix.Root, project.Path)
+		relpath, err := filepath.Rel(cwd, project.Path)
 		if err != nil {
 			return nil, err
 		}
