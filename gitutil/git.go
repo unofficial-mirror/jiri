@@ -980,8 +980,21 @@ func (g *Git) Push(remote, branch string, opts ...PushOpt) error {
 }
 
 // Rebase rebases to a particular upstream branch.
-func (g *Git) Rebase(upstream string) error {
-	return g.run("rebase", upstream)
+func (g *Git) Rebase(upstream string, opts ...RebaseOpt) error {
+	args := []string{"rebase"}
+	rebaseMerges := false
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case RebaseMerges:
+			rebaseMerges = bool(typedOpt)
+		}
+	}
+
+	if rebaseMerges {
+		args = append(args, "--rebase-merges")
+	}
+	args = append(args, upstream)
+	return g.run(args...)
 }
 
 // CherryPickAbort aborts an in-progress cherry-pick operation.

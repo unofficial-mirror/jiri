@@ -194,7 +194,7 @@ func rebaseProject(jirix *jiri.X, project project.Project, remoteBranch string) 
 		jirix.IncrementFailures()
 		return nil
 	}
-	if err := scm.Rebase("remotes/origin/" + remoteBranch); err != nil {
+	if err := scm.Rebase("remotes/origin/"+remoteBranch, gitutil.RebaseMerges(true)); err != nil {
 		if err2 := scm.RebaseAbort(); err2 != nil {
 			return err2
 		}
@@ -221,7 +221,7 @@ func rebaseProjectWRevision(jirix *jiri.X, project project.Project, revision str
 		jirix.IncrementFailures()
 		return nil
 	}
-	if err := scm.Rebase(revision); err != nil {
+	if err := scm.Rebase(revision, gitutil.RebaseMerges(true)); err != nil {
 		if err2 := scm.RebaseAbort(); err2 != nil {
 			return err2
 		}

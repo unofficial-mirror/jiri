@@ -31,6 +31,10 @@ type ResetOpt interface {
 	resetOpt()
 }
 
+type RebaseOpt interface {
+	rebaseOpt()
+}
+
 type FollowTagsOpt bool
 
 func (FollowTagsOpt) pushOpt() {}
@@ -114,3 +118,7 @@ func (DepthOpt) cloneOpt() {}
 type BareOpt bool
 
 func (BareOpt) cloneOpt() {}
+
+type RebaseMerges bool
+
+func (RebaseMerges) rebaseOpt() {}
