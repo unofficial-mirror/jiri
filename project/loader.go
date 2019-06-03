@@ -5,6 +5,7 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -37,11 +38,160 @@ type loader struct {
 	localProjects    Projects
 	importProjects   Projects
 	importCacheMap   map[string]importCache
+	importTree       importTree
 	update           bool
 	cycleStack       []cycleInfo
 	manifests        map[string]bool
 	lockfiles        map[string]bool
 	parentFile       string
+}
+
+type importTreeNode struct {
+	parents            map[*importTreeNode]bool
+	children           map[*importTreeNode]bool
+	tag                string
+	computedAttributes attributes
+}
+
+type importTree struct {
+	root          *importTreeNode
+	pool          map[string]*importTreeNode
+	filenameMap   map[string]bool
+	projectKeyMap map[ProjectKey]*importTreeNode
+}
+
+func newImportTree() importTree {
+	return importTree{
+		root: &importTreeNode{
+			make(map[*importTreeNode]bool),
+			make(map[*importTreeNode]bool),
+			"",
+			nil,
+		},
+		pool:          make(map[string]*importTreeNode),
+		filenameMap:   make(map[string]bool),
+		projectKeyMap: make(map[ProjectKey]*importTreeNode),
+	}
+}
+
+func (t *importTree) getNode(repoPath, file, ref string) *importTreeNode {
+	key := filepath.Join(repoPath, file) + ":" + ref
+	if v, ok := t.pool[key]; ok {
+		return v
+	}
+	v := &importTreeNode{
+		make(map[*importTreeNode]bool),
+		make(map[*importTreeNode]bool),
+		key,
+		nil,
+	}
+	if len(t.pool) == 0 {
+		t.root.addChild(v)
+	}
+	t.pool[key] = v
+	return v
+}
+
+func (t *importTree) buildImportAttributes() {
+	// Due to the logic in how remote imports are handled, the
+	// manifest loader will create two nodes for a single remote import,
+	// causing second one as an orphan. A simple solution is just
+	// connect the orphan nodes to the Root to build a connected tree.
+	for _, v := range t.pool {
+		if len(v.parents) == 0 {
+			t.root.addChild(v)
+		}
+	}
+	// The file name of a manifest is used as a git attributes name only if that
+	// file name is unique.
+	dupMap := make(map[string]bool)
+	for k := range t.filenameMap {
+		filename := filepath.Base(k)
+		if _, ok := dupMap[filename]; ok {
+			dupMap[filename] = true
+		} else {
+			dupMap[filename] = false
+		}
+	}
+	dfsAddAttribute(t.root, newAttributes(""))
+	for _, node := range t.pool {
+		for attr := range node.computedAttributes {
+			if v, ok := dupMap[attr]; ok && v {
+				delete(node.computedAttributes, attr)
+			}
+		}
+	}
+}
+
+func dfsAddAttribute(curNode *importTreeNode, parentAttrs attributes) {
+	if curNode.computedAttributes == nil {
+		curNode.computedAttributes = newAttributes(curNode.tag)
+	}
+	curNode.computedAttributes.Add(parentAttrs)
+	for k := range curNode.children {
+		dfsAddAttribute(k, curNode.computedAttributes)
+	}
+}
+
+// (TODO:haowei) generateAttributeGraph generate a graphviz .dot file of
+// importTree for debugging purpose. It should be removed once .gitattribute
+// generator is considered as stable.
+func (t *importTree) generateAttributeGraph() string {
+	var buf bytes.Buffer
+	buf.WriteString("\ndigraph G {\n")
+	nodeCount := 1
+	nameMap := make(map[*importTreeNode]string)
+	nameMap[t.root] = "n0"
+	for _, v := range t.pool {
+		nameMap[v] = fmt.Sprintf("n%d", nodeCount)
+		nodeCount++
+	}
+
+	// The file name of a manifest is used as a git attributes name only if that
+	// file name is unique.
+	dupMap := make(map[string]bool)
+	for k := range t.filenameMap {
+		filename := filepath.Base(k)
+		if _, ok := dupMap[filename]; ok {
+			dupMap[filename] = true
+		} else {
+			dupMap[filename] = false
+		}
+	}
+	// Output nodes
+	for k, v := range nameMap {
+		attrs := newAttributes(k.tag)
+		for attr := range attrs {
+			if v, ok := dupMap[attr]; ok && v {
+				delete(attrs, attr)
+			}
+		}
+		buf.WriteString(fmt.Sprintf("\t%s[label=\"%s,%p\"];\n", v, attrs.String(), k))
+	}
+	buf.WriteString("\n")
+	// Output edges
+	for k := range nameMap {
+		for child := range k.children {
+			nameSource := nameMap[k]
+			nameTarget, ok := nameMap[child]
+			if !ok {
+				fmt.Printf("ERROR: cound not find target node %q,%p in nameMap\n", child.tag, child)
+				continue
+			}
+			buf.WriteString(fmt.Sprintf("\t%s -> %s;\n", nameSource, nameTarget))
+		}
+	}
+
+	buf.WriteString("\n}")
+	return buf.String()
+}
+
+func (n *importTreeNode) addChild(other *importTreeNode) {
+	if other == nil {
+		return
+	}
+	n.children[other] = true
+	other.parents[n] = true
 }
 
 func (ld *loader) cleanup() {
@@ -78,6 +228,7 @@ func newManifestLoader(localProjects Projects, update bool, file string) *loader
 		importCacheMap:   make(map[string]importCache),
 		manifests:        make(map[string]bool),
 		lockfiles:        make(map[string]bool),
+		importTree:       newImportTree(),
 		parentFile:       file,
 	}
 }
@@ -356,6 +507,21 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		return fmt.Errorf("manifest %q contains overrides but was imported by %q. Overrides are allowed only in the root manifest", shortFileName(jirix.Root, repoPath, file, ref), parentImport)
 	}
 
+	// Use manifest's directory name and file name as default
+	// git attributes. It will be later expanded using the
+	// import relationships.
+	defaultGitAttrs := func() string {
+		manifestFile := file
+		if repoPath != "" {
+			manifestFile = filepath.Join(repoPath, manifestFile)
+		}
+		containingDir := filepath.Base(filepath.Dir(manifestFile))
+		filename := file
+		ld.importTree.filenameMap[filename] = false
+		return containingDir + "," + filepath.Base(file)
+	}
+	self := ld.importTree.getNode(repoPath, file, ref)
+	self.tag = defaultGitAttrs()
 	// Process remote imports.
 	for _, remote := range m.Imports {
 		// Apply override if it exists.
@@ -389,6 +555,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 			pi = fmt.Sprintf("import[manifest=%q, remote=%q]", remote.Manifest, remote.Remote)
 		}
 
+		self.addChild(ld.importTree.getNode(repoPath, remote.Manifest, ""))
 		if err := ld.loadImport(jirix, nextRoot, remote.Manifest, remote.cycleKey(), cacheDirPath, pi, p, localManifest); err != nil {
 			return err
 		}
@@ -397,6 +564,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 	// Process local imports.
 	for _, local := range m.LocalImports {
 		nextFile := filepath.Join(filepath.Dir(file), local.File)
+		self.addChild(ld.importTree.getNode(repoPath, nextFile, ref))
 		if err := ld.Load(jirix, root, repoPath, nextFile, ref, "", parentImport, localManifest); err != nil {
 			return err
 		}
@@ -453,6 +621,9 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 
 		// Record manifest location.
 		project.ManifestPath = f
+
+		// Associate project with importTreeNode for git attributes propagation.
+		ld.importTree.projectKeyMap[key] = self
 
 		ld.Projects[key] = project
 	}
@@ -544,4 +715,15 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath, 
 		return ld.Load(jirix, root, "", filepath.Join(project.Path, file), "", cycleKey, parentImport, false)
 	}
 	return ld.Load(jirix, root, project.Path, file, ref, cycleKey, parentImport, false)
+}
+
+func (ld *loader) GenerateGitAttributesForProjects(jirix *jiri.X) {
+	ld.importTree.buildImportAttributes()
+	for k, v := range ld.Projects {
+		if treeNode, ok := ld.importTree.projectKeyMap[k]; ok {
+			v.GitAttributes = treeNode.computedAttributes.String()
+			ld.Projects[k] = v
+		}
+	}
+	jirix.Logger.Debugf("Generated dot file: %s", ld.importTree.generateAttributeGraph())
 }

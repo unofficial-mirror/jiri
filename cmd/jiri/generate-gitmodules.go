@@ -21,13 +21,16 @@ import (
 var cmdGenGitModule = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runGenGitModule),
 	Name:   "generate-gitmodules",
-	Short:  "Create a .gitmodule file for git submodule repository",
+	Short:  "Create a .gitmodule and a .gitattributes files for git submodule repository",
 	Long: `
-The "jiri generate-gitmodules <.gitmodule path>" command captures the current project state
-and create a .gitmodules file.
+The "jiri generate-gitmodules command captures the current project state and
+create a .gitmodules file and an optional .gitattributes file for building
+a git submodule based super repository.
 `,
-	ArgsName: "<.gitmodule path>",
-	ArgsLong: "<.gitmodule path> is the path to the output .gitmodule file.",
+	ArgsName: "<.gitmodule path> [<.gitattributes path>]",
+	ArgsLong: `
+<.gitmodule path> is the path to the output .gitmodule file.
+<.gitattributes path> is the path to the output .gitattribute file, which is optional.`,
 }
 
 var genGitModuleFlags struct {
@@ -52,11 +55,16 @@ type projectTreeRoot struct {
 }
 
 func runGenGitModule(jirix *jiri.X, args []string) error {
-	var gitmodulesPath = ".gitmodules"
-	if len(args) == 1 {
+	gitmodulesPath := ".gitmodules"
+	gitattributesPath := ""
+	if len(args) >= 1 {
 		gitmodulesPath = args[0]
 	}
-	if len(args) > 1 {
+	if len(args) == 2 {
+		gitattributesPath = args[1]
+	}
+
+	if len(args) > 2 {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
 
@@ -64,7 +72,7 @@ func runGenGitModule(jirix *jiri.X, args []string) error {
 	if err != nil {
 		return err
 	}
-	return writeGitModules(jirix, localProjects, gitmodulesPath)
+	return writeGitModules(jirix, localProjects, gitmodulesPath, gitattributesPath)
 }
 
 func (p *projectTreeRoot) add(jirix *jiri.X, proj project.Project) error {
@@ -179,7 +187,7 @@ func (p *projectTreeRoot) prune(jirix *jiri.X, node *projectTree) error {
 	return nil
 }
 
-func writeGitModules(jirix *jiri.X, projects project.Projects, outputPath string) error {
+func writeGitModules(jirix *jiri.X, projects project.Projects, gitmodulesPath, gitattributesPath string) error {
 	projEntries := make([]project.Project, len(projects))
 
 	// relativaize the paths and copy projects from map to slice for sorting.
@@ -209,6 +217,7 @@ func writeGitModules(jirix *jiri.X, projects project.Projects, outputPath string
 	// Start creating .gitmodule and set up script.
 	var gitmoduleBuf bytes.Buffer
 	var commandBuf bytes.Buffer
+	var gitattributeBuf bytes.Buffer
 	commandBuf.WriteString("#!/bin/sh\n")
 
 	// Special hack for fuchsia.git
@@ -236,6 +245,10 @@ func writeGitModules(jirix *jiri.X, projects project.Projects, outputPath string
 			gitmoduleBuf.WriteString("\n")
 			commandBuf.WriteString(commandDecl(v))
 			commandBuf.WriteString("\n")
+			if v.GitAttributes != "" {
+				gitattributeBuf.WriteString(attributeDecl(v))
+				gitattributeBuf.WriteString("\n")
+			}
 		}
 	}
 
@@ -251,15 +264,26 @@ func writeGitModules(jirix *jiri.X, projects project.Projects, outputPath string
 		gitmoduleBuf.WriteString("\n")
 		commandBuf.WriteString(commandDecl(v))
 		commandBuf.WriteString("\n")
+		if v.GitAttributes != "" {
+			gitattributeBuf.WriteString(attributeDecl(v))
+			gitattributeBuf.WriteString("\n")
+		}
 	}
 	jirix.Logger.Debugf("generated gitmodule content \n%v\n", gitmoduleBuf.String())
-	if err := ioutil.WriteFile(outputPath, gitmoduleBuf.Bytes(), 0644); err != nil {
+	if err := ioutil.WriteFile(gitmodulesPath, gitmoduleBuf.Bytes(), 0644); err != nil {
 		return err
 	}
 
 	if genGitModuleFlags.genScript != "" {
 		jirix.Logger.Debugf("generated set up script for gitmodule content \n%v\n", commandBuf.String())
 		if err := ioutil.WriteFile(genGitModuleFlags.genScript, commandBuf.Bytes(), 0755); err != nil {
+			return err
+		}
+	}
+
+	if gitattributesPath != "" {
+		jirix.Logger.Debugf("generated gitattributes content \n%v\n", gitattributeBuf.String())
+		if err := ioutil.WriteFile(gitattributesPath, gitattributeBuf.Bytes(), 0644); err != nil {
 			return err
 		}
 	}
@@ -285,4 +309,10 @@ func moduleDecl(p project.Project) string {
 func commandDecl(p project.Project) string {
 	tmpl := "git update-index --add --cacheinfo 160000 %s \"%s\""
 	return fmt.Sprintf(tmpl, p.Revision, p.Path)
+}
+
+func attributeDecl(p project.Project) string {
+	tmpl := "%s %s"
+	attrs := strings.ReplaceAll(p.GitAttributes, ",", " ")
+	return fmt.Sprintf(tmpl, p.Path, strings.TrimSpace(attrs))
 }

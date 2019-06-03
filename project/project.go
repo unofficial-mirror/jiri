@@ -74,10 +74,14 @@ type Project struct {
 	// this project.
 	GitHooks string `xml:"githooks,attr,omitempty"`
 
-	// Attributes is a list of attributes for a project seperated by comma that
-	// will be helpful to group projects with similar purposes together. By
-	// default, jiri will use the directory name as attribute.
+	// Attributes is a list of attributes for a project seperated by comma.
+	// The project will not be fetched by default when attributes are present.
 	Attributes string `xml:"attributes,attr,omitempty"`
+
+	// GitAttributes is a list comma-separated attributes for a project,
+	// which will be helpful to group projects with similar purposes together.
+	// It will be used for .gitattributes file generation.
+	GitAttributes string `xml:"git_attributes,attr,omitempty"`
 
 	XMLName struct{} `xml:"project"`
 
@@ -296,13 +300,18 @@ func (m attributes) Match(other attributes) bool {
 }
 
 func (m attributes) String() string {
+	attrs := make([]string, 0)
 	var buf bytes.Buffer
-	first := true
 	for k := range m {
+		attrs = append(attrs, k)
+	}
+	sort.Strings(attrs)
+	first := true
+	for _, v := range attrs {
 		if !first {
 			buf.WriteString(",")
 		}
-		buf.WriteString(k)
+		buf.WriteString(v)
 		first = false
 	}
 	return buf.String()

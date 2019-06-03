@@ -721,6 +721,7 @@ func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localM
 			return nil, nil, nil, err
 		}
 	}
+	ld.GenerateGitAttributesForProjects(jirix)
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 
@@ -739,6 +740,7 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 			return nil, nil, nil, err
 		}
 	}
+	ld.GenerateGitAttributesForProjects(jirix)
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 

@@ -117,6 +117,12 @@ git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed
 	path = path-2
 	url = /tmp/115893653/project-2`)
 
+	goldenAttributes := []byte(`manifest manifest public
+path-0 manifest public
+path-1 manifest public
+path-2 manifest public
+`)
+
 	// Setup fake workspace and update $JIRI_ROOT
 	_, fakeroot, cleanup := setupUniverse(t)
 	defer cleanup()
@@ -145,7 +151,10 @@ git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed
 	defer os.RemoveAll(tempDir)
 
 	genGitModuleFlags.genScript = path.Join(tempDir, "setup.sh")
-	err = runGenGitModule(fakeroot.X, []string{path.Join(tempDir, ".gitmodules")})
+	err = runGenGitModule(fakeroot.X, []string{
+		path.Join(tempDir, ".gitmodules"),
+		path.Join(tempDir, ".gitattributes"),
+	})
 	if err != nil {
 		t.Errorf(".gitmodules generation failed due to error %v", err)
 	}
@@ -170,6 +179,16 @@ git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed
 
 	if err := verifyModules(goldenModule, data); err != nil {
 		t.Errorf("verifying generated .gitmodules failed due to error: %v", err)
+	}
+
+	// Read and verify content of generated .gitattributes file
+	data, err = ioutil.ReadFile(path.Join(tempDir, ".gitattributes"))
+	if err != nil {
+		t.Errorf("reading generated .gitattributes file failed due to error: %v", err)
+	}
+	t.Logf("generated gitattributes content \n%s\n", string(data))
+	if bytes.Compare(data, goldenAttributes) != 0 {
+		t.Errorf("verfying generated .gitattributes failed. Expecting: %q, got %q", string(goldenAttributes), string(data))
 	}
 }
 
