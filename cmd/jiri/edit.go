@@ -259,20 +259,36 @@ func updateRevision(manifestContent, tag, currentRevision, newRevision, name str
 }
 
 func updateVersion(manifestContent, tag string, pc packageChanges) (string, error) {
-	if pc.OldVer != "" && pc.OldVer != "HEAD" {
-		return strings.Replace(manifestContent, pc.OldVer, pc.NewVer, 1), nil
-	}
-	return updateRevisionOrVersionAttr(manifestContent, tag, pc.NewVer, pc.Name, "version")
-}
-
-func updateRevisionOrVersionAttr(manifestContent, tag, newAttrValue, name, attr string) (string, error) {
-	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s [^<]*?name=%q(.|\\n)*?\\/>", tag, name))
+	// There are chances multiple packages share the same version tag,
+	// therefore, we cannot simple replace version string globally.
+	// Unlike project declaration, the version attribute of a package is not
+	// allowed to be empty.
+	name := regexp.QuoteMeta(pc.Name)
+	oldVal := regexp.QuoteMeta(pc.OldVer)
+	// Avoid using %q in regex, it behaves differently from regex.QuoteMeta.
+	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s [^<]*?name=\"%s\"(.|\\n)*?version=\"%s\"(.|\\n)*?\\/>", tag, name, oldVal))
 	if err != nil {
 		return "", err
 	}
 	t := r.FindStringSubmatch(manifestContent)
 	if t == nil {
-		return "", fmt.Errorf("Not able to match %s %q", tag, name)
+		return "", fmt.Errorf("Not able to match %s \"%s\"", tag, name)
+	}
+	s := t[0]
+	us := strings.Replace(s, fmt.Sprintf("version=\"%s\"", pc.OldVer), fmt.Sprintf("version=\"%s\"", pc.NewVer), 1)
+	return strings.Replace(manifestContent, s, us, 1), nil
+}
+
+func updateRevisionOrVersionAttr(manifestContent, tag, newAttrValue, name, attr string) (string, error) {
+	name = regexp.QuoteMeta(name)
+	// Avoid using %q in regex, it behaves differently from regex.QuoteMeta.
+	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s [^<]*?name=\"%s\"(.|\\n)*?\\/>", tag, name))
+	if err != nil {
+		return "", err
+	}
+	t := r.FindStringSubmatch(manifestContent)
+	if t == nil {
+		return "", fmt.Errorf("Not able to match %s \"%s\"", tag, name)
 	}
 	s := t[0]
 	spaces := t[1]
