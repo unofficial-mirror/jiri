@@ -589,8 +589,7 @@ func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool) error {
 		floatingRef := <-c
 		pkgs[floatingRef.pkg] = floatingRef.floating
 		if floatingRef.err != nil {
-			errBuf.WriteString(floatingRef.err.Error())
-			errBuf.WriteByte('\n')
+			errBuf.WriteString(fmt.Sprintf("error happened while checking package %q with version %q: %v\n", floatingRef.pkg.PackageName, floatingRef.pkg.VersionTag, floatingRef.err.Error()))
 		}
 	}
 
