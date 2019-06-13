@@ -551,12 +551,17 @@ func (p *Project) setupDefaultPushTarget(jirix *jiri.X) error {
 		return nil
 	}
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
-	if err := scm.Config("--get", "remote.origin.push"); err == nil {
-		// Default already set, skip
-		return nil
+	if err := scm.Config("--get", "remote.origin.push"); err != nil {
+		// remote.origin.push does not exist.
+		if err := scm.Config("remote.origin.push", "HEAD:refs/for/master"); err != nil {
+			return fmt.Errorf("not able to set remote.origin.push for project %s(%s) due to error: %v", p.Name, p.Path, err)
+		}
 	}
-	if err := scm.Config("remote.origin.push", "HEAD:refs/for/master"); err != nil {
-		return fmt.Errorf("not able to set remote.origin.push for project %s(%s) due to error: %v", p.Name, p.Path, err)
+	if err := scm.Config("--get", "push.default"); err != nil {
+		// push.default does not exist.
+		if err := scm.Config("push.default", "nothing"); err != nil {
+			return fmt.Errorf("not able to set push.default for project %s(%s) due to error: %v", p.Name, p.Path, err)
+		}
 	}
 	jirix.Logger.Debugf("set remote.origin.push to \"HEAD:refs/for/master\" for project %s(%s)", p.Name, p.Path)
 	return nil
