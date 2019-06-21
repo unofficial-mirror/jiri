@@ -215,6 +215,11 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 	return branches, nil
 }
 
+// CheckRevAvailable runs cat-file on a commit or tag is available locally.
+func (g *Git) CheckRevAvailable(rev string) error {
+	return g.run("cat-file", "-e", rev)
+}
+
 // CheckoutBranch checks out the given branch.
 func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 	args := []string{"checkout"}

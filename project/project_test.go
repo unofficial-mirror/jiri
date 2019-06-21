@@ -471,6 +471,18 @@ func TestUpdateUniverseWithCache(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "master commit")
 	checkJiriRevFiles(t, fake.X, localProjects[1])
 
+	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
+	localRev, err := gitLocal.CurrentRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the manifest with our new HEAD position.
+	fake.AddProjectOverride(localProjects[1].Name, localProjects[1].Remote, localRev)
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
 	// Check that cache was updated
 	cacheDirPath, err := localProjects[1].CacheDirPath(fake.X)
 	if err != nil {
@@ -478,11 +490,6 @@ func TestUpdateUniverseWithCache(t *testing.T) {
 	}
 	gCache := gitutil.New(fake.X, gitutil.RootDirOpt(cacheDirPath))
 	cacheRev, err := gCache.CurrentRevision()
-	if err != nil {
-		t.Fatal(err)
-	}
-	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
-	localRev, err := gitLocal.CurrentRevision()
 	if err != nil {
 		t.Fatal(err)
 	}

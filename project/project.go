@@ -1830,12 +1830,17 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 				continue
 			}
 			processingPath[cacheDirPath] = true
-			wg.Add(1)
-			fetchLimit <- struct{}{}
 			if err := project.fillDefaults(); err != nil {
 				errs <- err
 				continue
 			}
+			scm := gitutil.New(jirix, gitutil.RootDirOpt(cacheDirPath))
+			if err := scm.CheckRevAvailable(project.Revision); err == nil {
+				jirix.Logger.Infof("%s cache up-to-date; skipping\n", project.Name)
+				continue
+			}
+			wg.Add(1)
+			fetchLimit <- struct{}{}
 			go func(dir, remote string, depth int, branch string) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
