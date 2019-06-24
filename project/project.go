@@ -1453,10 +1453,15 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 
-	if uncommitted, err := scm.HasUncommittedChanges(); err != nil {
+	if diff, err := scm.FilesWithUncommittedChanges(); err != nil {
 		return fmt.Errorf("Cannot get uncommited changes for project %q: %s", project.Name, err)
-	} else if uncommitted {
-		msg := fmt.Sprintf("Project %s(%s) contains uncommited changes.", project.Name, relativePath)
+	} else if len(diff) != 0 {
+		msg := fmt.Sprintf("Project %s(%s) contains uncommited changes:", project.Name, relativePath)
+		if jirix.Logger.LoggerLevel >= log.DebugLevel {
+			for _, item := range diff {
+				msg += "\n" + item
+			}
+		}
 		msg += fmt.Sprintf("\nCommit or discard the changes and try again.\n\n")
 		jirix.Logger.Errorf(msg)
 		jirix.IncrementFailures()
@@ -2039,7 +2044,11 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 			}
 			msg = fmt.Sprintf("%s\n%s (%s):", msg, p.Project.Name, relativePath)
 			if p.HasChanges {
-				msg = fmt.Sprintf("%s (%s)", msg, jirix.Color.Yellow("Has changes"))
+				if jirix.Logger.LoggerLevel >= log.DebugLevel {
+					msg = fmt.Sprintf("%s (%s: %s)", msg, jirix.Color.Yellow("Has changes"), p.Changes)
+				} else {
+					msg = fmt.Sprintf("%s (%s)", msg, jirix.Color.Yellow("Has changes"))
+				}
 			}
 			if !p.IsOnJiriHead {
 				msg = fmt.Sprintf("%s (%s)", msg, jirix.Color.Yellow("Not on JIRI_HEAD"))
@@ -2071,6 +2080,7 @@ type ProjectStatus struct {
 	Project      Project
 	HasChanges   bool
 	IsOnJiriHead bool
+	Changes      string
 }
 
 func getProjectStatus(jirix *jiri.X, ps Projects) ([]ProjectStatus, MultiError) {
@@ -2093,10 +2103,19 @@ func getProjectStatus(jirix *jiri.X, ps Projects) ([]ProjectStatus, MultiError) 
 					continue
 				}
 				scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
-				uncommitted, err := scm.HasUncommittedChanges()
+				diff, err := scm.FilesWithUncommittedChanges()
 				if err != nil {
 					errs <- fmt.Errorf("Cannot get uncommited changes for project %q: %s", project.Name, err)
 					continue
+				}
+				uncommitted := false
+				var changes bytes.Buffer
+				if len(diff) != 0 {
+					uncommitted = true
+					for _, item := range diff {
+						changes.WriteString(item + "\n")
+					}
+					changes.Truncate(changes.Len() - 1)
 				}
 
 				isOnJiriHead, err := project.IsOnJiriHead(jirix)
@@ -2105,7 +2124,7 @@ func getProjectStatus(jirix *jiri.X, ps Projects) ([]ProjectStatus, MultiError) 
 					continue
 				}
 				if uncommitted || !isOnJiriHead {
-					projectStatuses <- ProjectStatus{project, uncommitted, isOnJiriHead}
+					projectStatuses <- ProjectStatus{project, uncommitted, isOnJiriHead, changes.String()}
 				}
 			}
 		}()
