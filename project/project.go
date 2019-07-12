@@ -359,7 +359,7 @@ type ResolveConfig interface {
 	LocalManifest() bool
 	EnablePackageLock() bool
 	EnableProjectLock() bool
-	EnablePackageVersion() bool
+	HostnameAllowList() []string
 }
 
 // UnmarshalLockEntries unmarshals project locks and package locks from
@@ -1010,6 +1010,64 @@ func writeLockFile(jirix *jiri.X, lockfilePath string, projectLocks ProjectLocks
 	return nil
 }
 
+// HostnameAllowed determines if hostname is allowed under reference.
+// This function allows a single prefix '*' for wildcard matching E.g.
+// "*.google.com" will match "fuchsia.google.com" but does not match
+// "google.com".
+func HostnameAllowed(reference, hostname string) bool {
+	if strings.Count(reference, "*") > 1 || (strings.Count(reference, "*") == 1 && reference[0] != '*') {
+		return false
+	}
+	if !strings.HasPrefix(reference, "*") {
+		return reference == hostname
+	}
+	reference = reference[1:]
+	i := len(reference) - 1
+	j := len(hostname) - 1
+	for i >= 0 && j >= 0 {
+		if hostname[j] != reference[i] {
+			return false
+		}
+		i--
+		j--
+	}
+	if i >= 0 {
+		return false
+	}
+	return true
+}
+
+// CheckProjectsHostnames checks if the hostname of every project is allowed
+// under allowList. If allowList is empty, the check is skipped.
+func CheckProjectsHostnames(projects Projects, allowList []string) error {
+	if len(allowList) > 0 {
+		for _, item := range allowList {
+			if strings.Count(item, "*") > 1 || (strings.Count(item, "*") == 1 && item[0] != '*') {
+				return fmt.Errorf("failed to process %q. Only a single * at the beginning of a hostname is supported", item)
+			}
+		}
+		for _, proj := range projects {
+			projURL, err := url.Parse(proj.Remote)
+			if err != nil {
+				return fmt.Errorf("URL of project %q cannot be parsed due to error: %v", proj.Name, err)
+			}
+			remoteHost := projURL.Hostname()
+			allowed := false
+			for _, item := range allowList {
+				if HostnameAllowed(item, remoteHost) {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				err := fmt.Errorf("hostname: %s in project %s is not allowed", remoteHost, proj.Name)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // GenerateJiriLockFile generates jiri lockfile to lockFilePath using
 // manifests in manifestFiles slice.
 func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig ResolveConfig) error {
@@ -1018,6 +1076,10 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool) (projectLocks ProjectLocks, pkgLocks PackageLocks, err error) {
 		projects, pkgs, err := loadManifestFiles(jirix, manifestFiles, localManifest)
 		if err != nil {
+			return nil, nil, err
+		}
+		// Check hostnames of projects.
+		if err := CheckProjectsHostnames(projects, resolveConfig.HostnameAllowList()); err != nil {
 			return nil, nil, err
 		}
 		if resolveConfig.EnableProjectLock() {

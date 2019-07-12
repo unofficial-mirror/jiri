@@ -5,6 +5,8 @@
 package main
 
 import (
+	"strings"
+
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/project"
@@ -17,6 +19,7 @@ type resolveFlags struct {
 	enableProjectLock    bool
 	enablePackageVersion bool
 	allowFloatingRefs    bool
+	hostnameAllowList    string
 }
 
 func (r *resolveFlags) AllowFloatingRefs() bool {
@@ -39,8 +42,17 @@ func (r *resolveFlags) EnableProjectLock() bool {
 	return r.enableProjectLock
 }
 
-func (r *resolveFlags) EnablePackageVersion() bool {
-	return r.enablePackageVersion
+func (r *resolveFlags) HostnameAllowList() []string {
+	ret := make([]string, 0)
+	hosts := strings.Split(r.hostnameAllowList, ",")
+	for _, item := range hosts {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		ret = append(ret, item)
+	}
+	return ret
 }
 
 var resolveFlag resolveFlags
@@ -63,9 +75,8 @@ func init() {
 	flags.BoolVar(&resolveFlag.localManifestFlag, "local-manifest", false, "Use local manifest")
 	flags.BoolVar(&resolveFlag.enablePackageLock, "enable-package-lock", true, "Enable resolving packages in lockfile")
 	flags.BoolVar(&resolveFlag.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
-	// TODO: Remove this placeholder flag after all references are deleted.
-	flags.BoolVar(&resolveFlag.enablePackageVersion, "enable-package-version", true, "Enable version tag for packages in lockfile")
 	flags.BoolVar(&resolveFlag.allowFloatingRefs, "allow-floating-refs", false, "Allow packages to be pinned to floating refs such as \"latest\"")
+	flags.StringVar(&resolveFlag.hostnameAllowList, "allow-hosts", "", "List of hostnames that can be used in the url of a repository, seperated by comma. It will not be enforced if it is left empty.")
 }
 
 func runResolve(jirix *jiri.X, args []string) error {

@@ -2567,3 +2567,91 @@ func TestOverrideProject(t *testing.T) {
 		t.Errorf("expected git hash %q, got %q", testHash, currentHash)
 	}
 }
+
+func TestHostnameAllowed(t *testing.T) {
+	tests := map[string]bool{
+		"*.google.com,fuchsia.google.com":       true,
+		"*.google.com,fuchsia.dev.google.com":   true,
+		"google.com,google.com":                 true,
+		"*google.com,fuchsiagoogle.com":         true,
+		"google.com,fuchsiagoogle.com":          false,
+		"google.com,oogle.com":                  false,
+		"fuchsia-internal,fuchsia-internal":     true,
+		"fuchsia-internal,fuchsia":              false,
+		",":                                     true,
+		"*google*.com,fuchsia.googlesource.com": false,
+	}
+	for k, v := range tests {
+		test := strings.Split(k, ",")
+		if len(test) != 2 {
+			t.Errorf("expecting a single ',' in %q", k)
+		}
+		ret := project.HostnameAllowed(test[0], test[1])
+		if v != ret {
+			t.Errorf("expecting %v, got %v from test %q", v, ret, k)
+		}
+	}
+}
+
+func TestCheckProjectsHostnames(t *testing.T) {
+	allowList := []string{
+		"*.googlesource.com",
+		"fuchsia-internal",
+	}
+	allowListIllegal := []string{
+		"*.google*.com",
+		"fuchsia-internal",
+	}
+	testProjectListsTrue := []project.Project{
+		{
+			Name:   "project1",
+			Remote: "https://fuchsia.googlesource.com/project1",
+		},
+		{
+			Name:   "project2",
+			Remote: "https://chromium.googlesource.com/project2",
+		},
+		{
+			Name:   "project4",
+			Remote: "sso://fuchsia-internal/project4",
+		},
+	}
+	testProjectListsFalse := []project.Project{
+		{
+			Name:   "project1",
+			Remote: "https://fuchsia.googlesource.com/project1",
+		},
+		{
+			Name:   "project2",
+			Remote: "https://chromium.googlesource.com/project2",
+		},
+		{
+			Name:   "project3",
+			Remote: "https://test.github.com/project3",
+		},
+		{
+			Name:   "project4",
+			Remote: "sso://fuchsia-internal/project4",
+		},
+	}
+
+	mapTrue := make(project.Projects)
+	for _, item := range testProjectListsTrue {
+		mapTrue[item.Key()] = item
+	}
+	if err := project.CheckProjectsHostnames(mapTrue, allowList); err != nil {
+		t.Errorf("expecting nil from CheckProjectsHostnames, but got: %v", err)
+	}
+
+	mapFalse := make(project.Projects)
+	for _, item := range testProjectListsFalse {
+		mapFalse[item.Key()] = item
+	}
+	if err := project.CheckProjectsHostnames(mapFalse, allowList); err == nil {
+		t.Errorf("expecting error from CheckProjectsHostnames, but got nil")
+	}
+
+	if err := project.CheckProjectsHostnames(mapTrue, allowListIllegal); err == nil {
+		t.Errorf("expecting error from CheckProjectsHostnames, but got nil")
+	}
+}
