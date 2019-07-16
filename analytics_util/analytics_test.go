@@ -81,7 +81,7 @@ func TestSendCommand(t *testing.T) {
 		r.ParseForm()
 		for k, v := range expectedVals {
 			if got, ok := r.Form[k]; !ok && v != "" {
-				t.Errorf("expected key %q", k)
+				t.Errorf("expected key %q, but not found. Full request: %+v", k, r)
 			} else if ok {
 				if len(got) != 1 {
 					t.Errorf("Expected one value for key %q", k)
