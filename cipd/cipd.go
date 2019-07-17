@@ -568,7 +568,7 @@ type packageFloatingRef struct {
 
 // CheckFloatingRefs determines if pkgs contains a floating ref which shouldn't
 // be used normally.
-func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool) error {
+func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool, plats map[PackageInstance][]Platform) error {
 	if _, err := Bootstrap(); err != nil {
 		return err
 	}
@@ -583,7 +583,11 @@ func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool) error {
 	sem := semaphore.NewWeighted(10)
 	var errBuf bytes.Buffer
 	for k := range pkgs {
-		go checkFloatingRefs(jirix, k, jsonDir, sem, c)
+		plat, ok := plats[k]
+		if !ok {
+			return fmt.Errorf("Platforms for package \"%s\" is not found", k.PackageName)
+		}
+		go checkFloatingRefs(jirix, k, plat, jsonDir, sem, c)
 	}
 
 	for i := 0; i < len(pkgs); i++ {
@@ -610,7 +614,7 @@ type refsJSON struct {
 	Ref string `json:"ref,omitempty"`
 }
 
-func checkFloatingRefs(jirix *jiri.X, pkg PackageInstance, jsonDir string, sem *semaphore.Weighted, c chan<- packageFloatingRef) {
+func checkFloatingRefs(jirix *jiri.X, pkg PackageInstance, plats []Platform, jsonDir string, sem *semaphore.Weighted, c chan<- packageFloatingRef) {
 	// cipd should already bootstrapped before calling
 	// this function.
 	sem.Acquire(context.Background(), 1)
@@ -636,7 +640,32 @@ func checkFloatingRefs(jirix *jiri.X, pkg PackageInstance, jsonDir string, sem *
 	jsonFileName := jsonFile.Name()
 	jsonFile.Close()
 
-	args := []string{"describe", pkg.PackageName, "-version", pkg.VersionTag, "-json-output", jsonFileName}
+	// Remove ${platform}, ${os} ... from package name before calling cipd describe
+	// as it will fail when these tags are not compatible with current host.
+	pkgName := pkg.PackageName
+	if MustExpand(pkgName) {
+		expandedPkgName, err := Expand(pkgName, plats)
+		if err != nil {
+			c <- packageFloatingRef{
+				pkg:      pkg,
+				err:      err,
+				floating: false,
+			}
+			return
+		}
+		if len(expandedPkgName) == 0 {
+			c <- packageFloatingRef{
+				pkg: pkg,
+				// avoid using %q as we don't want escape characters in the output.
+				err:      fmt.Errorf("cannot expand package \"%s\"", pkgName),
+				floating: false,
+			}
+			return
+		}
+		pkgName = expandedPkgName[0]
+	}
+
+	args := []string{"describe", pkgName, "-version", pkg.VersionTag, "-json-output", jsonFileName}
 	if jirix != nil {
 		jirix.Logger.Debugf("Invoke cipd with %v", args)
 	}

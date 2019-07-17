@@ -1091,14 +1091,20 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 		if resolveConfig.EnablePackageLock() {
 			if !resolveConfig.AllowFloatingRefs() {
 				pkgsForRefCheck := make(map[cipd.PackageInstance]bool)
+				pkgsPlatformMap := make(map[cipd.PackageInstance][]cipd.Platform)
 				for _, v := range pkgs {
 					pkgInstance := cipd.PackageInstance{
 						PackageName: v.Name,
 						VersionTag:  v.Version,
 					}
 					pkgsForRefCheck[pkgInstance] = false
+					plats, err := v.GetPlatforms()
+					if err != nil {
+						return nil, nil, err
+					}
+					pkgsPlatformMap[pkgInstance] = plats
 				}
-				if err := cipd.CheckFloatingRefs(jirix, pkgsForRefCheck); err != nil {
+				if err := cipd.CheckFloatingRefs(jirix, pkgsForRefCheck, pkgsPlatformMap); err != nil {
 					return nil, nil, err
 				}
 				for k, v := range pkgsForRefCheck {

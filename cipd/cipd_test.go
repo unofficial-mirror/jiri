@@ -344,12 +344,17 @@ func TestFloatingRefs(t *testing.T) {
 		}: false,
 	}
 
+	platformMap := make(map[PackageInstance][]Platform)
+	for k := range testExpects {
+		platformMap[k] = DefaultPlatforms()
+	}
+
 	tests := make(map[PackageInstance]bool)
 	for k, v := range testExpects {
 		tests[k] = v
 	}
 
-	if err := CheckFloatingRefs(nil, tests); err != nil {
+	if err := CheckFloatingRefs(nil, tests, platformMap); err != nil {
 		t.Errorf("CheckFloatingRefs failed due to error: %v", err)
 		return
 	}
