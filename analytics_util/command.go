@@ -50,7 +50,7 @@ func (c *Command) AnalyticsObject() AnayticsObject {
 	e := Event{}
 	e.Category = "Command"
 	e.Action = c.name
-	if c.endTime.Second() != 0 {
+	if !c.endTime.IsZero() {
 		e.Label = "Complete"
 		e.Value = c.endTime.Sub(c.startTime).Nanoseconds() / 1000000
 	}
