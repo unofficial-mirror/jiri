@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -110,6 +111,11 @@ func fetchBinary(binaryPath, platform, version, digest string) error {
 		return errors.New("cipd failed integrity test")
 	}
 	// cipd binary verified. Save to disk
+	if _, err := os.Stat(filepath.Dir(binaryPath)); os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(binaryPath), 0755); err != nil {
+			return fmt.Errorf("failed to create parent directory %q for cipd: %v", filepath.Dir(binaryPath), err)
+		}
+	}
 	return writeFile(binaryPath, data)
 }
 
@@ -936,4 +942,19 @@ func DefaultPlatforms() []Platform {
 		Platform{"linux", "amd64"},
 		Platform{"mac", "amd64"},
 	}
+}
+
+// CopyCIPDToDirectory makes a copy of bootstrapped cipd to another location
+// by re-bootstrap cipd to dirname so it can be used by other Fuchsia tools.
+func CopyCIPDToDirectory(dirname string) error {
+	originalCIPD := cipdBinary
+	defer func() {
+		cipdBinary = originalCIPD
+	}()
+	cipdBinary = filepath.Join(dirname, "cipd")
+	_, err := Bootstrap()
+	if err != nil {
+		return err
+	}
+	return nil
 }
