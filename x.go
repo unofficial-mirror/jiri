@@ -422,6 +422,11 @@ func (x *X) RootMetaDir() string {
 	return filepath.Join(x.Root, RootMetaDir)
 }
 
+// CIPDPath returns the path to directory containing cipd.
+func (x *X) CIPDPath() string {
+	return filepath.Join(x.RootMetaDir(), "bin", "cipd")
+}
+
 // JiriManifestFile returns the path to the .jiri_manifest file.
 func (x *X) JiriManifestFile() string {
 	return filepath.Join(x.Root, JiriManifestFile)

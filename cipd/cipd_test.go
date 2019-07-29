@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"fuchsia.googlesource.com/jiri/jiritest/xtest"
 )
 
 const (
@@ -136,7 +138,9 @@ func TestSelfUpdate(t *testing.T) {
 }
 
 func TestBootsrap(t *testing.T) {
-	cipdPath, err := Bootstrap()
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
 	if cipdPath == "" {
 		t.Errorf("bootstrap returned an empty path")
 	}
@@ -153,7 +157,9 @@ func TestBootsrap(t *testing.T) {
 }
 
 func TestEnsure(t *testing.T) {
-	cipdPath, err := Bootstrap()
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -181,7 +187,7 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 	}
 	defer os.RemoveAll(tmpDir)
 	// Invoke Ensure on test ensure file
-	if err := Ensure(nil, testEnsureFile.Name(), tmpDir, 30); err != nil {
+	if err := Ensure(fakex, testEnsureFile.Name(), tmpDir, 30); err != nil {
 		t.Errorf("ensure failed due to error: %v", err)
 	}
 	// Check the existence downloaded package
@@ -195,7 +201,9 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 }
 
 func TestCheckACL(t *testing.T) {
-	cipdPath, err := Bootstrap()
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -204,7 +212,7 @@ func TestCheckACL(t *testing.T) {
 	pkgMap := make(map[string]bool)
 	pkgMap[cipdPkgPathA] = false
 	pkgMap[cipdPkgPathB] = false
-	if err := CheckPackageACL(nil, pkgMap); err != nil {
+	if err := CheckPackageACL(fakex, pkgMap); err != nil {
 		t.Errorf("CheckPackageACL failed due to error: %v", err)
 	}
 
@@ -219,7 +227,9 @@ func TestCheckACL(t *testing.T) {
 }
 
 func TestResolve(t *testing.T) {
-	cipdPath, err := Bootstrap()
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -250,7 +260,7 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 	}
 
 	testEnsureFile.Sync()
-	instances, err := Resolve(nil, testEnsureFile.Name())
+	instances, err := Resolve(fakex, testEnsureFile.Name())
 	if err != nil {
 		t.Errorf("resolve failed due to error: %v", err)
 	}
@@ -333,6 +343,13 @@ func TestDecl(t *testing.T) {
 }
 
 func TestFloatingRefs(t *testing.T) {
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	if err != nil {
+		t.Errorf("bootstrap failed due to error: %v", err)
+	}
+	defer os.Remove(cipdPath)
 	testExpects := map[PackageInstance]bool{
 		PackageInstance{
 			PackageName: "gn/gn/${platform}",
@@ -354,7 +371,7 @@ func TestFloatingRefs(t *testing.T) {
 		tests[k] = v
 	}
 
-	if err := CheckFloatingRefs(nil, tests, platformMap); err != nil {
+	if err := CheckFloatingRefs(fakex, tests, platformMap); err != nil {
 		t.Errorf("CheckFloatingRefs failed due to error: %v", err)
 		return
 	}

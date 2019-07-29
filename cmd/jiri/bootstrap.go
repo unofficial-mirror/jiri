@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/cmdline"
 )
@@ -32,7 +33,11 @@ func runBootstrap(env *cmdline.Env, args []string) error {
 	for _, v := range args {
 		switch strings.ToLower(v) {
 		case "cipd":
-			cipdPath, err := cipd.Bootstrap()
+			jirix, err := jiri.NewX(env)
+			if err != nil {
+				return err
+			}
+			cipdPath, err := cipd.Bootstrap(jirix.CIPDPath())
 			if err != nil {
 				return err
 			}

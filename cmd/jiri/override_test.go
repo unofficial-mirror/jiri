@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/jiritest/xtest"
 	"fuchsia.googlesource.com/jiri/project"
 )
 
@@ -290,7 +290,7 @@ func TestOverride(t *testing.T) {
 }
 
 func testOverride(t *testing.T, test overrideTestCase) error {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 	// Temporary directory in which to run `jiri import`.
 	tmpDir, err := ioutil.TempDir("", "")

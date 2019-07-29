@@ -13,6 +13,7 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/project"
+	"fuchsia.googlesource.com/jiri/jiritest/xtest"
 )
 
 // FakeJiriRoot sets up a fake root under a tmp directory.
@@ -37,7 +38,7 @@ const (
 // environment; typically it is run as a defer function.
 func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	// lockfiles are disabled in tests by defaults
-	jirix, cleanup := NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	fake := &FakeJiriRoot{
 		X:             jirix,
 		Projects:      map[string]string{},

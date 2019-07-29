@@ -26,7 +26,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/log"
-	"fuchsia.googlesource.com/jiri/osutil"
 	"fuchsia.googlesource.com/jiri/version"
 	"golang.org/x/sync/semaphore"
 )
@@ -86,16 +85,6 @@ func init() {
 		cipdArch = "armv6l"
 	}
 	CipdPlatform = Platform{cipdOS, cipdArch}
-
-	jiriPath, err := osutil.Executable()
-	if err != nil {
-		// Could not locate jiri, leave cipdBinary empty
-		// It will be checked by bootstrap and reported
-		return
-	}
-	// Assume cipd binary is located in the same directory of jiri
-	jiriBinaryRoot := path.Dir(jiriPath)
-	cipdBinary = path.Join(jiriBinaryRoot, "cipd")
 }
 
 func fetchBinary(binaryPath, platform, version, digest string) error {
@@ -122,7 +111,8 @@ func fetchBinary(binaryPath, platform, version, digest string) error {
 // Bootstrap returns the path of a valid cipd binary. It will fetch cipd from
 // remote if a valid cipd binary is not found. It will update cipd if there
 // is a new version.
-func Bootstrap() (string, error) {
+func Bootstrap(binaryPath string) (string, error) {
+	cipdBinary = binaryPath
 	bootstrap := func() error {
 		// Fetch cipd digest
 		cipdDigest, _, err := fetchDigest(CipdPlatform.String())
@@ -307,18 +297,15 @@ func checkPackageACL(jirix *jiri.X, cipdPath, jsonDir string, c chan<- packageAC
 	jsonFile.Close()
 
 	args := []string{"acl-check", "-reader", "-json-output", jsonFileName, cipdPath}
-	if jirix != nil {
-		jirix.Logger.Debugf("Invoke cipd with %v", args)
-	}
+	jirix.Logger.Debugf("Invoke cipd with %v", args)
+
 	command := exec.Command(cipdBinary, args...)
 	var stdoutBuf, stderrBuf bytes.Buffer
 	command.Stdout = &stdoutBuf
 	command.Stderr = &stderrBuf
 	// Return false if cipd cannot be executed or output jsonfile contains false.
 	if err := command.Run(); err != nil {
-		if jirix != nil {
-			jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stderrBuf.String())
-		}
+		jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stderrBuf.String())
 		c <- packageACL{path: cipdPath, access: false}
 		return
 	}
@@ -354,7 +341,7 @@ func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool) error {
 	// Not declared as CheckPackageACL(jirix *jiri.X, pkgs map[*package.Package]bool)
 	// due to import cycles. Package jiri/package imports jiri/cipd so here we cannot
 	// import jiri/package.
-	if _, err := Bootstrap(); err != nil {
+	if _, err := Bootstrap(jirix.CIPDPath()); err != nil {
 		return err
 	}
 
@@ -380,7 +367,7 @@ func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool) error {
 // if login information is found or return false if login information is not
 // found.
 func CheckLoggedIn(jirix *jiri.X) (bool, error) {
-	cipdPath, err := Bootstrap()
+	cipdPath, err := Bootstrap(jirix.CIPDPath())
 	if err != nil {
 		return false, err
 	}
@@ -391,9 +378,7 @@ func CheckLoggedIn(jirix *jiri.X) (bool, error) {
 	command.Stderr = &stderrBuf
 	if err := command.Run(); err != nil {
 		stdErrMsg := strings.TrimSpace(stderrBuf.String())
-		if jirix != nil {
-			jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stdErrMsg)
-		}
+		jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stdErrMsg)
 		if _, ok := err.(*exec.ExitError); ok && stdErrMsg == cipdNotLoggedInStr {
 			return false, nil
 		}
@@ -405,25 +390,23 @@ func CheckLoggedIn(jirix *jiri.X) (bool, error) {
 // Ensure runs cipd binary's ensure funcationality over file. Fetched packages will be
 // saved to projectRoot directory. Parameter timeout is in minutes.
 func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
-	cipdPath, err := Bootstrap()
+	cipdPath, err := Bootstrap(jirix.CIPDPath())
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Minute)
 	defer cancel()
 	args := []string{"ensure", "-ensure-file", file, "-root", projectRoot, "-log-level", "warning"}
-	// Workaround so tests do not have to create a new fake jirix, which would
-	// result in an import cycle
-	if jirix != nil {
-		task := jirix.Logger.AddTaskMsg("Fetching CIPD packages")
-		defer task.Done()
-		// If jiri is running with -v, change cipd log-level
-		// from warning to default.
-		if jirix.Logger.LoggerLevel >= log.DebugLevel {
-			args = args[:len(args)-2]
-		}
-		jirix.Logger.Debugf("Invoke cipd with %v", args)
+
+	task := jirix.Logger.AddTaskMsg("Fetching CIPD packages")
+	defer task.Done()
+	// If jiri is running with -v, change cipd log-level
+	// from warning to default.
+	if jirix.Logger.LoggerLevel >= log.DebugLevel {
+		args = args[:len(args)-2]
 	}
+	jirix.Logger.Debugf("Invoke cipd with %v", args)
+
 	// Construct arguments and invoke cipd for ensure file
 	command := exec.CommandContext(ctx, cipdPath, args...)
 	// Add User-Agent info for cipd
@@ -453,16 +436,13 @@ type PackageInstance struct {
 // Resolve runs cipd binary's ensure-file-resolve functionality over file.
 // It returns a slice containing resolved packages and cipd instance ids.
 func Resolve(jirix *jiri.X, file string) ([]PackageInstance, error) {
-	cipdPath, err := Bootstrap()
+	cipdPath, err := Bootstrap(jirix.CIPDPath())
 	if err != nil {
 		return nil, err
 	}
 	args := []string{"ensure-file-resolve", "-ensure-file", file, "-log-level", "warning"}
-	// Workaround so tests do not have to create a new fake jirix, which would
-	// result in an import cycle
-	if jirix != nil {
-		jirix.Logger.Debugf("Invoke cipd with %v", args)
-	}
+	jirix.Logger.Debugf("Invoke cipd with %v", args)
+
 	command := exec.Command(cipdPath, args...)
 	command.Env = append(os.Environ(), "CIPD_HTTP_USER_AGENT_PREFIX="+getUserAgent())
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -472,9 +452,7 @@ func Resolve(jirix *jiri.X, file string) ([]PackageInstance, error) {
 	command.Stdout = &stdoutBuf
 	command.Stderr = &stderrBuf
 	if err := command.Run(); err != nil {
-		if jirix != nil {
-			jirix.Logger.Errorf("cipd returned error: %v", stderrBuf.String())
-		}
+		jirix.Logger.Errorf("cipd returned error: %v", stderrBuf.String())
 		return nil, err
 	}
 
@@ -575,7 +553,7 @@ type packageFloatingRef struct {
 // CheckFloatingRefs determines if pkgs contains a floating ref which shouldn't
 // be used normally.
 func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool, plats map[PackageInstance][]Platform) error {
-	if _, err := Bootstrap(); err != nil {
+	if _, err := Bootstrap(jirix.CIPDPath()); err != nil {
 		return err
 	}
 
@@ -672,9 +650,8 @@ func checkFloatingRefs(jirix *jiri.X, pkg PackageInstance, plats []Platform, jso
 	}
 
 	args := []string{"describe", pkgName, "-version", pkg.VersionTag, "-json-output", jsonFileName}
-	if jirix != nil {
-		jirix.Logger.Debugf("Invoke cipd with %v", args)
-	}
+	jirix.Logger.Debugf("Invoke cipd with %v", args)
+
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer
 	command := exec.Command(cipdBinary, args...)
@@ -942,19 +919,4 @@ func DefaultPlatforms() []Platform {
 		Platform{"linux", "amd64"},
 		Platform{"mac", "amd64"},
 	}
-}
-
-// CopyCIPDToDirectory makes a copy of bootstrapped cipd to another location
-// by re-bootstrap cipd to dirname so it can be used by other Fuchsia tools.
-func CopyCIPDToDirectory(dirname string) error {
-	originalCIPD := cipdBinary
-	defer func() {
-		cipdBinary = originalCIPD
-	}()
-	cipdBinary = filepath.Join(dirname, "cipd")
-	_, err := Bootstrap()
-	if err != nil {
-		return err
-	}
-	return nil
 }

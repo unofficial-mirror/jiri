@@ -14,7 +14,6 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/analytics_util"
-	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/cmdline"
 )
 
@@ -206,11 +205,6 @@ func runInit(env *cmdline.Env, args []string) error {
 	if err := config.Write(configPath); err != nil {
 		return err
 	}
-
-	if err := cipd.CopyCIPDToDirectory(filepath.Join(jiri.RootMetaDir, "bin")); err != nil {
-		return fmt.Errorf("failed copy cipd to %q: %v", filepath.Join(jiri.RootMetaDir, "bin"), err)
-	}
-
 	// TODO(phosek): also create an empty manifest
 
 	return nil

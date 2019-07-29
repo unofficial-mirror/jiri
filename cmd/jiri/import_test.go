@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/jiritest/xtest"
 )
 
 type importTestCase struct {
@@ -344,7 +344,7 @@ func TestImport(t *testing.T) {
 }
 
 func testImport(t *testing.T, test importTestCase) error {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 	// Temporary directory in which to run `jiri import`.
 	tmpDir, err := ioutil.TempDir("", "")

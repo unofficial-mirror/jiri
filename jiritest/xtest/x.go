@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package jiritest provides utilities for testing jiri functionality.
-package jiritest
+// Package xtest provides utilities for testing jiri functionality.
+package xtest
 
 import (
 	"io/ioutil"

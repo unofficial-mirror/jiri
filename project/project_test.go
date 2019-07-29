@@ -22,6 +22,7 @@ import (
 	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/gitutil"
 	"fuchsia.googlesource.com/jiri/jiritest"
+	"fuchsia.googlesource.com/jiri/jiritest/xtest"
 	"fuchsia.googlesource.com/jiri/project"
 )
 
@@ -155,7 +156,7 @@ func checkProjectsMatchPaths(t *testing.T, gotProjects project.Projects, wantPro
 // TestLocalProjects tests the behavior of the LocalProjects method with
 // different ScanModes.
 func TestLocalProjects(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
 	// Create some projects.
@@ -1906,7 +1907,7 @@ func TestLocalBranchesNotUpdatedWhenOnBranch(t *testing.T) {
 }
 
 func TestFileImportCycle(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
 	// Set up the cycle .jiri_manifest -> A -> B -> A
@@ -2165,7 +2166,7 @@ func TestManifestToFromBytes(t *testing.T) {
 }
 
 func TestProjectToFromFile(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
 	tests := []struct {
@@ -2307,7 +2308,7 @@ func TestGetPath(t *testing.T) {
 }
 
 func TestWritePackageFlags(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
 	testPkgsWAS := []project.Package{
@@ -2351,7 +2352,7 @@ func TestWritePackageFlags(t *testing.T) {
 }
 
 func TestPackageVersionTemplate(t *testing.T) {
-	jirix, cleanup := jiritest.NewX(t)
+	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
 	testProjs := []project.Project{
