@@ -2351,6 +2351,38 @@ func TestWritePackageFlags(t *testing.T) {
 	}
 }
 
+func TestWriteProjectFlags(t *testing.T) {
+	jirix, cleanup := xtest.NewX(t)
+	defer cleanup()
+
+	testProjsList := []project.Project{
+		project.Project{Name: "test0", Revision: "version", Flag: "flagfile0|internal = true|internal = false"},
+		project.Project{Name: "test1", Revision: "version", Flag: ""},
+	}
+	expected := map[string]string{
+		"flagfile0": "internal = true",
+	}
+
+	testProjs := make(project.Projects)
+	for _, v := range testProjsList {
+		testProjs[v.Key()] = v
+	}
+
+	if err := project.WriteProjectFlags(jirix, testProjs); err != nil {
+		t.Errorf("WritePackageFlags failed due to error: %v", err)
+	}
+
+	for k, v := range expected {
+		data, err := ioutil.ReadFile(filepath.Join(jirix.Root, k))
+		if err != nil {
+			t.Errorf("read flag file %q failed due error: %v", k, err)
+		}
+		if string(data) != v {
+			t.Errorf("expecting flag %q from file %q, got %q", v, k, string(data))
+		}
+	}
+}
+
 func TestPackageVersionTemplate(t *testing.T) {
 	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()

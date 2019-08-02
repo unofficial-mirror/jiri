@@ -83,6 +83,10 @@ type Project struct {
 	// It will be used for .gitattributes file generation.
 	GitAttributes string `xml:"git_attributes,attr,omitempty"`
 
+	// Flag defines the content that should be written to a file when
+	// this project is successfully fetched.
+	Flag string `xml:"flag,attr,omitempty"`
+
 	XMLName struct{} `xml:"project"`
 
 	// This is used to store computed key. This is useful when remote and
@@ -258,6 +262,59 @@ func (p *Project) update(other *Project) {
 	if other.GitHooks != "" {
 		p.GitHooks = other.GitHooks
 	}
+	if other.Flag != "" {
+		p.Flag = other.Flag
+	}
+}
+
+// WriteProjectFlags write flag files into project directory using in "flag"
+// attribute from projs.
+func WriteProjectFlags(jirix *jiri.X, projs Projects) error {
+	// The flag attribute has a format of $FILE_NAME|$FLAG_SUCCESSFUL|$FLAG_FAILED
+	// When a package is successfully downloaded, jiri will write $FLAG_SUCCESSFUL
+	// to $FILE_NAME. If the package is not downloaded due to access reasons,
+	// jiri will write $FLAG_FAILED to $FILE_NAME.
+	// '|' is a forbidden symbol in Windows path, which is unlikely
+	// to be used by path.
+
+	// Unlike WritePackageFlags that writes the failure flags when the package was
+	// not fetched due to permission issues, this function will not write failure
+	// flags, as unfetchable projects are considered as errors.
+	flagMap := make(map[string]string)
+	fill := func(file, flag string) error {
+		if v, ok := flagMap[file]; ok {
+			if v != flag {
+				return fmt.Errorf("encountered conflicting flags for file %q: %q conflicts with %q", file, v, flag)
+			}
+		} else {
+			flagMap[file] = flag
+		}
+		return nil
+	}
+
+	for _, v := range projs {
+		if v.Flag == "" {
+			continue
+		}
+		fields := strings.Split(v.Flag, "|")
+		if len(fields) != 3 {
+			return fmt.Errorf("unknown project flag format found in project %+v", v)
+		}
+		if err := fill(fields[0], fields[1]); err != nil {
+			return err
+		}
+	}
+
+	var writeErrorBuf bytes.Buffer
+	for k, v := range flagMap {
+		if err := ioutil.WriteFile(filepath.Join(jirix.Root, k), []byte(v), 0644); err != nil {
+			writeErrorBuf.WriteString(fmt.Sprintf("write package flag %q to file %q failed: %v\n", v, k, err))
+		}
+	}
+	if writeErrorBuf.Len() > 0 {
+		return errors.New(writeErrorBuf.String())
+	}
+	return nil
 }
 
 type attributes map[string]bool
@@ -2093,6 +2150,12 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 				jirix.Logger.Debugf("set up default push target failed due to error: %v", err)
 			}
 		}
+	}
+	jirix.TimerPop()
+
+	jirix.TimerPush("jiri project flag files")
+	if err := WriteProjectFlags(jirix, remoteProjects); err != nil {
+		jirix.Logger.Errorf("failures in write jiri project flag files: %v", err)
 	}
 	jirix.TimerPop()
 
