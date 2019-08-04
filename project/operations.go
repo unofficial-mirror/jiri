@@ -113,16 +113,26 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 			}
 		}
 	} else {
-		// Shallow clones can not be used as as local git reference
-		if op.project.HistoryDepth > 0 && cache != "" {
-			err = clone(jirix, cache, op.destination, gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+		opts := []gitutil.CloneOpt{gitutil.NoCheckoutOpt(true)}
+		if op.project.HistoryDepth > 0 {
+			opts = append(opts, gitutil.DepthOpt(op.project.HistoryDepth))
 		} else {
-			err = clone(jirix, remote, op.destination, gitutil.ReferenceOpt(cache),
-				gitutil.NoCheckoutOpt(true), gitutil.DepthOpt(op.project.HistoryDepth))
+			// Shallow clones can not be used as as local git reference
+			opts = append(opts, gitutil.ReferenceOpt(cache))
 		}
-	}
-	if err != nil {
-		return err
+		if cache != "" {
+			if err = clone(jirix, cache, op.destination, opts...); err != nil {
+				return err
+			}
+			scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
+			if err = scm.AddOrReplaceRemote("origin", remote); err != nil {
+				return err
+			}
+		} else {
+			if err = clone(jirix, remote, op.destination, opts...); err != nil {
+				return err
+			}
+		}
 	}
 
 	if err := os.Chmod(op.destination, os.FileMode(0755)); err != nil {
