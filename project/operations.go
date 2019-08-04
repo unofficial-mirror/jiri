@@ -120,6 +120,9 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 			// Shallow clones can not be used as as local git reference
 			opts = append(opts, gitutil.ReferenceOpt(cache))
 		}
+		if jirix.Partial {
+			opts = append(opts, gitutil.OmitBlobsOpt(true))
+		}
 		if cache != "" {
 			if err = clone(jirix, cache, op.destination, opts...); err != nil {
 				return err

@@ -1821,7 +1821,7 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 	return multiErr
 }
 
-func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) error {
+func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, depth int) error {
 	refspec := "+refs/heads/*:refs/heads/*"
 	if depth > 0 {
 		// Shallow cache, fetch only manifest tracked remote branch
@@ -1830,7 +1830,13 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 	errCacheCorruption := errors.New("git cache corrupted")
 	updateCache := func() error {
 		// Test if git cache is intact
-		objectsDir := filepath.Join(dir, "objects")
+		var objectsDir string
+		if jirix.Partial {
+			// Partial clones do not use --bare so objects is in .git/
+			objectsDir = filepath.Join(dir, ".git", "objects")
+		} else {
+			objectsDir = filepath.Join(dir, "objects")
+		}
 		if _, err := os.Stat(objectsDir); err != nil {
 			jirix.Logger.Warningf("could not access objects directory under git cache directory %q due to error: %v", dir, err)
 			return errCacheCorruption
@@ -1858,8 +1864,17 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 		// We need to explicitly specify the ref for fetch to update in case
 		// the cache was created with a previous version and uses "refs/*"
 		if err := retry.Function(jirix, func() error {
-			return gitutil.New(jirix, gitutil.RootDirOpt(dir)).FetchRefspec("origin", refspec,
-				gitutil.DepthOpt(depth), gitutil.PruneOpt(true), gitutil.UpdateShallowOpt(true))
+			git := gitutil.New(jirix, gitutil.RootDirOpt(dir))
+			if err := git.FetchRefspec("origin", refspec,
+				gitutil.DepthOpt(depth), gitutil.PruneOpt(true), gitutil.UpdateShallowOpt(true)); err != nil {
+				return err
+			}
+			if jirix.Partial {
+				if err := git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+					return err
+				}
+			}
+			return nil
 		}, fmt.Sprintf("Fetching for %s:%s", dir, refspec),
 			retry.AttemptsOpt(jirix.Attempts)); err != nil {
 			return err
@@ -1912,12 +1927,25 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch string, depth int) e
 			return nil
 		}
 
-		if err := gitutil.New(jirix).Clone(remote, dir, gitutil.BareOpt(true), gitutil.DepthOpt(depth)); err != nil {
+		opts := []gitutil.CloneOpt{gitutil.DepthOpt(depth)}
+		if jirix.Partial {
+			opts = append(opts, gitutil.OmitBlobsOpt(true))
+		} else {
+			opts = append(opts, gitutil.BareOpt(true))
+		}
+		if err := gitutil.New(jirix).Clone(remote, dir, opts...); err != nil {
 			return err
+		}
+
+		git := gitutil.New(jirix, gitutil.RootDirOpt(dir))
+		if jirix.Partial {
+			if err := git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+				return err
+			}
 		}
 		// We need to explicitly specify the ref for fetch to update the bare
 		// repository.
-		if err := gitutil.New(jirix, gitutil.RootDirOpt(dir)).Config("remote.origin.fetch", refspec); err != nil {
+		if err := git.Config("remote.origin.fetch", refspec); err != nil {
 			return err
 		}
 		return nil
@@ -1969,15 +1997,15 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			}
 			wg.Add(1)
 			fetchLimit <- struct{}{}
-			go func(dir, remote string, depth int, branch string) {
+			go func(dir, remote string, depth int, branch, revision string) {
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				remote = rewriteRemote(jirix, remote)
-				if err := updateOrCreateCache(jirix, dir, remote, branch, depth); err != nil {
+				if err := updateOrCreateCache(jirix, dir, remote, branch, revision, depth); err != nil {
 					errs <- err
 					return
 				}
-			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch)
+			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision)
 		} else {
 			errs <- err
 		}

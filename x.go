@@ -57,6 +57,7 @@ type Config struct {
 	FetchingAttrs     string `xml:"fetchingAttrs,omitempty"`
 	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
+	Partial           bool   `xml:"partial,omitempty"`
 	// version user has opted-in to
 	AnalyticsVersion string `xml:"analytics>version,omitempty"`
 	KeepGitHooks     bool   `xml:"keepGitHooks,omitempty"`
@@ -109,6 +110,7 @@ type X struct {
 	LockfileEnabled     bool
 	LockfileName        string
 	SsoCookiePath       string
+	Partial             bool
 	PrebuiltJSON        string
 	FetchingAttrs       string
 	UsingSnapshot       bool
@@ -271,6 +273,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 	x.Cache, err = findCache(root, x.config)
 	if x.config != nil {
 		x.Shared = x.config.Shared
+		x.Partial = x.config.Partial
 	}
 
 	if err != nil {

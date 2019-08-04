@@ -256,7 +256,7 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 		case ReferenceOpt:
 			reference := string(typedOpt)
 			if reference != "" {
-				args = append(args, []string{"--reference", reference}...)
+				args = append(args, []string{"--reference-if-able", reference}...)
 			}
 		case SharedOpt:
 			if typedOpt {
@@ -269,6 +269,10 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 		case DepthOpt:
 			if typedOpt > 0 {
 				args = append(args, []string{"--depth", strconv.Itoa(int(typedOpt))}...)
+			}
+		case OmitBlobsOpt:
+			if typedOpt {
+				args = append(args, "--filter=blob:none")
 			}
 		}
 	}

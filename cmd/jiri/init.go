@@ -46,6 +46,7 @@ var (
 	lockfileNameFlag      string
 	prebuiltJSON          string
 	optionalAttrs         string
+	partialFlag           bool
 )
 
 const (
@@ -66,6 +67,7 @@ func init() {
 	// Empty string is not used as default value for optionalAttrs as we
 	// use empty string to clear existing saved attributes.
 	cmdInit.Flags.StringVar(&optionalAttrs, "fetch-optional", optionalAttrsNotSet, "Set up attributes of optional projects and packages that should be fetched by jiri.")
+	cmdInit.Flags.BoolVar(&partialFlag, "partial", false, "Whether to use a partial checkout.")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -155,6 +157,10 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if optionalAttrs != optionalAttrsNotSet {
 		config.FetchingAttrs = optionalAttrs
+	}
+
+	if partialFlag {
+		config.Partial = partialFlag
 	}
 
 	if ssoCookieFlag != "" {

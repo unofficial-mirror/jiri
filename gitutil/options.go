@@ -119,6 +119,10 @@ type BareOpt bool
 
 func (BareOpt) cloneOpt() {}
 
+type OmitBlobsOpt bool
+
+func (OmitBlobsOpt) cloneOpt() {}
+
 type RebaseMerges bool
 
 func (RebaseMerges) rebaseOpt() {}
