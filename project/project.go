@@ -1541,11 +1541,9 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 		//might be a tag
 		if err2 := fetch(jirix, project.Path, "origin", gitutil.FetchTagOpt(project.Revision)); err2 != nil {
 			// error while fetching tag, return original err and debug log this err
-			jirix.Logger.Debugf("Error while fetching tag for project %s (%s): %s\n\n", project.Name, project.Path, err2)
-			return err
-		} else {
-			return git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
+			return fmt.Errorf("error while fetching tag after failed to checkout revision %s for project %s (%s): %s\ncheckout error: %v", revision, project.Name, project.Path, err2, err)
 		}
+		return git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
 	}
 	return err
 }
