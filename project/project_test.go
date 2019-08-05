@@ -466,23 +466,21 @@ func TestUpdateUniverseWithCache(t *testing.T) {
 
 	// Commit to master branch of a project 1.
 	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
-	if err := fake.UpdateUniverse(false); err != nil {
-		t.Fatal(err)
-	}
-	checkReadme(t, fake.X, localProjects[1], "master commit")
-	checkJiriRevFiles(t, fake.X, localProjects[1])
 
-	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
-	localRev, err := gitLocal.CurrentRevision()
+	gitRemote := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Remote))
+	remoteRev, err := gitRemote.CurrentRevision()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Update the manifest with our new HEAD position.
-	fake.AddProjectOverride(localProjects[1].Name, localProjects[1].Remote, localRev)
+	fake.AddProjectOverride(localProjects[1].Name, localProjects[1].Remote, remoteRev)
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
+
+	checkReadme(t, fake.X, localProjects[1], "master commit")
+	checkJiriRevFiles(t, fake.X, localProjects[1])
 
 	// Check that cache was updated
 	cacheDirPath, err := localProjects[1].CacheDirPath(fake.X)
@@ -494,8 +492,8 @@ func TestUpdateUniverseWithCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cacheRev != localRev {
-		t.Fatalf("Cache revision(%v) not equal to local revision(%v)", cacheRev, localRev)
+	if cacheRev != remoteRev {
+		t.Fatalf("Cache revision(%v) not equal to local revision(%v)", cacheRev, remoteRev)
 	}
 }
 
