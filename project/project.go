@@ -1996,14 +1996,13 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 
 	errs := make(chan error, len(remoteProjects))
 	var wg sync.WaitGroup
-	processingPath := make(map[string]bool)
+	processingPath := make(map[string]*sync.Mutex)
 	fetchLimit := make(chan struct{}, jirix.Jobs)
 	for _, project := range remoteProjects {
 		if cacheDirPath, err := project.CacheDirPath(jirix); err == nil {
-			if processingPath[cacheDirPath] {
-				continue
+			if processingPath[cacheDirPath] == nil {
+				processingPath[cacheDirPath] = &sync.Mutex{}
 			}
-			processingPath[cacheDirPath] = true
 			if err := project.fillDefaults(); err != nil {
 				errs <- err
 				continue
@@ -2015,15 +2014,17 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			}
 			wg.Add(1)
 			fetchLimit <- struct{}{}
-			go func(dir, remote string, depth int, branch, revision string) {
+			go func(dir, remote string, depth int, branch, revision string, processingPath map[string]*sync.Mutex) {
+				processingPath[cacheDirPath].Lock()
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
+				defer processingPath[cacheDirPath].Unlock()
 				remote = rewriteRemote(jirix, remote)
 				if err := updateOrCreateCache(jirix, dir, remote, branch, revision, depth); err != nil {
 					errs <- err
 					return
 				}
-			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision)
+			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision, processingPath)
 		} else {
 			errs <- err
 		}
