@@ -879,7 +879,7 @@ func FetchPackages(jirix *jiri.X, projects Projects, pkgs Packages, fetchTimeout
 			return err
 		}
 		if !cipdLoggedIn {
-			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"cipd auth-login\" and try again")
+			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"%s auth-login\" and try again", jirix.CIPDPath())
 		}
 	}
 	return nil
