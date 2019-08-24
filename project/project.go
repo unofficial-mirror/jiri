@@ -2014,17 +2014,17 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			}
 			wg.Add(1)
 			fetchLimit <- struct{}{}
-			go func(dir, remote string, depth int, branch, revision string, processingPath map[string]*sync.Mutex) {
-				processingPath[cacheDirPath].Lock()
+			go func(dir, remote string, depth int, branch, revision string, cacheMutex *sync.Mutex) {
+				cacheMutex.Lock()
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
-				defer processingPath[cacheDirPath].Unlock()
+				defer cacheMutex.Unlock()
 				remote = rewriteRemote(jirix, remote)
 				if err := updateOrCreateCache(jirix, dir, remote, branch, revision, depth); err != nil {
 					errs <- err
 					return
 				}
-			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision, processingPath)
+			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision, processingPath[cacheDirPath])
 		} else {
 			errs <- err
 		}
