@@ -1555,6 +1555,7 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 	if err == nil {
 		return nil
 	}
+	jirix.Logger.Debugf("Checkout %s to head revision %s failed, fallback to fetch: %v", project.Name, revision, err)
 	if project.Revision != "" && project.Revision != "HEAD" {
 		//might be a tag
 		if err2 := fetch(jirix, project.Path, "origin", gitutil.FetchTagOpt(project.Revision)); err2 != nil {

@@ -1249,11 +1249,13 @@ func (g *Git) runGit(stdout, stderr io.Writer, args ...string) error {
 	if g.userEmail != "" {
 		args = append([]string{"-c", fmt.Sprintf("user.email=%s", g.userEmail)}, args...)
 	}
+	var outbuf bytes.Buffer
+	var errbuf bytes.Buffer
 	command := exec.Command("git", args...)
 	command.Dir = g.rootDir
 	command.Stdin = os.Stdin
-	command.Stdout = stdout
-	command.Stderr = stderr
+	command.Stdout = io.MultiWriter(stdout, &outbuf)
+	command.Stderr = io.MultiWriter(stderr, &errbuf)
 	env := g.jirix.Env()
 	env = envvar.MergeMaps(g.opts, env)
 	command.Env = envvar.MapToSlice(env)
@@ -1265,8 +1267,9 @@ func (g *Git) runGit(stdout, stderr io.Writer, args ...string) error {
 			// ignore error
 		}
 	}
-	g.jirix.Logger.Tracef("Run: git %s (%s)", strings.Join(args, " "), dir)
-	return command.Run()
+	err := command.Run()
+	g.jirix.Logger.Tracef("Run: git %s (%s), \nstdout: %s\nstderr: %s\n", strings.Join(args, " "), dir, outbuf.String(), errbuf.String())
+	return err
 }
 
 // Committer encapsulates the process of create a commit.
