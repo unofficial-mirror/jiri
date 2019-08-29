@@ -1875,6 +1875,10 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		}
 		// Cache already present, update it
 		// TODO : update this after implementing FetchAll using g
+		if scm.IsRevAvailable(revision) {
+			jirix.Logger.Infof("%s(%s) cache up-to-date; skipping\n", remote, dir)
+			return nil
+		}
 		msg := fmt.Sprintf("Updating cache: %q", dir)
 		task := jirix.Logger.AddTaskMsg(msg)
 		defer task.Done()
@@ -2006,11 +2010,6 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			}
 			if err := project.fillDefaults(); err != nil {
 				errs <- err
-				continue
-			}
-			scm := gitutil.New(jirix, gitutil.RootDirOpt(cacheDirPath))
-			if err := scm.CheckRevAvailable(project.Revision); err == nil {
-				jirix.Logger.Infof("%s cache up-to-date; skipping\n", project.Name)
 				continue
 			}
 			wg.Add(1)
