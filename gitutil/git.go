@@ -6,6 +6,7 @@ package gitutil
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -216,7 +217,7 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 	return branches, nil
 }
 
-// IsRevAvailable runs cat-file on a commit or tag is available locally.
+// IsRevAvailable runs cat-file on a commit hash is available locally.
 func (g *Git) IsRevAvailable(rev string) bool {
 	// TODO: (haowei@)(11517) We are having issues with corrupted
 	// cache data on mac builders. Return a non-nil error
@@ -225,6 +226,11 @@ func (g *Git) IsRevAvailable(rev string) bool {
 	if runtime.GOOS == "darwin" {
 		return false
 	}
+	// test if rev is a legit sha1 hash string
+	if _, err := hex.DecodeString(rev); len(rev) != 40 || err != nil {
+		return false
+	}
+
 	if err := g.run("cat-file", "-e", rev); err != nil {
 		return false
 	}
