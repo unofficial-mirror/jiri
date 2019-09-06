@@ -179,7 +179,7 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if enableLockfileFlag != "" {
 		if _, err := strconv.ParseBool(enableLockfileFlag); err != nil {
-			return fmt.Errorf("'enableLockfileFlag' flag should be true or false")
+			return fmt.Errorf("'enable-lockfile' flag should be true or false")
 		}
 		config.LockfileEnabled = enableLockfileFlag
 	}
