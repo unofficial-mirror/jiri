@@ -999,7 +999,9 @@ func generateEnsureFile(jirix *jiri.X, projects Projects, pkgs Packages, ignoreC
 		versionFileName := ensureFilePath[:len(ensureFilePath)-len(".ensure")] + ".version"
 		ensureFileBuf.WriteString("$ResolvedVersions " + versionFileName + "\n")
 	}
-	ensureFileBuf.WriteString("$ParanoidMode CheckPresence\n")
+	if jirix.CipdParanoidMode {
+		ensureFileBuf.WriteString("$ParanoidMode CheckPresence\n")
+	}
 	ensureFileBuf.WriteString("\n")
 
 	for _, pkg := range pkgs {

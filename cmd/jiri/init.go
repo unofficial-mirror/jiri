@@ -47,6 +47,7 @@ var (
 	prebuiltJSON          string
 	optionalAttrs         string
 	partialFlag           bool
+	cipdParanoidFlag      string
 )
 
 const (
@@ -68,6 +69,7 @@ func init() {
 	// use empty string to clear existing saved attributes.
 	cmdInit.Flags.StringVar(&optionalAttrs, "fetch-optional", optionalAttrsNotSet, "Set up attributes of optional projects and packages that should be fetched by jiri.")
 	cmdInit.Flags.BoolVar(&partialFlag, "partial", false, "Whether to use a partial checkout.")
+	cmdInit.Flags.StringVar(&cipdParanoidFlag, "cipd-paranoid-mode", "", "Whether to use paranoid mode in cipd.")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -178,9 +180,15 @@ func runInit(env *cmdline.Env, args []string) error {
 	if enableLockfileFlag != "" {
 		if _, err := strconv.ParseBool(enableLockfileFlag); err != nil {
 			return fmt.Errorf("'enableLockfileFlag' flag should be true or false")
-		} else {
-			config.LockfileEnabled = enableLockfileFlag
 		}
+		config.LockfileEnabled = enableLockfileFlag
+	}
+
+	if cipdParanoidFlag != "" {
+		if _, err := strconv.ParseBool(cipdParanoidFlag); err != nil {
+			return fmt.Errorf("'cipd-paranoid-mode' flag should be true or false")
+		}
+		config.CipdParanoidMode = cipdParanoidFlag
 	}
 
 	if analyticsOptFlag != "" {

@@ -48,6 +48,7 @@ const (
 // Config represents jiri global config
 type Config struct {
 	CachePath         string `xml:"cache>path,omitempty"`
+	CipdParanoidMode  string `xml:"cipd_paranoid_mode,omitempty"`
 	Shared            bool   `xml:"cache>shared,omitempty"`
 	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
 	SsoCookiePath     string `xml:"SsoCookiePath,omitempty"`
@@ -103,6 +104,7 @@ type X struct {
 	Usage               func(format string, args ...interface{}) error
 	config              *Config
 	Cache               string
+	CipdParanoidMode    bool
 	Shared              bool
 	Jobs                uint
 	KeepGitHooks        bool
@@ -258,6 +260,15 @@ func NewX(env *cmdline.Env) (*X, error) {
 				return nil, fmt.Errorf("'config>lockfile>enable' flag should be true or false")
 			} else {
 				x.LockfileEnabled = val
+			}
+		}
+		if x.config.CipdParanoidMode == "" {
+			x.CipdParanoidMode = true
+		} else {
+			if val, err := strconv.ParseBool(x.config.CipdParanoidMode); err != nil {
+				return nil, fmt.Errorf("'config>cipd_paranoid_mode' flag should be true or false")
+			} else {
+				x.CipdParanoidMode = val
 			}
 		}
 		x.LockfileName = x.config.LockfileName
