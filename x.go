@@ -490,9 +490,9 @@ func (r runner) Run(env *cmdline.Env, args []string) error {
 	defer x.RunCleanup()
 	enabledAnalytics := false
 	userId := ""
-	analyticsCommandMsg := fmt.Sprintf("To check what data we collect run '%s'\n"+
-		"To opt-in run '%s'\n"+
-		"To opt-out run '%s'",
+	analyticsCommandMsg := fmt.Sprintf("To check what data we collect run: %s\n"+
+		"To opt-in run: %s\n"+
+		"To opt-out run: %s",
 		x.Color.Yellow("jiri init -show-analytics-data"),
 		x.Color.Yellow("jiri init -analytics-opt=true %q", x.Root),
 		x.Color.Yellow("jiri init -analytics-opt=false %q", x.Root))
