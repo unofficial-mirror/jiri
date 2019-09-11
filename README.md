@@ -17,26 +17,23 @@ Jiri is open-source.
 ## Manually build jiri
 We have [prebuilts](#Bootstrapping) for linux and darwin `x86_64` systems. In
 order to fetch latest jiri source code and build jiri manually, latest version
-of [Go](https://golang.org) should be installed. After setting up environment
-variable GOPATH, you can fetch the latest jiri source code by using the
-command:
+of [Go](https://golang.org) should be installed. After installing Go, you can
+fetch the latest jiri source code by using the command:
 
 ```
-git clone https://fuchsia.googlesource.com/jiri $GOPATH/src/fuchsia.googlesource.com/jiri
+git clone https://fuchsia.googlesource.com/jiri
 ```
 
-The source of jiri will be cloned into
-`$GOPATH/src/fuchsia.googlesource.com/jiri`
-directory. To build or rebuild jiri, simply type the following command:
+To build (or rebuild) jiri, simply type the following commands:
 
 ```
-go get golang.org/x/net/publicsuffix golang.org/x/sync/semaphore
-go install fuchsia.googlesource.com/jiri/cmd/jiri
+cd jiri
+go install ./cmd/jiri
 ```
 
-The binary will be under `$GOPATH/bin/jiri` and can be copied to any directory
-in your PATH, as long as it is writable (to support jiri bootstrapping and
-self-updates).
+The binary will be installed to `$HOME/go/bin/jiri` (or `$GOPATH/bin/jiri`, if
+you set `GOPATH`) and can be copied to any directory in your PATH, as long as it
+is writable (to support jiri bootstrapping and self-updates).
 
 ## Jiri Behaviour
 [See this][behaviour]
