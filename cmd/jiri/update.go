@@ -129,5 +129,9 @@ func runUpdate(jirix *jiri.X, args []string) error {
 	if jirix.Failures() != 0 {
 		return fmt.Errorf("Project update completed with non-fatal errors")
 	}
+
+	if err := project.WriteUpdateHistoryLog(jirix); err != nil {
+		jirix.Logger.Errorf("Failed to save jiri logs: %v", err)
+	}
 	return nil
 }

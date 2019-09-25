@@ -1241,6 +1241,48 @@ func UpdateUniverse(jirix *jiri.X, gc, localManifest, rebaseTracked, rebaseUntra
 	return nil
 }
 
+// WriteUpdateHistoryLog creates a log file of the current update process.
+func WriteUpdateHistoryLog(jirix *jiri.X) error {
+	logFile := filepath.Join(jirix.UpdateHistoryLogDir(), time.Now().Format((time.RFC3339)))
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+		return fmtError(err)
+	}
+	if err := jirix.Logger.WriteLogToFile(logFile); err != nil {
+		return err
+	}
+
+	latestLink, secondLatestLink := jirix.UpdateHistoryLogLatestLink(), jirix.UpdateHistoryLogSecondLatestLink()
+
+	// If the "latest" symlink exists, point the "second-latest" symlink to its value.
+	latestLinkExists, err := isFile(latestLink)
+	if err != nil {
+		return err
+	}
+	if latestLinkExists {
+		latestFile, err := os.Readlink(latestLink)
+		if err != nil {
+			return fmtError(err)
+		}
+		if err := os.RemoveAll(secondLatestLink); err != nil {
+			return fmtError(err)
+		}
+		if err := os.Symlink(latestFile, secondLatestLink); err != nil {
+			return fmtError(err)
+		}
+	}
+
+	// Point the "latest" update history symlink to the new log file.  Try
+	// to keep the symlink relative, to make it easy to move or copy the entire
+	// update_history_log directory.
+	if rel, err := filepath.Rel(filepath.Dir(latestLink), logFile); err == nil {
+		logFile = rel
+	}
+	if err := os.RemoveAll(latestLink); err != nil {
+		return fmtError(err)
+	}
+	return fmtError(os.Symlink(logFile, latestLink))
+}
+
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
 // projects and writes it to the update history directory.
 func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks, pkgs Packages, localManifest bool) error {
@@ -2123,6 +2165,17 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	jirix.TimerPush("update projects")
 	defer jirix.TimerPop()
 
+	packageFetched := false
+	hookRun := false
+	defer func() {
+		if shouldFetchPkgs && !packageFetched {
+			jirix.Logger.Infof("Jiri packages are not fetched due to fatal errors when updating projects.")
+		}
+		if shouldRunHooks && !hookRun {
+			jirix.Logger.Infof("Jiri hooks are not run due to fatal errors when updating projects or packages")
+		}
+	}()
+
 	// filter optional projects
 	if err := FilterOptionalProjectsPackages(jirix, jirix.FetchingAttrs, remoteProjects, pkgs); err != nil {
 		return err
@@ -2234,12 +2287,14 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	}
 
 	if shouldFetchPkgs && len(pkgs) > 0 {
+		packageFetched = true
 		if err := FetchPackages(jirix, remoteProjects, pkgs, fetchTimeout); err != nil {
 			return err
 		}
 	}
 
 	if shouldRunHooks {
+		hookRun = true
 		if err := RunHooks(jirix, hooks, runHookTimeout); err != nil {
 			return err
 		}

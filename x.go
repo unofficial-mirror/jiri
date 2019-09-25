@@ -473,6 +473,23 @@ func (x *X) UpdateHistorySecondLatestLink() string {
 	return filepath.Join(x.UpdateHistoryDir(), "second-latest")
 }
 
+// UpdateHistoryLogDir returns the path to the update history directory.
+func (x *X) UpdateHistoryLogDir() string {
+	return filepath.Join(x.RootMetaDir(), "update_history_log")
+}
+
+// UpdateHistoryLogLatestLink returns the path to a symlink that points to the
+// latest update in the update history directory.
+func (x *X) UpdateHistoryLogLatestLink() string {
+	return filepath.Join(x.UpdateHistoryLogDir(), "latest")
+}
+
+// UpdateHistoryLogSecondLatestLink returns the path to a symlink that points to
+// the second latest update in the update history directory.
+func (x *X) UpdateHistoryLogSecondLatestLink() string {
+	return filepath.Join(x.UpdateHistoryLogDir(), "second-latest")
+}
+
 // RunnerFunc is an adapter that turns regular functions into cmdline.Runner.
 // This is similar to cmdline.RunnerFunc, but the first function argument is
 // jiri.X, rather than cmdline.Env.

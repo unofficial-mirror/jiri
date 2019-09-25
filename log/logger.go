@@ -5,9 +5,11 @@
 package log
 
 import (
+	"bytes"
 	"container/list"
 	"fmt"
 	"io"
+	"io/ioutil"
 	glog "log"
 	"os"
 	"sync"
@@ -47,6 +49,7 @@ type Logger struct {
 	LoggerLevel          LogLevel
 	goLogger             *glog.Logger
 	goErrorLogger        *glog.Logger
+	goBufferLogger       *glog.Logger
 	color                color.Color
 	progressLines        int
 	progressWindowSize   uint
@@ -54,6 +57,7 @@ type Logger struct {
 	progressUpdateNeeded bool
 	timeLogThreshold     time.Duration
 	tasks                *list.List
+	logBuffer            *bytes.Buffer
 }
 
 type LogLevel int
@@ -68,12 +72,15 @@ const (
 )
 
 func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, progressWindowSize uint, timeLogThreshold time.Duration, outWriter, errWriter io.Writer) *Logger {
+	var logBuffer bytes.Buffer
 	if outWriter == nil {
 		outWriter = os.Stdout
 	}
 	if errWriter == nil {
 		errWriter = os.Stderr
 	}
+	outWriter = io.MultiWriter(outWriter, &logBuffer)
+	errWriter = io.MultiWriter(errWriter, &logBuffer)
 	term := os.Getenv("TERM")
 	switch term {
 	case "dumb", "":
@@ -87,6 +94,7 @@ func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, pro
 		lock:                 &sync.Mutex{},
 		goLogger:             glog.New(outWriter, "", 0),
 		goErrorLogger:        glog.New(errWriter, "", 0),
+		goBufferLogger:       glog.New(&logBuffer, "", 0),
 		color:                color,
 		progressLines:        0,
 		enableProgress:       0,
@@ -94,6 +102,7 @@ func NewLogger(loggerLevel LogLevel, color color.Color, enableProgress bool, pro
 		progressUpdateNeeded: false,
 		timeLogThreshold:     timeLogThreshold,
 		tasks:                list.New(),
+		logBuffer:            &logBuffer,
 	}
 	if enableProgress {
 		l.enableProgress = 1
@@ -205,6 +214,12 @@ func (l *Logger) log(prefix, format string, a ...interface{}) {
 	l.goLogger.Printf("%s%s", prefix, fmt.Sprintf(format, a...))
 }
 
+func (l *Logger) logToBufferOnly(prefix, format string, a ...interface{}) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.goBufferLogger.Printf("%s%s", prefix, fmt.Sprintf(format, a...))
+}
+
 func (l *Logger) Logf(loglevel LogLevel, format string, a ...interface{}) {
 	switch loglevel {
 	case InfoLevel:
@@ -225,24 +240,32 @@ func (l *Logger) Logf(loglevel LogLevel, format string, a ...interface{}) {
 func (l *Logger) Infof(format string, a ...interface{}) {
 	if l.LoggerLevel >= InfoLevel {
 		l.log("", format, a...)
+	} else {
+		l.logToBufferOnly("", format, a...)
 	}
 }
 
 func (l *Logger) Debugf(format string, a ...interface{}) {
 	if l.LoggerLevel >= DebugLevel {
 		l.log(l.color.Cyan("DEBUG: "), format, a...)
+	} else {
+		l.logToBufferOnly(l.color.Cyan("DEBUG: "), format, a...)
 	}
 }
 
 func (l *Logger) Tracef(format string, a ...interface{}) {
 	if l.LoggerLevel >= TraceLevel {
 		l.log(l.color.Blue("TRACE: "), format, a...)
+	} else {
+		l.logToBufferOnly(l.color.Blue("TRACE: "), format, a...)
 	}
 }
 
 func (l *Logger) Warningf(format string, a ...interface{}) {
 	if l.LoggerLevel >= WarningLevel {
 		l.log(l.color.Yellow("WARN: "), format, a...)
+	} else {
+		l.logToBufferOnly(l.color.Yellow("WARN: "), format, a...)
 	}
 }
 
@@ -252,5 +275,17 @@ func (l *Logger) Errorf(format string, a ...interface{}) {
 		defer l.lock.Unlock()
 		l.clearProgress()
 		l.goErrorLogger.Printf("%s%s", l.color.Red("ERROR: "), fmt.Sprintf(format, a...))
+	} else {
+		l.logToBufferOnly(l.color.Red("ERROR: "), format, a...)
 	}
+}
+
+// WriteLogToFile writes current logs into file.
+func (l *Logger) WriteLogToFile(filename string) error {
+	return ioutil.WriteFile(filename, l.logBuffer.Bytes(), 0644)
+}
+
+// GetLogBuffer returns current buffer for the logger.
+func (l *Logger) GetLogBuffer() *bytes.Buffer {
+	return l.logBuffer
 }
