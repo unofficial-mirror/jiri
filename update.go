@@ -5,7 +5,9 @@
 package jiri
 
 import (
+	"archive/zip"
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -23,8 +25,8 @@ import (
 )
 
 const (
-	JiriRepository    = "https://fuchsia.googlesource.com/jiri"
-	JiriStorageBucket = "https://storage.googleapis.com/fuchsia-build/jiri"
+	JiriRepository   = "https://fuchsia.googlesource.com/jiri"
+	JiriCIPDEndPoint = "https://chrome-infra-packages.appspot.com/dl/fuchsia/tools/jiri"
 )
 
 var (
@@ -44,27 +46,41 @@ func Update(force bool) error {
 		return err
 	}
 	if force || commit != version.GitCommit {
-		// Check if the prebuilt for new version exsits.
-		has, err := hasPrebuilt(JiriStorageBucket, commit)
-		if err != nil {
-			return fmt.Errorf("cannot check if prebuilt is available, %s", err)
-		}
-		if !has {
-			return updateNotAvailableErr
-		}
-
-		// New version is available, download and update to it.
-		b, err := downloadBinary(JiriStorageBucket, commit)
+		// CIPD HTTP endpoint does not allow HTTP HEAD.
+		// Download the Jiri archive directly.
+		b, err := downloadBinary(JiriCIPDEndPoint, commit)
 		if err != nil {
 			return fmt.Errorf("cannot download latest jiri binary, %s", err)
+		}
+		unarchivedBinary, err := unarchiveJiri(b)
+		if err != nil {
+			return err
 		}
 		path, err := osutil.Executable()
 		if err != nil {
 			return fmt.Errorf("cannot get executable path, %s", err)
 		}
-		return updateExecutable(path, b)
+		return updateExecutable(path, unarchivedBinary)
 	}
 	return updateVersionErr
+}
+
+func unarchiveJiri(b []byte) ([]byte, error) {
+	zipReader, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read jiri archive: %v", err)
+	}
+	for _, file := range zipReader.File {
+		if file.Name == "jiri" {
+			fileReader, err := file.Open()
+			defer fileReader.Close()
+			if err != nil {
+				return nil, fmt.Errorf("Failed to read jiri archive: %v", err)
+			}
+			return ioutil.ReadAll(fileReader)
+		}
+	}
+	return nil, fmt.Errorf("Cannot find jiri in update archive")
 }
 
 func UpdateAndExecute(force bool) error {
@@ -144,23 +160,19 @@ func getCurrentCommit(repository string) (string, error) {
 	}
 }
 
-func hasPrebuilt(bucket, version string) (bool, error) {
-	url := fmt.Sprintf("%s/%s-%s/%s", bucket, runtime.GOOS, runtime.GOARCH, version)
-	res, err := http.Head(url)
-	if err != nil {
-		return false, err
+func downloadBinary(endpoint, version string) ([]byte, error) {
+	os := runtime.GOOS
+	if os == "darwin" {
+		os = "mac"
 	}
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNotFound {
-		return false, fmt.Errorf("HTTP request failed: %v", http.StatusText(res.StatusCode))
-	}
-	return res.StatusCode == http.StatusOK, nil
-}
-
-func downloadBinary(bucket, version string) ([]byte, error) {
-	url := fmt.Sprintf("%s/%s-%s/%s", bucket, runtime.GOOS, runtime.GOARCH, version)
+	url := fmt.Sprintf("%s/%s-%s/+/git_revision:%s", endpoint, os, runtime.GOARCH, version)
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
+	}
+
+	if res.StatusCode == http.StatusNotFound {
+		return nil, updateNotAvailableErr
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP request failed: %v", http.StatusText(res.StatusCode))

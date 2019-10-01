@@ -19,7 +19,7 @@ set -euf -o pipefail
 readonly JIRI_REPO_URL="https://fuchsia.googlesource.com/jiri"
 
 # Google Storage bucket that contains prebuilt versions of jiri.
-readonly GS_BUCKET_URL="https://fuchsia-build.storage.googleapis.com/jiri"
+readonly CIPD_ENDPOINT_URL="https://chrome-infra-packages.appspot.com/dl/fuchsia/tools/jiri"
 
 # fatal prints an error message, followed by the usage string, and then exits.
 fatal() {
@@ -77,17 +77,21 @@ mkdir -p "${BIN_DIR}"
 trap "rm -rf -- \"${CLEANUP_DIR}\"" INT TERM EXIT
 
 # Determine and validate the version of jiri.
-readonly HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
+HOST_OS=$(uname | tr '[:upper:]' '[:lower:]')
+if [[ ${HOST_OS} == "darwin" ]]; then
+  HOST_OS="mac"
+fi
 readonly TARGET="${HOST_OS}-${ARCH}"
 readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/master?format=JSON"
 readonly LOG_URL="${JIRI_REPO_URL}/+log/refs/heads/master?format=JSON"
 readonly VERSION=$(curl -sSf "${COMMIT_URL}" | sed -n 's/.*"value": "\([0-9a-f]\{40\}\)"/\1/p')
 readonly VERSIONS=$(curl -sSf "${LOG_URL}" | sed -n 's/.*"commit": "\([0-9a-f]\{40\}\)".*/\1/p')
+readonly TEMP_FILE=$(mktemp)
 
 JIRI_URL=""
 for version in ${VERSIONS}; do
-  url="${GS_BUCKET_URL}/${TARGET}/${version}"
-  if curl --output /dev/null --silent --head --fail "${url}"; then
+  url="${CIPD_ENDPOINT_URL}/${TARGET}/+/git_revision:${version}"
+  if curl --output /dev/null --silent --fail "${url}"; then
     JIRI_URL="${url}"
 	break
   fi
@@ -98,23 +102,31 @@ if [[ -z "${JIRI_URL}" ]]; then
   exit 1
 fi
 
-if ! curl -sf -o "${BIN_DIR}/jiri" "${JIRI_URL}"; then
-  echo "Failed downloading prebuilt Jiri binary." 1>&2
+if ! curl -sfL -o "${TEMP_FILE}" "${JIRI_URL}"; then
+  echo "Failed downloading prebuilt Jiri archive." 1>&2
   exit 1
 fi
+
+if ! unzip ${TEMP_FILE} jiri -d ${BIN_DIR}  > /dev/null; then
+  echo "Failed unarchiving Jiri"
+  rm -rf ${TEMP_FILE}
+  exit 1
+fi
+
+rm -rf ${TEMP_FILE}
 chmod 755 "${BIN_DIR}/jiri"
 if [ "$ARCH" == "arm64" ]; then
   echo "WARNING: Jiri doesn't support timely updates for arch '$HOST_ARCH'. This or future binaries of Jiri might be out of date."
 fi
 
 # Install cipd, which is frequently needed to use manifests.
-pushd "${BIN_DIR}"
+pushd "${BIN_DIR}" > /dev/null
 if ! "${BIN_DIR}/jiri" bootstrap cipd; then
   echo "Running jiri bootstrap failed." 1>&2
-  popd
+  popd > /dev/null
   exit 1
 fi
-popd
+popd > /dev/null
 
 echo "Please add ${BIN_DIR} to your PATH"
 

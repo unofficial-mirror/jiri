@@ -41,12 +41,9 @@ func TestHasPrebuilt(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	has, err := hasPrebuilt(ts.URL, "abc123")
+	_, err := downloadBinary(ts.URL, "abc123")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !has {
-		t.Errorf("wrong response\n")
 	}
 }
 
@@ -56,12 +53,9 @@ func TestDoesNotHavePrebuilt(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	has, err := hasPrebuilt(ts.URL, "abc123")
-	if err != nil {
+	_, err := downloadBinary(ts.URL, "abc123")
+	if err != updateNotAvailableErr {
 		t.Fatal(err)
-	}
-	if has {
-		t.Errorf("wrong response\n")
 	}
 }
 
