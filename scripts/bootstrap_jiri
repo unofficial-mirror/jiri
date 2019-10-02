@@ -107,7 +107,7 @@ if ! curl -sfL -o "${TEMP_FILE}" "${JIRI_URL}"; then
   exit 1
 fi
 
-if ! unzip ${TEMP_FILE} jiri -d ${BIN_DIR}  > /dev/null; then
+if ! unzip -o ${TEMP_FILE} jiri -d ${BIN_DIR}  > /dev/null; then
   echo "Failed unarchiving Jiri"
   rm -rf ${TEMP_FILE}
   exit 1
