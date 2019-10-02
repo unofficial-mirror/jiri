@@ -49,6 +49,9 @@ func Update(force bool) error {
 		// CIPD HTTP endpoint does not allow HTTP HEAD.
 		// Download the Jiri archive directly.
 		b, err := downloadBinary(JiriCIPDEndPoint, commit)
+		if err == updateNotAvailableErr {
+			return err
+		}
 		if err != nil {
 			return fmt.Errorf("cannot download latest jiri binary, %s", err)
 		}
@@ -93,9 +96,8 @@ func UpdateAndExecute(force bool) error {
 		if err != updateNotAvailableErr && err != updateVersionErr &&
 			err != updateTestVersionErr {
 			return err
-		} else {
-			return nil
 		}
+		return nil
 	}
 
 	args := []string{}
