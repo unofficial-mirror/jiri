@@ -2286,10 +2286,12 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 		jirix.Logger.Warningf("%s\n\n", msg)
 	}
 
-	if shouldFetchPkgs && len(pkgs) > 0 {
+	if shouldFetchPkgs {
 		packageFetched = true
-		if err := FetchPackages(jirix, remoteProjects, pkgs, fetchTimeout); err != nil {
-			return err
+		if len(pkgs) > 0 {
+			if err := FetchPackages(jirix, remoteProjects, pkgs, fetchTimeout); err != nil {
+				return err
+			}
 		}
 	}
 
