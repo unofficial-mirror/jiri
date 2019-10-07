@@ -405,7 +405,7 @@ type PackageLockKey string
 type PackageLocks map[PackageLockKey]PackageLock
 
 func (p PackageLock) Key() PackageLockKey {
-	return PackageLockKey(p.PackageName)
+	return PackageLockKey(p.PackageName + KeySeparator + p.VersionTag)
 }
 
 // ResolveConfig interface provides the configuration

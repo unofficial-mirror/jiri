@@ -2552,6 +2552,45 @@ func TestOptionalProjectsAndPackages(t *testing.T) {
 	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
 }
 
+func TestMultiplePackageVersions(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	pkg0 := project.Package{
+		Name:    "fuchsia/tools/jiri/${platform}",
+		Path:    "path-pkg0",
+		Version: "git_revision:9904764ed228c7fb87bfb252762952b502d1e360",
+	}
+	pkg1 := project.Package{
+		Name:    "fuchsia/tools/jiri/${platform}",
+		Path:    "path-pkg1",
+		Version: "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
+	}
+
+	fake.AddPackage(pkg0)
+	fake.AddPackage(pkg1)
+
+	pathExists := func(projPath string) bool {
+		if _, err := os.Stat(projPath); err != nil {
+			if os.IsNotExist(err) {
+				return false
+			}
+			t.Errorf("failed to access path due to error: %v", err)
+		}
+		return true
+	}
+	assertExist := func(localPath string) {
+		if !pathExists(localPath) {
+			t.Errorf("expecting path %q exists, but it does not", localPath)
+		}
+	}
+
+	fake.UpdateUniverse(true)
+
+	assertExist(filepath.Join(fake.X.Root, pkg0.Path))
+	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
+}
+
 func TestOverrideImport(t *testing.T) {
 	_, fake, cleanup := setupUniverse(t)
 	defer cleanup()
