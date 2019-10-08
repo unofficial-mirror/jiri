@@ -506,6 +506,9 @@ func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byt
 		i++
 	}
 	sort.Slice(pkgEntries, func(i, j int) bool {
+		if pkgEntries[i].PackageName == pkgEntries[j].PackageName {
+			return pkgEntries[i].VersionTag < pkgEntries[j].VersionTag
+		}
 		return pkgEntries[i].PackageName < pkgEntries[j].PackageName
 	})
 
