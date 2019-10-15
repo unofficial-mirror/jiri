@@ -246,7 +246,9 @@ func NewX(env *cmdline.Env) (*X, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else if !os.IsNotExist(err) {
+	} else if os.IsNotExist(err) {
+		x.config = &Config{}
+	} else {
 		return nil, err
 	}
 	if x.config != nil {
