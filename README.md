@@ -98,15 +98,15 @@ controlled repository.
 Jiri makes it easy to "import" a remote manifest from your local
 `.jiri_manifest` file with the `jiri import` command.  For example, running the
 following command will create a `.jiri_manifest` file (or append to an existing
-one) with an `import` tag that imports the minimal manifest from the
-`https://fuchsia.googlesource.com/manifest` repo.
+one) with an `import` tag that imports the jiri manifest from the
+`https://fuchsia.googlesource.com/jiri` repo.
 
 ```
-jiri import minimal https://fuchsia.googlesource.com/manifest
+jiri import manifests/jiri https://fuchsia.googlesource.com/jiri
 ```
 
 The next time you run `jiri update`, jiri will sync all projects listed in the
-minimal manifest.
+jiri manifest.
 
 ## Quickstart
 
@@ -143,16 +143,15 @@ The `jiri` command line tool will be installed in
 export PATH="$MY_ROOT"/.jiri_root/bin:$PATH
 ```
 
-Next, use the `jiri import` command to import the "minimal" manifest from the
-Fuchsia repo.  This manifest includes only the projects needed to
-make Jiri work.
+Next, use the `jiri import` command to import the "jiri" manifest from the
+Jiri repo.  This manifest includes Jiri's repository.
 
-You can see the minimal manifest [here][minimal manifest]. For more
+You can see the jiri manifest [here][jiri manifest]. For more
 information on manifests, read the [manifest docs][manifests].
 
 ```
 cd "$MY_ROOT"
-jiri import minimal https://fuchsia.googlesource.com/manifest
+jiri import manifests/jiri https://fuchsia.googlesource.com/jiri
 ```
 
 You should now have a file in the root directory called `.jiri_manifest`, which
@@ -165,7 +164,7 @@ listed in the manifest (which in this case will be `HEAD`).
 jiri update
 ```
 
-You should now see the imported project in `$MY_ROOT/manifest`.
+You should now see the imported project in `$MY_ROOT/jiri`.
 
 Running `jiri update` again will sync the local repos to the remotes, and
 update the jiri tool.
@@ -179,7 +178,7 @@ In order for jiri to manage a set of projects, those projects must be listed in
 a [manifest][manifests], and that manifest must be hosted in a git repo.
 
 If you already have a manifest hosted in a git repo, you can import that
-manifest the same way we imported the "minimal" manifest.
+manifest the same way we imported the "jiri" manifest.
 
 For example, if your manifest is called "my_manifest" and is in a repo hosted
 at "https://github.com/my_org/manifests", then you can import that manifest
@@ -487,7 +486,7 @@ see [Jiri local update][hacking doc]
 [go contrib]: https://golang.org/doc/contribute.html#Code_review "Go Contribution Guidelines - Code Review"
 [jiri-wiki]: https://en.wikipedia.org/wiki/Ji%C5%99%C3%AD "Jiří"
 [manifests]: #manifests "manifests"
-[minimal manifest]: https://fuchsia.googlesource.com/manifest/+/refs/heads/master/minimal "minimal manifest"
+[jiri manifest]: https://fuchsia.googlesource.com/jiri/+/refs/heads/master/manifests/jiri "jiri manifest"
 [manifest doc]:/manifest.md "Jiri manifest"
 [filesystem doc]:/filesystem.md "Jiri filesystem"
 [hacking doc]:/HACKING.md "Jiri local updates"
