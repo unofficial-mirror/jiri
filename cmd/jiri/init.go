@@ -48,6 +48,7 @@ var (
 	optionalAttrs         string
 	partialFlag           bool
 	cipdParanoidFlag      string
+	cipdMaxThreads        int
 )
 
 const (
@@ -70,6 +71,8 @@ func init() {
 	cmdInit.Flags.StringVar(&optionalAttrs, "fetch-optional", optionalAttrsNotSet, "Set up attributes of optional projects and packages that should be fetched by jiri.")
 	cmdInit.Flags.BoolVar(&partialFlag, "partial", false, "Whether to use a partial checkout.")
 	cmdInit.Flags.StringVar(&cipdParanoidFlag, "cipd-paranoid-mode", "", "Whether to use paranoid mode in cipd.")
+	// Default (0) causes CIPD to use as many threads as there are CPUs.
+	cmdInit.Flags.IntVar(&cipdMaxThreads, "cipd-max-threads", 0, "Number of threads to use for unpacking CIPD packages. If zero, uses all CPUs.")
 }
 
 func runInit(env *cmdline.Env, args []string) error {
@@ -190,6 +193,8 @@ func runInit(env *cmdline.Env, args []string) error {
 		}
 		config.CipdParanoidMode = cipdParanoidFlag
 	}
+
+	config.CipdMaxThreads = cipdMaxThreads
 
 	if analyticsOptFlag != "" {
 		if val, err := strconv.ParseBool(analyticsOptFlag); err != nil {

@@ -49,6 +49,7 @@ const (
 type Config struct {
 	CachePath         string `xml:"cache>path,omitempty"`
 	CipdParanoidMode  string `xml:"cipd_paranoid_mode,omitempty"`
+	CipdMaxThreads    int    `xml:"cipd_max_threads,omitempty"`
 	Shared            bool   `xml:"cache>shared,omitempty"`
 	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
 	SsoCookiePath     string `xml:"SsoCookiePath,omitempty"`
@@ -105,6 +106,7 @@ type X struct {
 	config              *Config
 	Cache               string
 	CipdParanoidMode    bool
+	CipdMaxThreads      int
 	Shared              bool
 	Jobs                uint
 	KeepGitHooks        bool
@@ -273,6 +275,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 				x.CipdParanoidMode = val
 			}
 		}
+		x.CipdMaxThreads = x.config.CipdMaxThreads
 		x.LockfileName = x.config.LockfileName
 		x.PrebuiltJSON = x.config.PrebuiltJSON
 		x.FetchingAttrs = x.config.FetchingAttrs

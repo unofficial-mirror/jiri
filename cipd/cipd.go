@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -396,7 +397,13 @@ func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Minute)
 	defer cancel()
-	args := []string{"ensure", "-ensure-file", file, "-root", projectRoot, "-log-level", "warning"}
+	args := []string{
+		"ensure",
+		"-ensure-file", file,
+		"-root", projectRoot,
+		"-log-level", "warning",
+		"-max-threads", strconv.Itoa(jirix.CipdMaxThreads),
+	}
 
 	task := jirix.Logger.AddTaskMsg("Fetching CIPD packages")
 	defer task.Done()
