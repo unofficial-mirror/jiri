@@ -401,17 +401,17 @@ func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
 		"ensure",
 		"-ensure-file", file,
 		"-root", projectRoot,
-		"-log-level", "warning",
 		"-max-threads", strconv.Itoa(jirix.CipdMaxThreads),
+	}
+
+	// If jiri is *not* running with -v, use the less verbose cipd "warning"
+	// log-level.
+	if jirix.Logger.LoggerLevel < log.DebugLevel {
+		args = append(args, "-log-level", "warning")
 	}
 
 	task := jirix.Logger.AddTaskMsg("Fetching CIPD packages")
 	defer task.Done()
-	// If jiri is running with -v, change cipd log-level
-	// from warning to default.
-	if jirix.Logger.LoggerLevel >= log.DebugLevel {
-		args = args[:len(args)-2]
-	}
 	jirix.Logger.Debugf("Invoke cipd with %v", args)
 
 	// Construct arguments and invoke cipd for ensure file
