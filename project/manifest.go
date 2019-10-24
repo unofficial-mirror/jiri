@@ -631,6 +631,29 @@ func LoadManifest(jirix *jiri.X) (Projects, Hooks, Packages, error) {
 	return LoadManifestFile(jirix, file, localProjects, false)
 }
 
+func (ld *loader) warnOverrides(jirix *jiri.X) {
+	if len(ld.ProjectOverrides) != 0 {
+		for _, v := range ld.ProjectOverrides {
+			revision := v.Revision
+			if revision == "" {
+				revision = "HEAD"
+			}
+			jirix.Logger.Warningf("Project %s(remote: %s) is overridden to revision %s, if this is not your intention, please run \"jiri override --delete %s %s\" to disable it.", v.Name, v.Remote, revision, v.Name, v.Remote)
+			jirix.OverrideWarned = true
+		}
+	}
+	if len(ld.ImportOverrides) != 0 {
+		for _, v := range ld.ImportOverrides {
+			revision := v.Revision
+			if revision == "" {
+				revision = "HEAD"
+			}
+			jirix.Logger.Warningf("Import %s(remote: %s) is overridden to revision %s, if this is not your intention, please run \"jiri override --import-manifest=%s --delete %s %s\" to disable it.", v.Name, v.Remote, revision, v.Manifest, v.Name, v.Remote)
+			jirix.OverrideWarned = true
+		}
+	}
+}
+
 func (ld *loader) enforceLocks(jirix *jiri.X) error {
 	enforceProjLocks := func(jirix *jiri.X) (err error) {
 		for _, v := range ld.Projects {
@@ -722,6 +745,9 @@ func LoadManifestFile(jirix *jiri.X, file string, localProjects Projects, localM
 			return nil, nil, nil, err
 		}
 	}
+	if !jirix.OverrideWarned {
+		ld.warnOverrides(jirix)
+	}
 	ld.GenerateGitAttributesForProjects(jirix)
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
@@ -740,6 +766,9 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 		if err := ld.enforceLocks(jirix); err != nil {
 			return nil, nil, nil, err
 		}
+	}
+	if !jirix.OverrideWarned {
+		ld.warnOverrides(jirix)
 	}
 	ld.GenerateGitAttributesForProjects(jirix)
 	return ld.Projects, ld.Hooks, ld.Packages, nil

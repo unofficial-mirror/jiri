@@ -127,6 +127,7 @@ type X struct {
 	Attempts            uint
 	cleanupFuncs        []func()
 	AnalyticsSession    *analytics_util.AnalyticsSession
+	OverrideWarned      bool
 }
 
 func (jirix *X) IncrementFailures() {

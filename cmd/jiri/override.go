@@ -157,30 +157,20 @@ func runOverride(jirix *jiri.X, args []string) error {
 		var importOverrides []project.Import
 		var deletedProjectOverrides []project.Project
 		var deletedImportOverrides []project.Import
-		if overrideFlags.importManifest != "" {
-			for _, p := range manifest.ImportOverrides {
-				if len(args) == 2 && p.Remote != args[1] {
-					importOverrides = append(importOverrides, p)
-					continue
-				}
-				if p.Name != name {
-					importOverrides = append(importOverrides, p)
-					continue
-				}
-				deletedImportOverrides = append(deletedImportOverrides, p)
+		for _, p := range manifest.ImportOverrides {
+			if overrideFlags.importManifest == "" || (len(args) == 2 && p.Remote != args[1]) || p.Name != name {
+				importOverrides = append(importOverrides, p)
+				continue
 			}
-		} else {
-			for _, p := range manifest.ProjectOverrides {
-				if len(args) == 2 && p.Remote != args[1] {
-					projectOverrides = append(projectOverrides, p)
-					continue
-				}
-				if p.Name != name {
-					projectOverrides = append(projectOverrides, p)
-					continue
-				}
-				deletedProjectOverrides = append(deletedProjectOverrides, p)
+			deletedImportOverrides = append(deletedImportOverrides, p)
+		}
+
+		for _, p := range manifest.ProjectOverrides {
+			if overrideFlags.importManifest != "" || (len(args) == 2 && p.Remote != args[1]) || p.Name != name {
+				projectOverrides = append(projectOverrides, p)
+				continue
 			}
+			deletedProjectOverrides = append(deletedProjectOverrides, p)
 		}
 
 		if len(deletedProjectOverrides)+len(deletedImportOverrides) > 1 {
