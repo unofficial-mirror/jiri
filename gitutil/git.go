@@ -1284,6 +1284,7 @@ func (g *Git) runGit(stdout, stderr io.Writer, args ...string) error {
 			// ignore error
 		}
 	}
+	g.jirix.Logger.Tracef("Run: git %s (%s)", strings.Join(args, " "), dir)
 	err := command.Run()
 	exitCode := 0
 	if err != nil {
@@ -1291,7 +1292,7 @@ func (g *Git) runGit(stdout, stderr io.Writer, args ...string) error {
 			exitCode = exitError.ExitCode()
 		}
 	}
-	g.jirix.Logger.Tracef("Run: git %s (%s), \nstdout: %s\nstderr: %s\nexit code: %v\n", strings.Join(args, " "), dir, outbuf.String(), errbuf.String(), exitCode)
+	g.jirix.Logger.Tracef("Finished: git %s (%s), \nstdout: %s\nstderr: %s\nexit code: %v\n", strings.Join(args, " "), dir, outbuf.String(), errbuf.String(), exitCode)
 	return err
 }
 

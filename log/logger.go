@@ -209,15 +209,17 @@ func (l *Logger) clearProgress() {
 
 func (l *Logger) log(prefix, format string, a ...interface{}) {
 	l.lock.Lock()
+	stamp := time.Now().Format("15:04:05.000")
 	defer l.lock.Unlock()
 	l.clearProgress()
-	l.goLogger.Printf("%s%s", prefix, fmt.Sprintf(format, a...))
+	l.goLogger.Printf("[%s] %s%s", stamp, prefix, fmt.Sprintf(format, a...))
 }
 
 func (l *Logger) logToBufferOnly(prefix, format string, a ...interface{}) {
 	l.lock.Lock()
+	stamp := time.Now().Format("15:04:05.000")
 	defer l.lock.Unlock()
-	l.goBufferLogger.Printf("%s%s", prefix, fmt.Sprintf(format, a...))
+	l.goBufferLogger.Printf("[%s] %s%s", stamp, prefix, fmt.Sprintf(format, a...))
 }
 
 func (l *Logger) Logf(loglevel LogLevel, format string, a ...interface{}) {
