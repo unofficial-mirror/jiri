@@ -638,7 +638,7 @@ func (ld *loader) warnOverrides(jirix *jiri.X) {
 			if revision == "" {
 				revision = "HEAD"
 			}
-			jirix.Logger.Warningf("Project %s(remote: %s) is overridden to revision %s, if this is not your intention, please run \"jiri override --delete %s %s\" to disable it.", v.Name, v.Remote, revision, v.Name, v.Remote)
+			jirix.Logger.Warningf("Project %s(remote: %s) is pinned to revision %s, if that is not what you want, please run \"jiri override --delete %s %s\" to unpin it.", v.Name, v.Remote, revision, v.Name, v.Remote)
 			jirix.OverrideWarned = true
 		}
 	}
@@ -648,7 +648,7 @@ func (ld *loader) warnOverrides(jirix *jiri.X) {
 			if revision == "" {
 				revision = "HEAD"
 			}
-			jirix.Logger.Warningf("Import %s(remote: %s) is overridden to revision %s, if this is not your intention, please run \"jiri override --import-manifest=%s --delete %s %s\" to disable it.", v.Name, v.Remote, revision, v.Manifest, v.Name, v.Remote)
+			jirix.Logger.Warningf("Import %s(remote: %s) is pinned to revision %s, if that is not what you want, please run \"jiri override --import-manifest=%s --delete %s %s\" to unpin it.", v.Name, v.Remote, revision, v.Manifest, v.Name, v.Remote)
 			jirix.OverrideWarned = true
 		}
 	}
