@@ -394,6 +394,7 @@ func (p ProjectLock) Key() ProjectLockKey {
 // PackageLock describes locked version information for a jiri managed package.
 type PackageLock struct {
 	PackageName string `json:"package"`
+	LocalPath   string `json:"path,omitempty"`
 	VersionTag  string `json:"version"`
 	InstanceID  string `json:"instance_id"`
 }
@@ -506,10 +507,13 @@ func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byt
 		i++
 	}
 	sort.Slice(pkgEntries, func(i, j int) bool {
-		if pkgEntries[i].PackageName == pkgEntries[j].PackageName {
-			return pkgEntries[i].VersionTag < pkgEntries[j].VersionTag
+		if pkgEntries[i].PackageName != pkgEntries[j].PackageName {
+			return pkgEntries[i].PackageName < pkgEntries[j].PackageName
 		}
-		return pkgEntries[i].PackageName < pkgEntries[j].PackageName
+		if pkgEntries[i].LocalPath != pkgEntries[j].LocalPath {
+			return pkgEntries[i].LocalPath < pkgEntries[j].LocalPath
+		}
+		return pkgEntries[i].VersionTag < pkgEntries[j].VersionTag
 	})
 
 	i = 0
@@ -1178,9 +1182,31 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 					}
 				}
 			}
+			pkgsWithMultiVersionsMap := make(map[string]map[string]bool)
+			for _, v := range pkgs {
+				versionMap := make(map[string]bool)
+				if _, ok := pkgsWithMultiVersionsMap[v.Name]; ok {
+					versionMap = pkgsWithMultiVersionsMap[v.Name]
+				}
+				versionMap[v.Version] = true
+				pkgsWithMultiVersionsMap[v.Name] = versionMap
+			}
+			for k := range pkgsWithMultiVersionsMap {
+				if len(pkgsWithMultiVersionsMap[k]) <= 1 {
+					delete(pkgsWithMultiVersionsMap, k)
+				}
+			}
 			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgs)
 			if err != nil {
 				return
+			}
+			for _, v := range pkgs {
+				if _, ok := pkgsWithMultiVersionsMap[v.Name]; ok {
+					lockKey := PackageLockKey(v.Name + KeySeparator + v.Version)
+					lockEntry := pkgLocks[lockKey]
+					lockEntry.LocalPath = v.Path
+					pkgLocks[lockKey] = lockEntry
+				}
 			}
 		}
 		return
