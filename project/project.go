@@ -1202,10 +1202,24 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 			}
 			for _, v := range pkgs {
 				if _, ok := pkgsWithMultiVersionsMap[v.Name]; ok {
-					lockKey := PackageLockKey(v.Name + KeySeparator + v.Version)
-					lockEntry := pkgLocks[lockKey]
-					lockEntry.LocalPath = v.Path
-					pkgLocks[lockKey] = lockEntry
+					plats, err := v.GetPlatforms()
+					if err != nil {
+						return nil, nil, err
+					}
+					expandedNames, err := cipd.Expand(v.Name, plats)
+					if err != nil {
+						return nil, nil, err
+					}
+					for _, expandedName := range expandedNames {
+						lockKey := PackageLockKey(expandedName + KeySeparator + v.Version)
+						lockEntry, ok := pkgLocks[lockKey]
+						if !ok {
+							jirix.Logger.Errorf("lock key not found in pkgLocks: %v, package: %+v", lockKey, v)
+							return nil, nil, err
+						}
+						lockEntry.LocalPath = v.Path
+						pkgLocks[lockKey] = lockEntry
+					}
 				}
 			}
 		}
