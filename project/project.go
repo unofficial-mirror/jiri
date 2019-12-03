@@ -1200,7 +1200,16 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 			if err != nil {
 				return
 			}
-			for _, v := range pkgs {
+			// sort the keys of pkgs to avoid nondeterministic output.
+			pkgKeys := make([]PackageKey, 0)
+			for k := range pkgs {
+				pkgKeys = append(pkgKeys, k)
+			}
+			sort.Slice(pkgKeys, func(i, j int) bool {
+				return pkgKeys[i] < pkgKeys[j]
+			})
+			for _, k := range pkgKeys {
+				v := pkgs[k]
 				if _, ok := pkgsWithMultiVersionsMap[v.Name]; ok {
 					plats, err := v.GetPlatforms()
 					if err != nil {
