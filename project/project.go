@@ -1967,27 +1967,34 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 			jirix.Logger.Warningf("set remote.origin.fetch failed under git cache directory %q due to error: %v", dir, err)
 			return errCacheCorruption
 		}
-		// Cache already present, update it
-		// TODO : update this after implementing FetchAll using g
-		if scm.IsRevAvailable(revision) {
-			jirix.Logger.Infof("%s(%s) cache up-to-date; skipping\n", remote, dir)
-			return nil
+		if jirix.Partial {
+			if err := scm.AddOrReplacePartialRemote("origin", remote); err != nil {
+				return err
+			}
 		}
 		msg := fmt.Sprintf("Updating cache: %q", dir)
 		task := jirix.Logger.AddTaskMsg(msg)
 		defer task.Done()
 		t := jirix.Logger.TrackTime(msg)
 		defer t.Done()
+		// Cache already present, update it
+		// TODO : update this after implementing FetchAll using g
+		if scm.IsRevAvailable(jirix, revision) {
+			jirix.Logger.Infof("%s(%s) cache up-to-date; skipping\n", remote, dir)
+			return nil
+		}
 		// We need to explicitly specify the ref for fetch to update in case
 		// the cache was created with a previous version and uses "refs/*"
 		if err := retry.Function(jirix, func() error {
-			git := gitutil.New(jirix, gitutil.RootDirOpt(dir))
-			if err := git.FetchRefspec("origin", refspec,
-				gitutil.DepthOpt(depth), gitutil.PruneOpt(true), gitutil.UpdateShallowOpt(true)); err != nil {
+			// Use --update-head-ok here to force fetch to update the current branch.
+			// This is used in the case of a partial clone having a working tree
+			// checked out in the cache.
+			if err := scm.FetchRefspec("origin", refspec,
+				gitutil.DepthOpt(depth), gitutil.PruneOpt(true), gitutil.UpdateShallowOpt(true), gitutil.UpdateHeadOkOpt(true)); err != nil {
 				return err
 			}
 			if jirix.Partial {
-				if err := git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+				if err := scm.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 					return err
 				}
 			}
@@ -2036,17 +2043,19 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		defer t.Done()
 		// Try use clone.bundle to speed up the initialization of git cache.
 		os.MkdirAll(dir, 0755)
-		if err := createCacheThroughBundle(); err != nil {
-			jirix.Logger.Debugf("create git cache for %q through clone.bundle failed due to error: %v", remote, err)
-			os.RemoveAll(dir)
-		} else {
-			jirix.Logger.Debugf("git cache for %q created through clone.bundle", remote)
-			return nil
+		if !jirix.Partial {
+			if err := createCacheThroughBundle(); err != nil {
+				jirix.Logger.Debugf("create git cache for %q through clone.bundle failed due to error: %v", remote, err)
+				os.RemoveAll(dir)
+			} else {
+				jirix.Logger.Debugf("git cache for %q created through clone.bundle", remote)
+				return nil
+			}
 		}
 
 		opts := []gitutil.CloneOpt{gitutil.DepthOpt(depth)}
 		if jirix.Partial {
-			opts = append(opts, gitutil.OmitBlobsOpt(true))
+			opts = append(opts, gitutil.NoCheckoutOpt(true), gitutil.OmitBlobsOpt(true))
 		} else {
 			opts = append(opts, gitutil.BareOpt(true))
 		}
@@ -2063,6 +2072,9 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		// We need to explicitly specify the ref for fetch to update the bare
 		// repository.
 		if err := git.Config("remote.origin.fetch", refspec); err != nil {
+			return err
+		}
+		if err := git.Config("uploadpack.allowFilter", "true"); err != nil {
 			return err
 		}
 		return nil

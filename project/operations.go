@@ -7,6 +7,7 @@ package project
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -88,31 +89,54 @@ func (op createOperation) Kind() string {
 func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	var err error
 	remote := rewriteRemote(jirix, op.project.Remote)
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
 	// Hack to make fuchsia.git happen
 	if op.destination == jirix.Root {
-		scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
 		if err = scm.Init(op.destination); err != nil {
 			return err
 		}
 		if err = scm.AddOrReplaceRemote("origin", remote); err != nil {
 			return err
 		}
-		// We must specify a refspec here in order for patch to be able to set
-		// upstream to 'origin/master'.
-		if op.project.HistoryDepth > 0 && cache != "" {
-			if err = scm.FetchRefspec(cache, "+refs/heads/*:refs/remotes/origin/*", gitutil.DepthOpt(op.project.HistoryDepth)); err != nil {
+		// This appears to be set to 0 via some quirk of `git init`.
+		if err := scm.Config("core.repositoryformatversion", "1"); err != nil {
+			return err
+		}
+		if jirix.Partial {
+			if err := scm.Config("extensions.partialClone", "origin"); err != nil {
 				return err
 			}
-		} else if cache != "" {
-			if err = scm.FetchRefspec(cache, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
-				return err
-			}
-		} else {
-			if err = scm.FetchRefspec(remote, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+			if err := scm.AddOrReplacePartialRemote("origin", remote); err != nil {
 				return err
 			}
 		}
+		// We must specify a refspec here in order for patch to be able to set
+		// upstream to 'origin/master'.
+		if err := scm.Config("remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+			return err
+		}
+		if cache != "" {
+			objPath := "objects"
+			if jirix.Partial {
+				objPath = ".git/objects"
+			}
+			if err := ioutil.WriteFile(filepath.Join(op.destination, ".git/objects/info/alternates"), []byte(filepath.Join(cache, objPath) + "\n"), 0644); err != nil {
+				return err
+			}
+		}
+		if err = fetchAll(jirix, op.project); err != nil {
+			return err
+		}
 	} else {
+		r := remote
+		if cache != "" {
+			r = cache
+			defer func() {
+				if err := scm.AddOrReplaceRemote("origin", remote); err != nil {
+						jirix.Logger.Errorf("failed to set remote back to %v for project %+v", remote, op.project)
+				}
+			}()
+		}
 		opts := []gitutil.CloneOpt{gitutil.NoCheckoutOpt(true)}
 		if op.project.HistoryDepth > 0 {
 			opts = append(opts, gitutil.DepthOpt(op.project.HistoryDepth))
@@ -123,18 +147,18 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		if jirix.Partial {
 			opts = append(opts, gitutil.OmitBlobsOpt(true))
 		}
-		if cache != "" {
-			if err = clone(jirix, cache, op.destination, opts...); err != nil {
-				return err
-			}
-			scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
-			if err = scm.AddOrReplaceRemote("origin", remote); err != nil {
-				return err
-			}
-		} else {
-			if err = clone(jirix, remote, op.destination, opts...); err != nil {
-				return err
-			}
+		if err = clone(jirix, r, op.destination, opts...); err != nil {
+			return err
+		}
+	}
+
+	if jirix.Partial && cache != "" {
+		// Set Cache Remote
+		if err := scm.Config("extensions.partialClone", "origin"); err != nil {
+			return err
+		}
+		if err := scm.AddOrReplacePartialRemote("cache", cache); err != nil {
+			return err
 		}
 	}
 
@@ -149,13 +173,6 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 	if err := writeMetadata(jirix, op.project, op.project.Path); err != nil {
 		return err
 	}
-	scm := gitutil.New(jirix, gitutil.RootDirOpt(op.project.Path))
-
-	// Reset remote to point to correct location so that shared cache does not cause problem.
-	if err := scm.SetRemoteUrl("origin", remote); err != nil {
-		return err
-	}
-
 	// Delete inital branch(es)
 	if branches, _, err := scm.GetBranches(); err != nil {
 		jirix.Logger.Warningf("not able to get branches for newly created project %s(%s)\n\n", op.project.Name, op.project.Path)

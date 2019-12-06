@@ -6,7 +6,6 @@ package gitutil
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -137,6 +136,28 @@ func (g *Git) AddRemote(name, path string) error {
 	return g.run("remote", "add", name, path)
 }
 
+// AddOrReplacePartialRemote adds a new partial remote with given name and path.
+// If the name already exists, it replaces the named remote with new path.
+func (g *Git) AddOrReplacePartialRemote(name, path string) error {
+	configStr := fmt.Sprintf("remote.%s.url", name)
+	if err := g.Config(configStr, path); err != nil {
+		return err
+	}
+	configStr = fmt.Sprintf("remote.%s.partialCloneFilter", name)
+	if err := g.Config(configStr, "blob:none"); err != nil {
+		return err
+	}
+	configStr = fmt.Sprintf("remote.%s.promisor", name)
+	if err := g.Config(configStr, "true"); err != nil {
+		return err
+	}
+	configStr = fmt.Sprintf("remote.%s.fetch", name)
+	if err := g.Config(configStr, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+		return err
+	}
+	return nil
+}
+
 // AddOrReplaceRemote adds a new remote with given name and path. If the name
 // already exists, it replaces the named remote with new path.
 func (g *Git) AddOrReplaceRemote(name, path string) error {
@@ -217,8 +238,8 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 	return branches, nil
 }
 
-// IsRevAvailable runs cat-file on a commit hash is available locally.
-func (g *Git) IsRevAvailable(rev string) bool {
+// IsRevAvailable checks if a commit hash is available locally.
+func (g *Git) IsRevAvailable(jirix *jiri.X, rev string) bool {
 	// TODO: (haowei@)(11517) We are having issues with corrupted
 	// cache data on mac builders. Return a non-nil error
 	// to force the mac builders fetch from remote to avoid
@@ -226,11 +247,26 @@ func (g *Git) IsRevAvailable(rev string) bool {
 	if runtime.GOOS == "darwin" {
 		return false
 	}
-	// test if rev is a legit sha1 hash string
-	if _, err := hex.DecodeString(rev); len(rev) != 40 || err != nil {
+	// If it wants HEAD, always fetch.
+	if rev == "HEAD" {
 		return false
 	}
-
+	// Ensure the revision is present.
+	if jirix.Partial {
+		currentRevision, err := g.CurrentRevision()
+		if err != nil {
+			jirix.Logger.Errorf("could not get current revision\n")
+			return false
+		}
+		expectedRevision, err := g.CurrentRevisionForRef(rev)
+		if err != nil {
+			jirix.Logger.Errorf("could not get revision\n")
+			return false
+		}
+		if currentRevision != expectedRevision {
+			return false
+		}
+	}
 	if err := g.run("cat-file", "-e", rev); err != nil {
 		return false
 	}
@@ -656,6 +692,7 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	updateShallow := false
 	depth := 0
 	fetchTag := ""
+	updateHeadOk := false
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case TagsOpt:
@@ -670,6 +707,8 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 			updateShallow = bool(typedOpt)
 		case FetchTagOpt:
 			fetchTag = string(typedOpt)
+		case UpdateHeadOkOpt:
+			updateHeadOk = bool(typedOpt)
 		}
 	}
 	args := []string{}
@@ -688,6 +727,9 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	}
 	if all {
 		args = append(args, "--all")
+	}
+	if updateHeadOk {
+		args = append(args, "--update-head-ok")
 	}
 	if remote != "" {
 		args = append(args, remote)

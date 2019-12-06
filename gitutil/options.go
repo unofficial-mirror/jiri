@@ -126,3 +126,7 @@ func (OmitBlobsOpt) cloneOpt() {}
 type RebaseMerges bool
 
 func (RebaseMerges) rebaseOpt() {}
+
+type UpdateHeadOkOpt bool
+
+func (UpdateHeadOkOpt) fetchOpt() {}

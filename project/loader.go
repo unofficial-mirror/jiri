@@ -324,7 +324,6 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 		return fmtError(err)
 	}
 	remoteUrl := rewriteRemote(jirix, p.Remote)
-	r := remoteUrl
 	task := jirix.Logger.AddTaskMsg("Creating manifest: %s", remote.Name)
 	defer task.Done()
 	if cacheDirPath != "" {
@@ -335,21 +334,25 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 		if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, remote.RemoteBranch, remote.Revision, 0); err != nil {
 			return err
 		}
-		r = cacheDirPath
 	}
 	opts := []gitutil.CloneOpt{gitutil.ReferenceOpt(cacheDirPath), gitutil.NoCheckoutOpt(true)}
 	if jirix.Partial {
 		opts = append(opts, gitutil.OmitBlobsOpt(true))
 	}
-	if err := clone(jirix, r, path, opts...); err != nil {
+	if err := clone(jirix, remoteUrl, path, opts...); err != nil {
 		return err
 	}
-	scm := gitutil.New(jirix, gitutil.RootDirOpt(path))
-	defer func() {
-		if err := scm.AddOrReplaceRemote("origin", remoteUrl); err != nil {
-			jirix.Logger.Errorf("failed to set remote back to %v for project %+v", remoteUrl, p)
+	if jirix.Partial && cacheDirPath != "" {
+		// Set Cache Remote
+		scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
+		if err := scm.Config("extensions.partialClone", "origin"); err != nil {
+			return err
 		}
-	}()
+		if err := scm.AddOrReplacePartialRemote("cache", cacheDirPath); err != nil {
+			return err
+		}
+	}
+
 	p.Revision = remote.Revision
 	p.RemoteBranch = remote.RemoteBranch
 	if err := checkoutHeadRevision(jirix, p, false); err != nil {
