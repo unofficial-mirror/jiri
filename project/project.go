@@ -2439,3 +2439,20 @@ func writeMetadata(jirix *jiri.X, project Project, dir string) (e error) {
 	metadataFile := filepath.Join(metadataDir, jiri.ProjectMetaFile)
 	return project.ToFile(jirix, metadataFile)
 }
+
+func writeAttributesJSON(jirix *jiri.X) error {
+	attrs := make([]string, 0)
+	for k := range newAttributes(jirix.FetchingAttrs) {
+		attrs = append(attrs, k)
+	}
+	jsonData, err := json.MarshalIndent(&attrs, "", "    ")
+	if err != nil {
+		return err
+	}
+	jsonFile := filepath.Join(jirix.RootMetaDir(), jiri.AttrsJSON)
+	if err := safeWriteFile(jirix, jsonFile, jsonData); err != nil {
+		return err
+	}
+	jirix.Logger.Debugf("package optional attributes written to %s", jsonFile)
+	return nil
+}

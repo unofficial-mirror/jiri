@@ -912,7 +912,7 @@ func FetchPackages(jirix *jiri.X, projects Projects, pkgs Packages, fetchTimeout
 			jirix.Logger.Warningf("Some packages are skipped by cipd due to lack of access, you might want to run \"%s auth-login\" and try again", jirix.CIPDPath())
 		}
 	}
-	return nil
+	return writeAttributesJSON(jirix)
 }
 
 // WritePackageFlags write flag files into project directory using in "flag"
