@@ -30,6 +30,16 @@ Manifests have the following XML schema:
     />
     ...
   </projects>
+  <packages>
+    <package name="package/path"
+             version="version"
+             path="path/to/directory"
+             internal="true"
+             platforms="os-arch1,os-arch2..."
+             flag="filename|content_successful|content_failed"
+    />
+    ...
+  </packages>
   <overrides>
     <project ... />
   </overrides>
@@ -56,7 +66,7 @@ If the manifest being imported and the importing manifest are in different repos
 * name (optional) - The name of the project corresponding to the manifest repository.  If your manifest contains a &lt;project> with the same remote as the manifest remote, then the "name" attribute of on the
 &lt;import> tag should match the "name" attribute on the &lt;project>.  Otherwise, jiri will clone the manifest repository on every update.
 
-The &lt;project> tags describe the projects to sync, and what state they should sync to, accoring to the following attributes:
+The &lt;project> tags describe the projects to sync, and what state they should sync to, according to the following attributes:
 
 * name (required) - The name of the project.
 
@@ -73,6 +83,20 @@ The &lt;project> tags describe the projects to sync, and what state they should 
 * gerrithost (optional) - The url of the Gerrit host for the project.  If specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 
 * githooks (optional) - The path (relative to the jiri root) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
+
+The &lt;packages> tags describe the CIPD packages to sync, and what version they should sync to, according to the following attributes:
+
+* name (required) - The CIPD path of the package.
+
+* version (required) - The version tag of the CIPD package. Floating refs are not recommended.
+
+* path (optional) - The local path this package should be stored. It should be a relative path based on `JIRI_ROOT`. If the manifest does not define this attribute, it will be put into `JIRI_ROOT/prebuilt` directory. Jiri allows the path to be platform specific, for example `path="buildtools/{{.OS}}-{{.Arch}}"`, if run jiri under linux-amd64, it will be expanded to `path="buildtools/linux-amd64"`
+
+* internal (optional) - Whether the package is accessible to the public. If a cipd package requires explicit permissions such as packages under fuchsia_internal, this attribute needs to be set to `true`. By default it is `false`.
+
+* platforms (optional) - The platforms supported by the package. By default, it is set to `linux-amd64,mac-amd64`. However, if this package supports other platforms, e.g. `linux-arm64`, this attribute needs to be explicitly defined.
+
+* flag (optional) - The flag needs to be written by jiri when this package is successfully fetched. The flag attribute has a format of `filename|content_successful|content_failed` When a package is successfully downloaded, jiri will write `content_succeful` to filename. If the package is not downloaded due to access reasons, jiri will write `content_failed` to filename.
 
 The projects in the &lt;overrides> tag replace existing projects defined by in the &lt;projects> tag (and from transitively imported &lt;projects> tags).
 Only the root manifest can contain overrides and repositories referenced using the
