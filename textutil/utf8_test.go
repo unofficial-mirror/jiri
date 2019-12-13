@@ -11,6 +11,7 @@ import (
 )
 
 func TestUTF8ChunkDecoder(t *testing.T) {
+	t.Parallel()
 	r2 := "Δ"
 	r3 := "王"
 	r4 := "\U0001F680"

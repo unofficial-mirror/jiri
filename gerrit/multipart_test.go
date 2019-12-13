@@ -19,6 +19,7 @@ func checkMultiPartCLSet(t *testing.T, expectedTotal int, expectedCLsByPart map[
 }
 
 func TestMultiPartCLSet(t *testing.T) {
+	t.Parallel()
 	set := NewMultiPartCLSet()
 	checkMultiPartCLSet(t, -1, map[int]Change{}, set)
 
@@ -96,6 +97,7 @@ func TestMultiPartCLSet(t *testing.T) {
 }
 
 func TestNewOpenCLs(t *testing.T) {
+	t.Parallel()
 	nonMultiPartCLs := CLList{
 		GenCL(1010, 1, "release.go.core"),
 		GenCL(1020, 2, "release.go.tools"),

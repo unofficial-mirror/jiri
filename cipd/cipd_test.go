@@ -77,6 +77,7 @@ func TestFetchBinary(t *testing.T) {
 }
 
 func TestCipdVersion(t *testing.T) {
+	t.Parallel()
 	// Assume cipd version is always a git commit hash for now
 	versionStr := string(cipdVersion)
 	if len(versionStr) != len("git_revision:00e2d8b49a4e7505d1c71f19d15c9e7c5b9245a5") ||
@@ -90,6 +91,7 @@ func TestCipdVersion(t *testing.T) {
 }
 
 func TestFetchDigest(t *testing.T) {
+	t.Parallel()
 	tests := []string{
 		"linux-amd64",
 		"linux-arm64",
@@ -277,6 +279,7 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 }
 
 func TestExpand(t *testing.T) {
+	t.Parallel()
 	platforms := []Platform{
 		Platform{"linux", "amd64"},
 		Platform{"linux", "arm64"},
@@ -303,6 +306,7 @@ func TestExpand(t *testing.T) {
 }
 
 func TestMustExpand(t *testing.T) {
+	t.Parallel()
 	tests := map[string]bool{
 		"fuchsia/clang/${platform}":               true,
 		"fuchsia/clang/${os}-${arch}":             true,
@@ -317,6 +321,7 @@ func TestMustExpand(t *testing.T) {
 }
 
 func TestDecl(t *testing.T) {
+	t.Parallel()
 	platforms := []Platform{
 		Platform{"linux", "amd64"},
 		Platform{"linux", "arm64"},

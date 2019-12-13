@@ -14,6 +14,7 @@ import (
 )
 
 func TestPrefixWriter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Prefix string
 		Writes []string
@@ -73,6 +74,7 @@ func TestPrefixWriter(t *testing.T) {
 }
 
 func TestPrefixLineWriter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Prefix string
 		Writes []string
@@ -180,6 +182,7 @@ func (f *fakeWriteFlusher) Flush() error {
 }
 
 func TestPrefixLineWriter_Flush(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{}
 	w := PrefixLineWriter(fake, "prefix")
 	if err := w.Flush(); err != nil {
@@ -191,6 +194,7 @@ func TestPrefixLineWriter_Flush(t *testing.T) {
 }
 
 func TestPrefixLineWriter_FlushError(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{flushErr: err1}
 	w := PrefixLineWriter(fake, "prefix")
 	if err := w.Flush(); err != err1 {
@@ -202,6 +206,7 @@ func TestPrefixLineWriter_FlushError(t *testing.T) {
 }
 
 func TestPrefixLineWriter_WriteFlush(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{}
 	w := PrefixLineWriter(fake, "prefix")
 	if n, err := w.Write([]byte("abc")); n != 3 || err != nil {
@@ -216,6 +221,7 @@ func TestPrefixLineWriter_WriteFlush(t *testing.T) {
 }
 
 func TestPrefixLineWriter_WriteFlushError(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{flushErr: err1}
 	w := PrefixLineWriter(fake, "prefix")
 	if n, err := w.Write([]byte("abc")); n != 3 || err != nil {
@@ -230,6 +236,7 @@ func TestPrefixLineWriter_WriteFlushError(t *testing.T) {
 }
 
 func TestPrefixLineWriter_WriteErrorFlush(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{writeErr: err1}
 	w := PrefixLineWriter(fake, "prefix")
 	if n, err := w.Write([]byte("abc")); n != 3 || err != nil {
@@ -244,6 +251,7 @@ func TestPrefixLineWriter_WriteErrorFlush(t *testing.T) {
 }
 
 func TestPrefixLineWriter_WriteErrorFlushError(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{writeErr: err1, flushErr: err2}
 	w := PrefixLineWriter(fake, "prefix")
 	if n, err := w.Write([]byte("abc")); n != 3 || err != nil {
@@ -258,6 +266,7 @@ func TestPrefixLineWriter_WriteErrorFlushError(t *testing.T) {
 }
 
 func TestPrefixLineWriter_EOLWriteErrorFlushError(t *testing.T) {
+	t.Parallel()
 	fake := &fakeWriteFlusher{writeErr: err1, flushErr: err2}
 	w := PrefixLineWriter(fake, "prefix")
 	if n, err := w.Write([]byte("ab\n")); n != 3 || err != err1 {
@@ -272,6 +281,7 @@ func TestPrefixLineWriter_EOLWriteErrorFlushError(t *testing.T) {
 }
 
 func TestByteReplaceWriter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Old    byte
 		New    string

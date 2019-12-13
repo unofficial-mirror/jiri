@@ -21,6 +21,7 @@ var (
 )
 
 func TestWrapWriter(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Width   int
 		Indents [][]int
@@ -176,6 +177,7 @@ func TestWrapWriter(t *testing.T) {
 }
 
 func TestWrapWriterForceVerbatim(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		In   string // See xlateIn for details on the format
 		Want string // See xlateIn for details on the format

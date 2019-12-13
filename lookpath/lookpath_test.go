@@ -59,6 +59,7 @@ func isNotFoundError(err error, name string) bool {
 }
 
 func TestLook(t *testing.T) {
+	t.Parallel()
 	tmpDir, cleanup := initTmpDir(t)
 	defer cleanup()
 	dirA, dirB := mkdir(t, tmpDir, "a"), mkdir(t, tmpDir, "b")
@@ -109,6 +110,7 @@ func TestLook(t *testing.T) {
 }
 
 func TestLookPrefix(t *testing.T) {
+	t.Parallel()
 	tmpDir, cleanup := initTmpDir(t)
 	defer cleanup()
 	dirA, dirB := mkdir(t, tmpDir, "a"), mkdir(t, tmpDir, "b")

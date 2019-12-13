@@ -15,6 +15,7 @@ import (
 // -root flag as a path, evaluates any symlinks the path might contain, and
 // returns the result.
 func TestFindRootEnvSymlink(t *testing.T) {
+	t.Parallel()
 	// Create a temporary directory.
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {

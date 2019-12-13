@@ -12,6 +12,7 @@ import (
 )
 
 func TestParseQueryResults(t *testing.T) {
+	t.Parallel()
 	input := `)]}'
 	[
 		{
@@ -143,6 +144,7 @@ func TestParseQueryResults(t *testing.T) {
 }
 
 func TestParseMultiPartMatch(t *testing.T) {
+	t.Parallel()
 	type testCase struct {
 		str             string
 		expectNoMatches bool
@@ -209,6 +211,7 @@ func TestParseMultiPartMatch(t *testing.T) {
 }
 
 func TestParseValidGitCookieFile(t *testing.T) {
+	t.Parallel()
 	// Valid content.
 	gitCookieFileContent := `
 vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com=12345
@@ -239,6 +242,7 @@ vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.c
 }
 
 func TestParseInvalidGitCookieFile(t *testing.T) {
+	t.Parallel()
 	// Content with invalid entries which should be skipped.
 	gitCookieFileContentWithInvalidEntries := `
 vanadium.googlesource.com	FALSE	/	TRUE	2147483647	o	git-johndoe.example.com
@@ -262,6 +266,7 @@ vanadium-review.googlesource.com	FALSE	/	TRUE	2147483647	o
 }
 
 func TestParseValidNetRcFile(t *testing.T) {
+	t.Parallel()
 	// Valid content.
 	netrcFileContent := `
 machine vanadium.googlesource.com login git-johndoe.example.com password 12345
@@ -287,6 +292,7 @@ machine vanadium-review.googlesource.com login git-johndoe.example.com password 
 }
 
 func TestParseInvalidNetRcFile(t *testing.T) {
+	t.Parallel()
 	// Content with invalid entries which should be skipped.
 	netRcFileContentWithInvalidEntries := `
 machine vanadium.googlesource.com login git-johndoe.example.com password
@@ -311,6 +317,7 @@ machine vanadium-review.googlesource.com login git-johndoe.example.com password 
 }
 
 func TestParseRefString(t *testing.T) {
+	t.Parallel()
 	type testCase struct {
 		ref              string
 		expectErr        bool
@@ -359,6 +366,7 @@ func TestParseRefString(t *testing.T) {
 }
 
 func TestReference(t *testing.T) {
+	t.Parallel()
 	testOpts := CLOpts{
 		RemoteBranch: "master",
 		Labels:       []string{"Commit-Queue+1"},

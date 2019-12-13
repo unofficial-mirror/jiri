@@ -69,6 +69,7 @@ func expect(t *testing.T, out chan *simplemr.Record, key string, vals ...int) {
 }
 
 func TestMR(t *testing.T) {
+	t.Parallel()
 	mrt := &simplemr.MR{}
 	in, out := newChans(10)
 	tc := &termCount{}
@@ -102,6 +103,7 @@ func (sr *slowReducer) Reduce(mr *simplemr.MR, key string, values []interface{})
 }
 
 func TestTimeout(t *testing.T) {
+	t.Parallel()
 	in, out := newChans(1)
 	mrt := &simplemr.MR{Timeout: 100 * time.Millisecond}
 	identity := &simplemr.Identity{}
@@ -152,6 +154,7 @@ func runMappers(t *testing.T, bufsize, numMappers int) time.Duration {
 }
 
 func TestOneMappers(t *testing.T) {
+	t.Parallel()
 	bufsize := 5
 	runtime := runMappers(t, bufsize, 1)
 	if got, want := runtime, time.Duration(int64(sleepTime)*int64(bufsize)); got < want {
@@ -186,6 +189,7 @@ func (a *adder) Reduce(mr *simplemr.MR, key string, values []interface{}) error 
 }
 
 func TestChainedMR(t *testing.T) {
+	t.Parallel()
 	chanSize := 5
 	in, middle, out := make(chan *simplemr.Record, chanSize), make(chan *simplemr.Record, chanSize), make(chan *simplemr.Record, chanSize)
 	mrt1 := &simplemr.MR{}
@@ -258,9 +262,11 @@ func testCancel(t *testing.T, mapper bool) {
 }
 
 func TestCancelMappers(t *testing.T) {
+	t.Parallel()
 	testCancel(t, true)
 }
 
 func TestCancelReducers(t *testing.T) {
+	t.Parallel()
 	testCancel(t, false)
 }

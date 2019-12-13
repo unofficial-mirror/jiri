@@ -83,6 +83,7 @@ func stripGaps(out string) string {
 }
 
 func TestTimer(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		ops       []op
 		intervals []Interval
@@ -430,6 +431,7 @@ func TestTimer(t *testing.T) {
 // TestIntervalPrinterCornerCases tests corner cases for the printer.  These are
 // all cases where only a subset of the full Timer intervals is printed.
 func TestIntervalPrinterCornerCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		intervals []Interval
 		str       string

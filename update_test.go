@@ -15,6 +15,7 @@ import (
 )
 
 func TestGetCurrentCommit(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `)]}'
@@ -36,6 +37,7 @@ func TestGetCurrentCommit(t *testing.T) {
 }
 
 func TestHasPrebuilt(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -48,6 +50,7 @@ func TestHasPrebuilt(t *testing.T) {
 }
 
 func TestDoesNotHavePrebuilt(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -60,6 +63,7 @@ func TestDoesNotHavePrebuilt(t *testing.T) {
 }
 
 func TestDownloadBinary(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		b := bytes.NewBuffer([]byte("jiri"))
@@ -77,6 +81,7 @@ func TestDownloadBinary(t *testing.T) {
 }
 
 func TestUpdateExecutable(t *testing.T) {
+	t.Parallel()
 	content := []byte("old")
 
 	f, err := ioutil.TempFile("", "jiri")

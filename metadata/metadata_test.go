@@ -90,6 +90,7 @@ b value
 }
 
 func TestToMap(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		if got, want := test.MD.ToMap(), test.MD.entries; !reflect.DeepEqual(got, want) {
 			t.Errorf("got %v, want %v", got, want)
@@ -98,6 +99,7 @@ func TestToMap(t *testing.T) {
 }
 
 func TestFromMap(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		if got, want := FromMap(test.MD.entries), test.MD; !reflect.DeepEqual(got, want) {
 			t.Errorf("got %#v, want %#v", got, want)
@@ -106,6 +108,7 @@ func TestFromMap(t *testing.T) {
 }
 
 func TestToXML(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		if got, want := test.MD.ToXML(), test.XML; got != want {
 			t.Errorf("got %v, want %v", got, want)
@@ -114,6 +117,7 @@ func TestToXML(t *testing.T) {
 }
 
 func TestFromXML(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		got, err := FromXML([]byte(test.XML))
 		if err != nil {
@@ -131,6 +135,7 @@ func TestFromXML(t *testing.T) {
 }
 
 func TestToBase64(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		got := test.MD.ToBase64()
 		found := false
@@ -147,6 +152,7 @@ func TestToBase64(t *testing.T) {
 }
 
 func TestFromBase64(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		for _, b64 := range test.B64 {
 			got, err := FromBase64([]byte(b64))
@@ -166,6 +172,7 @@ func TestFromBase64(t *testing.T) {
 }
 
 func TestInsertLookup(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		ID, Value, Old string
 		Map            map[string]string
@@ -206,6 +213,7 @@ func TestInsertLookup(t *testing.T) {
 }
 
 func TestLDFlag(t *testing.T) {
+	t.Parallel()
 	for _, test := range allTests {
 		got := LDFlag(test.MD)
 		found := false
@@ -224,6 +232,7 @@ func TestLDFlag(t *testing.T) {
 
 // TestBuiltIn tests the package-level functions that operate on BuiltIn.
 func TestBuiltIn(t *testing.T) {
+	t.Parallel()
 	const id, value1, value2 = "TestID", "testvalue1", "testvalue2"
 	if got, want := Lookup(id), ""; got != want {
 		t.Errorf("Lookup %s got %q, want %q", id, got, want)
@@ -257,6 +266,7 @@ func TestBuiltIn(t *testing.T) {
 // TestInitAndFlag builds a test binary with some metadata, and invokes the
 // -metadata flag to make sure it dumps the expected metadata.
 func TestInitAndFlag(t *testing.T) {
+	t.Parallel()
 	// Run the test binary.
 	const id, value = "zzzTestID", "abcdefg"
 	x := FromMap(map[string]string{id: value})

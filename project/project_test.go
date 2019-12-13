@@ -2063,6 +2063,7 @@ func TestFileAndRemoteImportCycle(t *testing.T) {
 }
 
 func TestManifestToFromBytes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Manifest project.Manifest
 		XML      string
@@ -2164,6 +2165,7 @@ func TestManifestToFromBytes(t *testing.T) {
 }
 
 func TestProjectToFromFile(t *testing.T) {
+	t.Parallel()
 	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
@@ -2219,6 +2221,7 @@ func TestProjectToFromFile(t *testing.T) {
 }
 
 func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
+	t.Parallel()
 
 	projectLock0 := project.ProjectLock{"https://dart.googlesource.com/web_socket_channel.git", "dart", "1.0.9"}
 	pkgLock0 := project.PackageLock{
@@ -2278,6 +2281,7 @@ func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
 }
 
 func TestGetPath(t *testing.T) {
+	t.Parallel()
 	testPkgs := []project.Package{
 		project.Package{Name: "test0", Version: "version", Path: "A/test0"},
 		project.Package{Name: "test1/${platform}", Version: "version", Path: ""},
@@ -2306,6 +2310,7 @@ func TestGetPath(t *testing.T) {
 }
 
 func TestWritePackageFlags(t *testing.T) {
+	t.Parallel()
 	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
@@ -2350,6 +2355,7 @@ func TestWritePackageFlags(t *testing.T) {
 }
 
 func TestWriteProjectFlags(t *testing.T) {
+	t.Parallel()
 	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
@@ -2382,6 +2388,7 @@ func TestWriteProjectFlags(t *testing.T) {
 }
 
 func TestPackageVersionTemplate(t *testing.T) {
+	t.Parallel()
 	jirix, cleanup := xtest.NewX(t)
 	defer cleanup()
 
@@ -2440,6 +2447,7 @@ func TestPackageVersionTemplate(t *testing.T) {
 }
 
 func TestOptionalProjectsAndPackages(t *testing.T) {
+	t.Parallel()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
@@ -2553,6 +2561,7 @@ func TestOptionalProjectsAndPackages(t *testing.T) {
 }
 
 func TestMultiplePackageVersions(t *testing.T) {
+	t.Parallel()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
@@ -2639,6 +2648,7 @@ func TestOverrideProject(t *testing.T) {
 }
 
 func TestHostnameAllowed(t *testing.T) {
+	t.Parallel()
 	tests := map[string]bool{
 		"*.google.com,fuchsia.google.com":       true,
 		"*.google.com,fuchsia.dev.google.com":   true,
@@ -2664,6 +2674,7 @@ func TestHostnameAllowed(t *testing.T) {
 }
 
 func TestCheckProjectsHostnames(t *testing.T) {
+	t.Parallel()
 	allowList := []string{
 		"*.googlesource.com",
 		"fuchsia-internal",

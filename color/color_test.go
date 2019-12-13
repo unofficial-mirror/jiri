@@ -6,6 +6,7 @@ import (
 )
 
 func TestColors(t *testing.T) {
+	t.Parallel()
 	c := NewColor(ColorAlways)
 	colorFns := []Colorfn{c.Black, c.Red, c.Green, c.Yellow, c.Magenta, c.Cyan, c.White, c.DefaultColor}
 	colorCodes := []ColorCode{BlackFg, RedFg, GreenFg, YellowFg, MagentaFg, CyanFg, WhiteFg, DefaultFg}
@@ -43,6 +44,7 @@ func TestColors(t *testing.T) {
 }
 
 func TestColorsDisabled(t *testing.T) {
+	t.Parallel()
 	c := NewColor(ColorNever)
 	colorFns := []Colorfn{c.Black, c.Red, c.Green, c.Yellow, c.Magenta, c.Cyan, c.White, c.DefaultColor}
 

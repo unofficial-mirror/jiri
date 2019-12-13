@@ -11,6 +11,7 @@ import (
 )
 
 func TestMapSliceFuncs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		FromMap, Map     map[string]string
 		FromSlice, Slice []string
@@ -106,6 +107,7 @@ func TestMapSliceFuncs(t *testing.T) {
 }
 
 func TestSplitJoinKeyValue(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		KV, Key, Value string
 	}{
@@ -136,6 +138,7 @@ func TestSplitJoinKeyValue(t *testing.T) {
 }
 
 func TestSplitJoinTokens(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Sep, FromValue, Value string
 		FromTokens, Tokens    []string
@@ -162,6 +165,7 @@ func TestSplitJoinTokens(t *testing.T) {
 }
 
 func TestUniqueTokens(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Tokens, Want []string
 	}{
@@ -180,6 +184,7 @@ func TestUniqueTokens(t *testing.T) {
 }
 
 func TestFilterToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Tokens []string
 		Target string
@@ -210,6 +215,7 @@ func TestFilterToken(t *testing.T) {
 }
 
 func TestPrependUniqueToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Sep, Value, Token, Want string
 	}{
@@ -233,6 +239,7 @@ func TestPrependUniqueToken(t *testing.T) {
 }
 
 func TestAppendUniqueToken(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Sep, Value, Token, Want string
 	}{
@@ -255,6 +262,7 @@ func TestAppendUniqueToken(t *testing.T) {
 }
 
 func TestSortByKey(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		In, Sorted []string
 	}{
@@ -424,6 +432,7 @@ func expectVarsAC(t *testing.T, vars *Vars) {
 var v123, vxyz, vfoo = "123", "x:y:z", "foo"
 
 func TestZeroVars(t *testing.T) {
+	t.Parallel()
 	var vars Vars
 	if got, want := vars.Contains("A"), false; got != want {
 		t.Errorf(`Contains("A") got %v, want %v`, got, want)
@@ -466,6 +475,7 @@ func TestZeroVars(t *testing.T) {
 }
 
 func TestVarsFromMap(t *testing.T) {
+	t.Parallel()
 	vars := VarsFromMap(map[string]string{"A": "123", "B": "x:y:z"})
 	expectVarsAB(t, vars)
 	if got, want := vars.Deltas(), map[string]*string{}; !reflect.DeepEqual(got, want) {
@@ -492,6 +502,7 @@ func TestVarsFromMap(t *testing.T) {
 }
 
 func TestVarsFromSlice(t *testing.T) {
+	t.Parallel()
 	vars := VarsFromSlice([]string{"A=123", "B=x:y:z"})
 	expectVarsAB(t, vars)
 	if got, want := vars.Deltas(), map[string]*string{}; !reflect.DeepEqual(got, want) {
@@ -518,6 +529,7 @@ func TestVarsFromSlice(t *testing.T) {
 }
 
 func TestVarsFromOS(t *testing.T) {
+	t.Parallel()
 	// Set an environment variable and make sure it shows up.
 	const testKey, testValue = "OS_ENV_TEST_KEY", "OS_ENV_TEST_VAL"
 	if err := os.Setenv(testKey, testValue); err != nil {
