@@ -1700,7 +1700,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 		}
 		msg += fmt.Sprintf("\nCommit or discard the changes and try again.\n\n")
 		jirix.Logger.Errorf(msg)
-		jirix.IncrementFailures()
+		// Do not call jirix.IncrementFailures() here. See fxb/42984.
 		return nil
 	}
 
