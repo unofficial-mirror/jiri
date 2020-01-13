@@ -332,23 +332,6 @@ func findCache(root string, config *Config) (string, error) {
 		return cleanPath(config.CachePath)
 	}
 
-	// Check default location under .jiri_root.
-	defaultCache := filepath.Join(root, DefaultCacheSubdir)
-	fi, err := os.Stat(defaultCache)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-
-	// .jiri_root/cache exists and is a directory (success).
-	if fi.IsDir() {
-		return defaultCache, nil
-	}
-
-	// defaultCache exists but is not a directory.  Assume the user is
-	// up to something and there's no real cache directory.
 	return "", nil
 }
 
