@@ -8,6 +8,8 @@ package retry
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
@@ -30,6 +32,34 @@ const (
 	defaultInterval = 5 * time.Second
 )
 
+type exponentialBackoff struct {
+	InitialInterval float64
+	MaxInterval     float64
+	Multiplier      float64
+	Iteration       int
+	Rand            *rand.Rand
+}
+
+func newExponentialBackoff(initialInterval float64, maxInterval float64, multiplier float64) *exponentialBackoff {
+	e := &exponentialBackoff{
+		InitialInterval: initialInterval,
+		MaxInterval:     maxInterval,
+		Multiplier:      multiplier,
+		Iteration:       0,
+		Rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+	return e
+}
+
+func (e *exponentialBackoff) nextBackoff() time.Duration {
+	next := e.InitialInterval*math.Pow(e.Multiplier, float64(e.Iteration)) + 10*e.Rand.Float64()
+	e.Iteration++
+	if next > e.MaxInterval {
+		next = e.MaxInterval
+	}
+	return time.Duration(float64(time.Second) * next)
+}
+
 // Function retries the given function for the given number of
 // attempts at the given interval.
 func Function(jirix *jiri.X, fn func() error, task string, opts ...RetryOpt) error {
@@ -43,6 +73,7 @@ func Function(jirix *jiri.X, fn func() error, task string, opts ...RetryOpt) err
 		}
 	}
 
+	backoff := newExponentialBackoff(float64(interval), 64, 2)
 	var err error
 	for i := 1; i <= attempts; i++ {
 		if i > 1 {
@@ -53,8 +84,9 @@ func Function(jirix *jiri.X, fn func() error, task string, opts ...RetryOpt) err
 		}
 		if i < attempts {
 			jirix.Logger.Errorf("%s\n\n", err)
-			jirix.Logger.Infof("Wait for %s before next attempt...: %s\n\n", interval, task)
-			time.Sleep(interval)
+			backoffInterval := backoff.nextBackoff()
+			jirix.Logger.Infof("Wait for %s before next attempt...: %s\n\n", backoffInterval, task)
+			time.Sleep(backoffInterval)
 		}
 	}
 	if attempts > 1 {
