@@ -418,6 +418,7 @@ type ResolveConfig interface {
 	EnablePackageLock() bool
 	EnableProjectLock() bool
 	HostnameAllowList() []string
+	FullResolve() bool
 }
 
 // UnmarshalLockEntries unmarshals project locks and package locks from
@@ -444,10 +445,12 @@ func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
 			if !ok {
 				return nil, nil, fmt.Errorf("package version %+v is not a valid string", entryMap["version"])
 			}
+			localPath, ok := entryMap["path"].(string)
 			pkgLock := PackageLock{
 				PackageName: pkgName,
 				VersionTag:  version,
 				InstanceID:  id,
+				LocalPath:   localPath,
 			}
 			if v, ok := pkgLocks[pkgLock.Key()]; ok {
 				if v != pkgLock {
@@ -1132,12 +1135,77 @@ func CheckProjectsHostnames(projects Projects, allowList []string) error {
 	return nil
 }
 
+func getChangedLocksPkgs(ePkgLocks PackageLocks, pkgs Packages) (PackageLocks, Packages, error) {
+	retPkgs := make(Packages)
+	retLocks := make(PackageLocks)
+	// lockMap is the mapping between package name -> PackageLock
+	lockMap := make(map[string][]PackageLock)
+	// pkgMap is the mappting between package name -> Package
+	pkgMap := make(map[string][]Package)
+	for _, v := range ePkgLocks {
+		lockMap[v.PackageName] = append(lockMap[v.PackageName], v)
+	}
+	for _, v := range pkgs {
+		plats, err := v.GetPlatforms()
+		if err != nil {
+			return nil, nil, err
+		}
+		expandedNames, err := cipd.Expand(v.Name, plats)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, expexpandedName := range expandedNames {
+			pkgMap[expexpandedName] = append(pkgMap[expexpandedName], v)
+		}
+	}
+
+	// If items exist in lockfile but not in manifest, return
+	// an error to force full resolve.
+	for k := range lockMap {
+		if _, ok := pkgMap[k]; !ok {
+			return ePkgLocks, pkgs, errors.New("existing lockfile does not match manifest")
+		}
+	}
+	// For packages do not show up in lockfile,
+	// force resolve on them as they may have been
+	// changed from using instance-ids to using version tags.
+	for k := range pkgMap {
+		if _, ok := lockMap[k]; !ok {
+			for _, v := range pkgMap[k] {
+				retPkgs[v.Key()] = v
+			}
+		}
+	}
+	versionMatch := func(lockSlice []PackageLock, pkgSlice []Package) bool {
+		lockVersions := make(map[string]struct{})
+		pkgVersions := make(map[string]struct{})
+		for _, v := range lockSlice {
+			lockVersions[v.VersionTag] = struct{}{}
+		}
+		for _, v := range pkgSlice {
+			pkgVersions[v.Version] = struct{}{}
+		}
+		return reflect.DeepEqual(lockVersions, pkgVersions)
+	}
+	for k := range lockMap {
+		if !versionMatch(lockMap[k], pkgMap[k]) {
+			for _, v := range pkgMap[k] {
+				retPkgs[v.Key()] = v
+			}
+			for _, v := range lockMap[k] {
+				retLocks[v.Key()] = v
+			}
+		}
+	}
+	return retLocks, retPkgs, nil
+}
+
 // GenerateJiriLockFile generates jiri lockfile to lockFilePath using
 // manifests in manifestFiles slice.
 func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig ResolveConfig) error {
 	jirix.Logger.Debugf("Generate jiri lockfile for manifests %v to %q", manifestFiles, resolveConfig.LockFilePath())
 
-	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool) (projectLocks ProjectLocks, pkgLocks PackageLocks, err error) {
+	resolveLocks := func(jirix *jiri.X, manifestFiles []string, localManifest bool, resolveFully bool, ePkgLocks PackageLocks) (projectLocks ProjectLocks, pkgLocks PackageLocks, err error) {
 		projects, pkgs, err := loadManifestFiles(jirix, manifestFiles, localManifest)
 		if err != nil {
 			return nil, nil, err
@@ -1147,16 +1215,29 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 			return nil, nil, err
 		}
 		if resolveConfig.EnableProjectLock() {
+			// For project locks, there is no differences between
+			// full or partial resolve.
 			projectLocks, err = resolveProjectLocks(jirix, projects)
 			if err != nil {
 				return
 			}
 		}
 		if resolveConfig.EnablePackageLock() {
+			var pkgsToProcess Packages
+			var locksToProcess PackageLocks
+			if resolveFully {
+				pkgsToProcess = pkgs
+			} else {
+				if locksToProcess, pkgsToProcess, err = getChangedLocksPkgs(ePkgLocks, pkgs); err != nil {
+					jirix.Logger.Warningf("%v, fallback to full resolve", err)
+					pkgsToProcess = pkgs
+					resolveFully = true
+				}
+			}
 			if !resolveConfig.AllowFloatingRefs() {
 				pkgsForRefCheck := make(map[cipd.PackageInstance]bool)
 				pkgsPlatformMap := make(map[cipd.PackageInstance][]cipd.Platform)
-				for _, v := range pkgs {
+				for _, v := range pkgsToProcess {
 					pkgInstance := cipd.PackageInstance{
 						PackageName: v.Name,
 						VersionTag:  v.Version,
@@ -1183,7 +1264,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 				}
 			}
 			pkgsWithMultiVersionsMap := make(map[string]map[string]bool)
-			for _, v := range pkgs {
+			for _, v := range pkgsToProcess {
 				versionMap := make(map[string]bool)
 				if _, ok := pkgsWithMultiVersionsMap[v.Name]; ok {
 					versionMap = pkgsWithMultiVersionsMap[v.Name]
@@ -1196,9 +1277,18 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 					delete(pkgsWithMultiVersionsMap, k)
 				}
 			}
-			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgs)
+			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgsToProcess)
 			if err != nil {
 				return
+			}
+			// Merge with existing locks.
+			if !resolveFully {
+				for k := range locksToProcess {
+					delete(ePkgLocks, k)
+				}
+				for k, v := range ePkgLocks {
+					pkgLocks[k] = v
+				}
 			}
 			// sort the keys of pkgs to avoid nondeterministic output.
 			pkgKeys := make([]PackageKey, 0)
@@ -1235,11 +1325,22 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 		return
 	}
 
-	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, resolveConfig.LocalManifest())
+	resolveFully := false
+	var ePkgLocks PackageLocks
+	// Read existing lockfile.
+	jsonData, err := ioutil.ReadFile(resolveConfig.LockFilePath())
+	if err == nil {
+		_, ePkgLocks, err = UnmarshalLockEntries(jsonData)
+	}
+	if err != nil {
+		resolveFully = true
+	}
+	resolveFully = resolveFully || resolveConfig.FullResolve()
+
+	projectLocks, pkgLocks, err := resolveLocks(jirix, manifestFiles, resolveConfig.LocalManifest(), resolveFully, ePkgLocks)
 	if err != nil {
 		return err
 	}
-
 	return writeLockFile(jirix, resolveConfig.LockFilePath(), projectLocks, pkgLocks)
 }
 

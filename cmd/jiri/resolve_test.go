@@ -127,3 +127,105 @@ func TestResolvePackages(t *testing.T) {
 		}
 	}
 }
+
+func TestResolvePackagesPartial(t *testing.T) {
+	fakeroot, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+	// Replace the .jiri_manifest with package declarations
+	pkgData := []byte(`
+<manifest>
+	<packages>
+		<package name="gn/gn/${platform}"
+             version="git_revision:bdb0fd02324b120cacde634a9235405061c8ea06"
+             path="buildtools/{{.OS}}-x64"/>
+		<package name="infra/tools/luci/vpython/${platform}"
+             version="git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89"
+             path="buildtools/{{.OS}}-x64"/>
+	</packages>
+</manifest>
+`)
+	lockData := []byte(`
+[
+	{
+		"package": "gn/gn/linux-amd64",
+		"version": "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
+		"instance_id": "0uGjKAZkJXPZjtYktgEwHiNbwsut_qRsk7ZCGGxi82IC"
+	},
+	{
+		"package": "gn/gn/mac-amd64",
+		"version": "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
+		"instance_id": "rN2F641yR4Bj-H1q8OwC_RiqRpUYxy3hryzRfPER9wcC"
+	},
+	{
+		"package": "infra/tools/luci/vpython/linux-amd64",
+		"version": "git_revision:d7d9ae19b9ace8164177c38a3f0afd2f698c02a7",
+		"instance_id": "uiXWd9vshjd1KMvVmdopnRnfAPbWpyvqJqsWn2Rcs9kC"
+	},
+	{
+		"package": "infra/tools/luci/vpython/mac-amd64",
+		"version": "git_revision:d7d9ae19b9ace8164177c38a3f0afd2f698c02a7",
+		"instance_id": "DEbIUasQv4NGfzxj9b6gYzMrZKr9kQ6mF6ZX41a_9_8C"
+	}
+]
+`)
+	// Currently jiri is hard coded to only verify cipd packages for linux-amd64 and mac-amd64.
+	// If new supported platform added, this test should be updated.
+	expectedLocks := []project.PackageLock{
+		project.PackageLock{
+			PackageName: "gn/gn/linux-amd64",
+			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
+			InstanceID:  "0uGjKAZkJXPZjtYktgEwHiNbwsut_qRsk7ZCGGxi82IC",
+		},
+		project.PackageLock{
+			PackageName: "gn/gn/mac-amd64",
+			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
+			InstanceID:  "rN2F641yR4Bj-H1q8OwC_RiqRpUYxy3hryzRfPER9wcC",
+		},
+		project.PackageLock{
+			PackageName: "infra/tools/luci/vpython/linux-amd64",
+			VersionTag:  "git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89",
+			InstanceID:  "uCjugbKg6wMIF6_H_BHECZQdcGRebhnZ6LzSodPHQ7AC",
+		},
+		project.PackageLock{
+			PackageName: "infra/tools/luci/vpython/mac-amd64",
+			VersionTag:  "git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89",
+			InstanceID:  "yAdok-mh5vfwq1vCAHprmejM9iE7R1t9Wn6RxrWmAAEC",
+		},
+	}
+	if err := ioutil.WriteFile(fakeroot.X.JiriManifestFile(), pkgData, 0644); err != nil {
+		t.Errorf("failed to write package information into .jiri_manifest due to error: %v", err)
+	}
+	lockPath := fakeroot.X.Root + "/jiri.lock"
+	if err := ioutil.WriteFile(lockPath, lockData, 0644); err != nil {
+		t.Errorf("failed to write lockfile information into jiri.lock due to error: %v", err)
+	}
+	resolveFlag.lockFilePath = lockPath
+	resolveFlag.enablePackageLock = true
+	resolveFlag.enableProjectLock = true
+	resolveFlag.enablePackageVersion = true
+	resolveFlag.fullResolve = false
+	args := []string{}
+	if err := runResolve(fakeroot.X, args); err != nil {
+		t.Errorf("resolve failed due to error: %v", err)
+	}
+	data, err := ioutil.ReadFile(lockPath)
+	if err != nil {
+		t.Errorf("read generated lockfile failed due to error: %v", err)
+	}
+	_, pkgLocks, err := project.UnmarshalLockEntries(data)
+	if err != nil {
+		t.Errorf("parse generated lockfile failed due to error: %v", err)
+	}
+	if len(expectedLocks) != len(pkgLocks) {
+		t.Errorf("expecting %v locks, got %v", len(expectedLocks), len(pkgLocks))
+	}
+	for _, v := range expectedLocks {
+		if pkgLock, ok := pkgLocks[v.Key()]; ok {
+			if pkgLock != v {
+				t.Errorf("expecting instance id %q for package %q, got %q", v.InstanceID, v.PackageName, pkgLock.InstanceID)
+			}
+		} else {
+			t.Errorf("package %q not found in generated lockfile", v.PackageName)
+		}
+	}
+}

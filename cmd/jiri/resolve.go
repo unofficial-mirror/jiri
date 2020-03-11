@@ -19,6 +19,7 @@ type resolveFlags struct {
 	enableProjectLock    bool
 	enablePackageVersion bool
 	allowFloatingRefs    bool
+	fullResolve          bool
 	hostnameAllowList    string
 }
 
@@ -55,6 +56,10 @@ func (r *resolveFlags) HostnameAllowList() []string {
 	return ret
 }
 
+func (r *resolveFlags) FullResolve() bool {
+	return r.fullResolve
+}
+
 var resolveFlag resolveFlags
 
 var cmdResolve = &cmdline.Command{
@@ -77,6 +82,7 @@ func init() {
 	flags.BoolVar(&resolveFlag.enableProjectLock, "enable-project-lock", false, "Enable resolving projects in lockfile")
 	flags.BoolVar(&resolveFlag.allowFloatingRefs, "allow-floating-refs", false, "Allow packages to be pinned to floating refs such as \"latest\"")
 	flags.StringVar(&resolveFlag.hostnameAllowList, "allow-hosts", "", "List of hostnames that can be used in the url of a repository, seperated by comma. It will not be enforced if it is left empty.")
+	flags.BoolVar(&resolveFlag.fullResolve, "full-resolve", false, "Resolve all project and packages, not just those are changed.")
 }
 
 func runResolve(jirix *jiri.X, args []string) error {
