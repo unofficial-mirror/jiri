@@ -1081,19 +1081,19 @@ func (g *Git) CherryPickAbort() error {
 	return g.run("cherry-pick", "--abort")
 }
 
-// RebaseAbort aborts an in-progress rebase operation.
+// RebaseAbort aborts an in-progress rebase operation. It should
+// only be used after invoking Rebase().
 func (g *Git) RebaseAbort() error {
 	// First check if rebase is in progress
-	path := ".git/rebase-apply"
-	if g.rootDir != "" {
-		path = filepath.Join(g.rootDir, path)
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return nil // Not in progress return
-		}
+	out, err := g.runOutput("status", "--porcelain", "--untracked-files=no")
+	if err != nil {
 		return err
 	}
+	if len(out) == 0 {
+		// rebase is not in progress
+		return nil
+	}
+	// rebase is in progress, abort.
 	return g.run("rebase", "--abort")
 }
 
