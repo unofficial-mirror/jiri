@@ -2447,7 +2447,6 @@ func TestPackageVersionTemplate(t *testing.T) {
 }
 
 func TestOptionalProjectsAndPackages(t *testing.T) {
-	t.Parallel()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
@@ -2488,13 +2487,13 @@ func TestOptionalProjectsAndPackages(t *testing.T) {
 	}
 	pkg0 := project.Package{
 		Name:       "gn/gn/${platform}",
-		Path:       "path-pkg0",
+		Path:       "path-optional-pkg0",
 		Version:    "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
 		Attributes: "debug,testing",
 	}
 	pkg1 := project.Package{
 		Name:       "fuchsia/tools/jiri/${platform}",
-		Path:       "path-pkg1",
+		Path:       "path-optional-pkg1",
 		Version:    "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
 		Attributes: "",
 	}
@@ -2561,18 +2560,17 @@ func TestOptionalProjectsAndPackages(t *testing.T) {
 }
 
 func TestMultiplePackageVersions(t *testing.T) {
-	t.Parallel()
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
 	pkg0 := project.Package{
 		Name:    "fuchsia/tools/jiri/${platform}",
-		Path:    "path-pkg0",
+		Path:    "path-multi-pkg0",
 		Version: "git_revision:9904764ed228c7fb87bfb252762952b502d1e360",
 	}
 	pkg1 := project.Package{
 		Name:    "fuchsia/tools/jiri/${platform}",
-		Path:    "path-pkg1",
+		Path:    "path-multi-pkg1",
 		Version: "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
 	}
 
