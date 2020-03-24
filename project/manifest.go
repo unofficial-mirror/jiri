@@ -1339,24 +1339,6 @@ func applyGitHooks(jirix *jiri.X, ops []operation) error {
 					return fmtError(err)
 				}
 			}
-			hookPath := filepath.Join(op.Project().Path, ".git", "hooks", "post-commit")
-			commitHook, err := os.Create(hookPath)
-			if err != nil {
-				return err
-			}
-			bytes := []byte(`#!/bin/sh
-
-if ! git symbolic-ref HEAD &> /dev/null; then
-  echo -e "WARNING: You are in a detached head state! You might lose this commit.\nUse 'git checkout -b <branch> to put it on a branch.\n"
-fi
-`)
-			if _, err := commitHook.Write(bytes); err != nil {
-				return err
-			}
-			commitHook.Close()
-			if err := os.Chmod(hookPath, 0750); err != nil {
-				return err
-			}
 		}
 		if op.Project().GitHooks == "" {
 			continue
