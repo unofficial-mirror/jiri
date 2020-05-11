@@ -2081,7 +2081,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		// Cache already present, update it
 		// TODO : update this after implementing FetchAll using g
 		if scm.IsRevAvailable(jirix, revision) {
-			jirix.Logger.Infof("%s(%s) cache up-to-date; skipping\n", remote, dir)
+			jirix.Logger.Debugf("%s(%s) cache up-to-date; skipping\n", remote, dir)
 			return nil
 		}
 		// We need to explicitly specify the ref for fetch to update in case
