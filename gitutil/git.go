@@ -139,20 +139,21 @@ func (g *Git) AddRemote(name, path string) error {
 // AddOrReplacePartialRemote adds a new partial remote with given name and path.
 // If the name already exists, it replaces the named remote with new path.
 func (g *Git) AddOrReplacePartialRemote(name, path string) error {
-	configStr := fmt.Sprintf("remote.%s.url", name)
-	if err := g.Config(configStr, path); err != nil {
+	configKey := fmt.Sprintf("remote.%s.url", name)
+	if err := g.Config(configKey, path); err != nil {
 		return err
 	}
-	configStr = fmt.Sprintf("remote.%s.partialCloneFilter", name)
-	if err := g.Config(configStr, "blob:none"); err != nil {
+	configKey = fmt.Sprintf("remote.%s.partialCloneFilter", name)
+	if err := g.Config(configKey, "blob:none"); err != nil {
 		return err
 	}
-	configStr = fmt.Sprintf("remote.%s.promisor", name)
-	if err := g.Config(configStr, "true"); err != nil {
+	configKey = fmt.Sprintf("remote.%s.promisor", name)
+	if err := g.Config(configKey, "true"); err != nil {
 		return err
 	}
-	configStr = fmt.Sprintf("remote.%s.fetch", name)
-	if err := g.Config(configStr, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+	configKey = fmt.Sprintf("remote.%s.fetch", name)
+	configVal := fmt.Sprintf("+refs/heads/*:refs/remotes/%s/*", name)
+	if err := g.Config(configKey, configVal); err != nil {
 		return err
 	}
 	return nil
@@ -161,12 +162,13 @@ func (g *Git) AddOrReplacePartialRemote(name, path string) error {
 // AddOrReplaceRemote adds a new remote with given name and path. If the name
 // already exists, it replaces the named remote with new path.
 func (g *Git) AddOrReplaceRemote(name, path string) error {
-	configStr := fmt.Sprintf("remote.%s.url", name)
-	if err := g.Config(configStr, path); err != nil {
+	configKey := fmt.Sprintf("remote.%s.url", name)
+	if err := g.Config(configKey, path); err != nil {
 		return err
 	}
-	configStr = fmt.Sprintf("remote.%s.fetch", name)
-	if err := g.Config(configStr, "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+	configKey = fmt.Sprintf("remote.%s.fetch", name)
+	configVal := fmt.Sprintf("+refs/heads/*:refs/remotes/%s/*", name)
+	if err := g.Config(configKey, configVal); err != nil {
 		return err
 	}
 	return nil
