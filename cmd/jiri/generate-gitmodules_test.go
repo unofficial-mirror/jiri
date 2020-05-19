@@ -101,19 +101,15 @@ git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed
 git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed28 "path-2"`)
 
 	goldenModule := []byte(`[submodule "manifest"]
-	branch = 87326c54332e5be21eda2173bb001aaee73a9ab7
 	path = manifest
 	url = /tmp/115893653/manifest
 [submodule "project-0"]
-	branch = 87f863bcbc7cd2177bac17c61e31093de6eeed28
 	path = path-0
 	url = /tmp/115893653/project-0
 [submodule "project-1"]
-	branch = 87f863bcbc7cd2177bac17c61e31093de6eeed28
 	path = path-1
 	url = /tmp/115893653/project-1
 [submodule "project-2"]
-	branch = 87f863bcbc7cd2177bac17c61e31093de6eeed28
 	path = path-2
 	url = /tmp/115893653/project-2`)
 

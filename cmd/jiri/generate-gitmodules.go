@@ -302,8 +302,8 @@ func makePathRel(basepath, targpath string) (string, error) {
 }
 
 func moduleDecl(p project.Project) string {
-	tmpl := "[submodule \"%s\"]\n\tbranch = %s\n\tpath = %s\n\turl = %s"
-	return fmt.Sprintf(tmpl, p.Name, p.Revision, p.Path, p.Remote)
+	tmpl := "[submodule \"%s\"]\n\tpath = %s\n\turl = %s"
+	return fmt.Sprintf(tmpl, p.Name, p.Path, p.Remote)
 }
 
 func commandDecl(p project.Project) string {
