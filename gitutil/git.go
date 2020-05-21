@@ -265,7 +265,7 @@ func (g *Git) IsRevAvailable(jirix *jiri.X, rev string) bool {
 		// This removes a `git rev-list -n 1 <rev>` which takes ~30 seconds for
 		// git partial-clones on `fuchsia/fuchsia`
 		var expectedRevision string
-		if _, err := hex.DecodeString(rev); len(rev) == 40 && err != nil {
+		if _, err := hex.DecodeString(rev); len(rev) == 40 && err == nil {
 			expectedRevision = rev
 		}
 		if expectedRevision == "" {
