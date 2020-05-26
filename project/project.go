@@ -2405,15 +2405,22 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	if err := runCommonOperations(jirix, nullOperations, log.TraceLevel); err != nil {
 		return err
 	}
+
 	jirix.TimerPush("jiri revision files")
+	var wg sync.WaitGroup
 	for _, project := range remoteProjects {
-		if !(project.LocalConfig.Ignore || project.LocalConfig.NoUpdate) {
-			project.writeJiriRevisionFiles(jirix)
-			if err := project.setupDefaultPushTarget(jirix); err != nil {
-				jirix.Logger.Debugf("set up default push target failed due to error: %v", err)
+		wg.Add(1)
+		go func (jirix *jiri.X, project Project) {
+			defer wg.Done()
+			if !(project.LocalConfig.Ignore || project.LocalConfig.NoUpdate) {
+				project.writeJiriRevisionFiles(jirix)
+				if err := project.setupDefaultPushTarget(jirix); err != nil {
+					jirix.Logger.Debugf("set up default push target failed due to error: %v", err)
+				}
 			}
-		}
+		} (jirix, project)
 	}
+	wg.Wait()
 	jirix.TimerPop()
 
 	jirix.TimerPush("jiri project flag files")
