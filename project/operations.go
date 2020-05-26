@@ -705,6 +705,8 @@ func computeOp(local, remote *Project, state *ProjectState, gc, rebaseTracked, r
 
 // This function creates worktree and runs create operation in parallel
 func runCreateOperations(jirix *jiri.X, ops []createOperation) MultiError {
+	jirix.TimerPush("create operations")
+	defer jirix.TimerPop()
 	count := len(ops)
 	if count == 0 {
 		return nil
@@ -836,6 +838,8 @@ func (p *PathTrie) Insert(path string) {
 }
 
 func runDeleteOperations(jirix *jiri.X, ops []deleteOperation, gc bool) error {
+	jirix.TimerPush("delete operations")
+	defer jirix.TimerPop()
 	if len(ops) == 0 {
 		return nil
 	}
@@ -884,6 +888,8 @@ func runDeleteOperations(jirix *jiri.X, ops []deleteOperation, gc bool) error {
 }
 
 func runMoveOperations(jirix *jiri.X, ops []moveOperation) error {
+	jirix.TimerPush("move operations")
+	defer jirix.TimerPop()
 	parentSrcPath := ""
 	parentDestPath := ""
 	for _, op := range ops {
@@ -906,6 +912,8 @@ func runMoveOperations(jirix *jiri.X, ops []moveOperation) error {
 }
 
 func runCommonOperations(jirix *jiri.X, ops operations, loglevel log.LogLevel) error {
+	jirix.TimerPush("common operations")
+	defer jirix.TimerPop()
 	for _, op := range ops {
 		logMsg := fmt.Sprintf("Updating project %q", op.Project().Name)
 		task := jirix.Logger.AddTaskMsg(logMsg)
