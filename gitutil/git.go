@@ -261,19 +261,10 @@ func (g *Git) IsRevAvailable(jirix *jiri.X, rev string) bool {
 			jirix.Logger.Errorf("could not get current revision\n")
 			return false
 		}
-		// Check if we have a commit-id.
-		// This removes a `git rev-list -n 1 <rev>` which takes ~30 seconds for
-		// git partial-clones on `fuchsia/fuchsia`
-		var expectedRevision string
-		if _, err := hex.DecodeString(rev); len(rev) == 40 && err == nil {
-			expectedRevision = rev
-		}
-		if expectedRevision == "" {
-			expectedRevision, err = g.CurrentRevisionForRef(rev)
-			if err != nil {
-				jirix.Logger.Errorf("could not get revision\n")
-				return false
-			}
+		expectedRevision, err := g.CurrentRevisionForRef(rev)
+		if err != nil {
+			jirix.Logger.Errorf("could not get revision\n")
+			return false
 		}
 		if currentRevision != expectedRevision {
 			return false
@@ -626,6 +617,10 @@ func (g *Git) CurrentRevision() (string, error) {
 
 // CurrentRevisionForRef gets current rev for ref/branch/tags
 func (g *Git) CurrentRevisionForRef(ref string) (string, error) {
+	// Short-circuit all calls for commit hashes.
+	if _, err := hex.DecodeString(ref); len(ref) == 40 && err == nil {
+		return ref, nil
+	}
 	out, err := g.runOutput("rev-list", "-n", "1", ref)
 	if err != nil {
 		return "", err
