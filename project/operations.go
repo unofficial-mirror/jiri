@@ -153,16 +153,6 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		}
 	}
 
-	if jirix.Partial && cache != "" {
-		// Set Cache Remote
-		if err := scm.Config("extensions.partialClone", "origin"); err != nil {
-			return err
-		}
-		if err := scm.AddOrReplacePartialRemote("cache", cache); err != nil {
-			return err
-		}
-	}
-
 	if err := os.Chmod(op.destination, os.FileMode(0755)); err != nil {
 		return fmtError(err)
 	}
