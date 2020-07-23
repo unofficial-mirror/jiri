@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -243,13 +242,6 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 
 // IsRevAvailable checks if a commit hash is available locally.
 func (g *Git) IsRevAvailable(jirix *jiri.X, rev string) bool {
-	// TODO: (haowei@)(11517) We are having issues with corrupted
-	// cache data on mac builders. Return a non-nil error
-	// to force the mac builders fetch from remote to avoid
-	// jiri checkout failures.
-	if runtime.GOOS == "darwin" {
-		return false
-	}
 	// If it wants HEAD, always fetch.
 	if rev == "HEAD" {
 		return false
