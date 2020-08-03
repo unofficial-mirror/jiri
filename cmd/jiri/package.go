@@ -33,10 +33,11 @@ var cmdPackage = &cmdline.Command{
 
 // packageInfoOutput defines JSON format for 'project info' output.
 type packageInfoOutput struct {
-	Name     string `json:"name"`
-	Path     string `json:"path"`
-	Version  string `json:"version"`
-	Manifest string `json:"manifest,omitempty"`
+	Name      string   `json:"name"`
+	Path      string   `json:"path"`
+	Version   string   `json:"version"`
+	Manifest  string   `json:"manifest,omitempty"`
+	Platforms []string `json:"platforms,omitempty"`
 }
 
 func init() {
@@ -101,11 +102,22 @@ func runPackageInfo(jirix *jiri.X, args []string) error {
 		tmpl.Execute(&subdirBuf, cipd.FuchsiaPlatform(cipd.CipdPlatform))
 		pkgPath = filepath.Join(jirix.Root, subdirBuf.String())
 
+		platforms, err := pkg.GetPlatforms()
+		if err != nil {
+			return fmt.Errorf("parsing %s platforms failed", pkg.Name)
+		}
+
+		resolvedPlatforms := make([]string, 0, len(platforms))
+		for _, p := range platforms {
+			resolvedPlatforms = append(resolvedPlatforms, p.String())
+		}
+
 		info = append(info, packageInfoOutput{
-			Name:     pkg.Name,
-			Path:     pkgPath,
-			Version:  pkg.Version,
-			Manifest: pkg.ManifestPath,
+			Name:      pkg.Name,
+			Path:      pkgPath,
+			Version:   pkg.Version,
+			Manifest:  pkg.ManifestPath,
+			Platforms: resolvedPlatforms,
 		})
 	}
 
@@ -114,6 +126,7 @@ func runPackageInfo(jirix *jiri.X, args []string) error {
 		fmt.Printf("  Path:     %s\n", i.Path)
 		fmt.Printf("  Version:  %s\n", i.Version)
 		fmt.Printf("  Manifest: %s\n", i.Manifest)
+		fmt.Printf("  Platforms: %v\n", i.Platforms)
 	}
 
 	if jsonOutputFlag != "" {
