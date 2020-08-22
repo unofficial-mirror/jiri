@@ -266,7 +266,7 @@ func updateVersion(manifestContent, tag string, pc packageChanges) (string, erro
 	name := regexp.QuoteMeta(pc.Name)
 	oldVal := regexp.QuoteMeta(pc.OldVer)
 	// Avoid using %q in regex, it behaves differently from regex.QuoteMeta.
-	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s [^<]*?name=\"%s\"(.|\\n)*?version=\"%s\"(.|\\n)*?\\/>", tag, name, oldVal))
+	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s[\\s\\n]+[^<]*?name=\"%s\"(.|\\n)*?version=\"%s\"(.|\\n)*?\\/>", tag, name, oldVal))
 	if err != nil {
 		return "", err
 	}
@@ -282,7 +282,7 @@ func updateVersion(manifestContent, tag string, pc packageChanges) (string, erro
 func updateRevisionOrVersionAttr(manifestContent, tag, newAttrValue, name, attr string) (string, error) {
 	name = regexp.QuoteMeta(name)
 	// Avoid using %q in regex, it behaves differently from regex.QuoteMeta.
-	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s [^<]*?name=\"%s\"(.|\\n)*?\\/>", tag, name))
+	r, err := regexp.Compile(fmt.Sprintf("( *?)<%s[\\s\\n]+[^<]*?name=\"%s\"(.|\\n)*?\\/>", tag, name))
 	if err != nil {
 		return "", err
 	}
