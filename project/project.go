@@ -2056,6 +2056,11 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 			return errCacheCorruption
 		}
 		scm := gitutil.New(jirix, gitutil.RootDirOpt(dir))
+		if jirix.OffloadPackfiles {
+			if err := scm.Config("fetch.uriprotocols", "https"); err != nil {
+				return err
+			}
+		}
 		if err := scm.Config("--remove-section", "remote.origin"); err != nil {
 			jirix.Logger.Warningf("purge git config failed under git cache directory %q due to error: %v", dir, err)
 			return errCacheCorruption
@@ -2165,6 +2170,11 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		}
 
 		git := gitutil.New(jirix, gitutil.RootDirOpt(dir))
+		if jirix.OffloadPackfiles {
+			if err := git.Config("fetch.uriprotocols", "https"); err != nil {
+				return err
+			}
+		}
 		if jirix.Partial {
 			if err := git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 				return err

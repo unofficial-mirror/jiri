@@ -47,6 +47,7 @@ var (
 	prebuiltJSON          string
 	optionalAttrs         string
 	partialFlag           bool
+	offloadPackfilesFlag  bool
 	cipdParanoidFlag      string
 	cipdMaxThreads        int
 )
@@ -70,6 +71,7 @@ func init() {
 	// use empty string to clear existing saved attributes.
 	cmdInit.Flags.StringVar(&optionalAttrs, "fetch-optional", optionalAttrsNotSet, "Set up attributes of optional projects and packages that should be fetched by jiri.")
 	cmdInit.Flags.BoolVar(&partialFlag, "partial", false, "Whether to use a partial checkout.")
+	cmdInit.Flags.BoolVar(&offloadPackfilesFlag, "offload-packfiles", false, "Whether to use a CDN for packfiles if available.")
 	cmdInit.Flags.StringVar(&cipdParanoidFlag, "cipd-paranoid-mode", "", "Whether to use paranoid mode in cipd.")
 	// Default (0) causes CIPD to use as many threads as there are CPUs.
 	cmdInit.Flags.IntVar(&cipdMaxThreads, "cipd-max-threads", 0, "Number of threads to use for unpacking CIPD packages. If zero, uses all CPUs.")
@@ -166,6 +168,10 @@ func runInit(env *cmdline.Env, args []string) error {
 
 	if partialFlag {
 		config.Partial = partialFlag
+	}
+
+	if offloadPackfilesFlag {
+		config.OffloadPackfiles = offloadPackfilesFlag
 	}
 
 	if ssoCookieFlag != "" {

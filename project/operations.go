@@ -102,6 +102,11 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		if err := scm.Config("core.repositoryformatversion", "1"); err != nil {
 			return err
 		}
+		if jirix.OffloadPackfiles {
+			if err := scm.Config("fetch.uriprotocols", "https"); err != nil {
+				return err
+			}
+		}
 		if jirix.Partial {
 			if err := scm.Config("extensions.partialClone", "origin"); err != nil {
 				return err
@@ -150,6 +155,11 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		}
 		if err = clone(jirix, r, op.destination, opts...); err != nil {
 			return err
+		}
+		if jirix.OffloadPackfiles {
+			if err := scm.Config("fetch.uriprotocols", "https"); err != nil {
+				return err
+			}
 		}
 	}
 

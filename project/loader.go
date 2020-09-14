@@ -342,9 +342,14 @@ func (ld *loader) cloneManifestRepo(jirix *jiri.X, remote *Import, cacheDirPath 
 	if err := clone(jirix, remoteUrl, path, opts...); err != nil {
 		return err
 	}
+	scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
+	if jirix.OffloadPackfiles {
+		if err := scm.Config("fetch.uriprotocols", "https"); err != nil {
+			return err
+		}
+	}
 	if jirix.Partial && cacheDirPath != "" {
 		// Set Cache Remote
-		scm := gitutil.New(jirix, gitutil.RootDirOpt(p.Path))
 		if err := scm.Config("extensions.partialClone", "origin"); err != nil {
 			return err
 		}

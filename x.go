@@ -61,6 +61,7 @@ type Config struct {
 	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	Partial           bool   `xml:"partial,omitempty"`
+	OffloadPackfiles  bool   `xml:"offloadPackfiles,omitempty`
 	// version user has opted-in to
 	AnalyticsVersion string `xml:"analytics>version,omitempty"`
 	KeepGitHooks     bool   `xml:"keepGitHooks,omitempty"`
@@ -114,6 +115,7 @@ type X struct {
 	RewriteSsoToHttps   bool
 	LockfileEnabled     bool
 	LockfileName        string
+	OffloadPackfiles    bool
 	SsoCookiePath       string
 	Partial             bool
 	PrebuiltJSON        string
@@ -287,13 +289,11 @@ func NewX(env *cmdline.Env) (*X, error) {
 		if x.PrebuiltJSON == "" {
 			x.PrebuiltJSON = "prebuilt.json"
 		}
-	}
-	x.Cache, err = findCache(root, x.config)
-	if x.config != nil {
 		x.Shared = x.config.Shared
 		x.Partial = x.config.Partial
+		x.OffloadPackfiles = x.config.OffloadPackfiles
 	}
-
+	x.Cache, err = findCache(root, x.config)
 	if err != nil {
 		return nil, err
 	}
