@@ -145,7 +145,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 			opts = append(opts, gitutil.ReferenceOpt(cache))
 		}
 		// Passing --filter=blob:none for a local clone is a no-op.
-		if cache == r && jirix.Partial {
+		if (cache == r || cache == "") && jirix.Partial {
 			opts = append(opts, gitutil.OmitBlobsOpt(true))
 		}
 		if err = clone(jirix, r, op.destination, opts...); err != nil {
