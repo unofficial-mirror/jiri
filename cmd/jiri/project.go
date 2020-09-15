@@ -149,6 +149,12 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 		if err != nil {
 			return err
 		}
+		// filter optional projects
+		// we only need to filter in the remote projects path, otherwise it is only using
+		// projects that already exist on disk.
+		if err := project.FilterOptionalProjectsPackages(jirix, jirix.FetchingAttrs, projects, nil); err != nil {
+			return err
+		}
 	}
 	if len(args) == 0 {
 		currentProject, err := project.CurrentProject(jirix)
@@ -278,12 +284,12 @@ func runProjectInfo(jirix *jiri.X, args []string) error {
 func writeJSONOutput(result interface{}) error {
 	out, err := json.MarshalIndent(&result, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to serialize JSON output: %s\n", err)
+		return fmt.Errorf("failed to serialize JSON output: %s", err)
 	}
 
 	err = ioutil.WriteFile(jsonOutputFlag, out, 0600)
 	if err != nil {
-		return fmt.Errorf("failed write JSON output to %s: %s\n", jsonOutputFlag, err)
+		return fmt.Errorf("failed write JSON output to %s: %s", jsonOutputFlag, err)
 	}
 
 	return nil
