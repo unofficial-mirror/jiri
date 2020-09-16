@@ -204,6 +204,11 @@ func (m *Manifest) fillDefaults() error {
 			return err
 		}
 	}
+	for index := range m.Packages {
+		if err := m.Packages[index].FillDefaults(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -230,6 +235,11 @@ func (m *Manifest) unfillDefaults() error {
 	}
 	for index := range m.ImportOverrides {
 		if err := m.ImportOverrides[index].unfillDefaults(); err != nil {
+			return err
+		}
+	}
+	for index := range m.Packages {
+		if err := m.Packages[index].unfillDefaults(); err != nil {
 			return err
 		}
 	}
@@ -552,14 +562,24 @@ type PackageInstance struct {
 // Package struct if it is not defined and path is using template.
 func (p *Package) FillDefaults() error {
 	if cipd.MustExpand(p.Name) && p.Platforms == "" {
-		for _, v := range cipd.DefaultPlatforms() {
-			p.Platforms += v.String() + ","
-		}
-		if p.Platforms[len(p.Platforms)-1] == ',' {
-			p.Platforms = p.Platforms[:len(p.Platforms)-1]
-		}
+		p.Platforms = p.defaultPlatforms()
 	}
 	return nil
+}
+
+func (p *Package) unfillDefaults() error {
+	if cipd.MustExpand(p.Name) && p.Platforms == p.defaultPlatforms() {
+		p.Platforms = ""
+	}
+	return nil
+}
+
+func (p *Package) defaultPlatforms() string {
+	var platforms []string
+	for _, v := range cipd.DefaultPlatforms() {
+		platforms = append(platforms, v.String())
+	}
+	return strings.Join(platforms, ",")
 }
 
 // GetPath returns the relative path that Package p should be

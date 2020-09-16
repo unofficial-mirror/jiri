@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"fuchsia.googlesource.com/jiri/cipd"
 	"fuchsia.googlesource.com/jiri/jiritest"
 )
 
@@ -41,7 +42,7 @@ func TestManifest(t *testing.T) {
 			historydepth="2"/>
 	</projects>
 	<packages>
-		<package name="the_package"
+		<package name="the_package/${platform}"
 			version="the_package_version"
 			path="path/to/the_package"
 			internal="false" />
@@ -93,7 +94,7 @@ func TestManifest(t *testing.T) {
 
 		// Compare stdout to the expected value.
 		if strings.Trim(stdout, " \n") != expectedValue {
-			t.Errorf("expected %s, got %s", expectedValue, stdout)
+			t.Errorf("expected %q, got %q", expectedValue, stdout)
 		}
 	}
 
@@ -220,28 +221,39 @@ func TestManifest(t *testing.T) {
 
 	t.Run("should read <package> attributes", func(t *testing.T) {
 		expectAttributeValue(t, []string{
-			"-element=the_package",
+			"-element=the_package/${platform}",
 			"-template={{.Name}}",
 			testManifestFile.Name(),
 		},
-			"the_package")
+			"the_package/${platform}")
 
 		expectAttributeValue(t, []string{
-			"-element=the_package",
+			"-element=the_package/${platform}",
 			"-template={{.Version}}",
 			testManifestFile.Name(),
 		},
 			"the_package_version")
 
 		expectAttributeValue(t, []string{
-			"-element=the_package",
+			"-element=the_package/${platform}",
 			"-template={{.Path}}",
 			testManifestFile.Name(),
 		},
 			"path/to/the_package")
 
+		var defaultPlatforms []string
+		for _, p := range cipd.DefaultPlatforms() {
+			defaultPlatforms = append(defaultPlatforms, p.String())
+		}
 		expectAttributeValue(t, []string{
-			"-element=the_package",
+			"-element=the_package/${platform}",
+			"-template={{.Platforms}}",
+			testManifestFile.Name(),
+		},
+			strings.Join(defaultPlatforms, ","))
+
+		expectAttributeValue(t, []string{
+			"-element=the_package/${platform}",
 			"-template={{.Internal}}",
 			testManifestFile.Name(),
 		},
