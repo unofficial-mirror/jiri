@@ -27,13 +27,13 @@ Run git grep across all projects.
 
 var grepFlags struct {
 	cwdRel bool
-	n bool
-	h bool
-	i bool
-	e string
-	l bool
-	L bool
-	w bool
+	n      bool
+	h      bool
+	i      bool
+	e      string
+	l      bool
+	L      bool
+	w      bool
 }
 
 func init() {

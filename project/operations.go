@@ -125,7 +125,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 			if jirix.Partial {
 				objPath = ".git/objects"
 			}
-			if err := ioutil.WriteFile(filepath.Join(op.destination, ".git/objects/info/alternates"), []byte(filepath.Join(cache, objPath) + "\n"), 0644); err != nil {
+			if err := ioutil.WriteFile(filepath.Join(op.destination, ".git/objects/info/alternates"), []byte(filepath.Join(cache, objPath)+"\n"), 0644); err != nil {
 				return err
 			}
 		}
@@ -138,7 +138,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 			r = cache
 			defer func() {
 				if err := scm.AddOrReplaceRemote("origin", remote); err != nil {
-						jirix.Logger.Errorf("failed to set remote back to %v for project %+v", remote, op.project)
+					jirix.Logger.Errorf("failed to set remote back to %v for project %+v", remote, op.project)
 				}
 			}()
 		}

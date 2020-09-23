@@ -12,8 +12,8 @@ import (
 
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/project"
 	"fuchsia.googlesource.com/jiri/jiritest/xtest"
+	"fuchsia.googlesource.com/jiri/project"
 )
 
 // FakeJiriRoot sets up a fake root under a tmp directory.

@@ -2420,7 +2420,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	var wg sync.WaitGroup
 	for _, project := range remoteProjects {
 		wg.Add(1)
-		go func (jirix *jiri.X, project Project) {
+		go func(jirix *jiri.X, project Project) {
 			defer wg.Done()
 			if !(project.LocalConfig.Ignore || project.LocalConfig.NoUpdate) {
 				project.writeJiriRevisionFiles(jirix)
@@ -2428,7 +2428,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 					jirix.Logger.Debugf("set up default push target failed due to error: %v", err)
 				}
 			}
-		} (jirix, project)
+		}(jirix, project)
 	}
 	wg.Wait()
 	jirix.TimerPop()
