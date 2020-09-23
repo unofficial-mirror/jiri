@@ -324,7 +324,7 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 			}
 		case OffloadPackfilesOpt:
 			if typedOpt {
-				args = append([]string{"-c", "fetch.uriprotocols", "https"}, args...)
+				args = append([]string{"-c", "fetch.uriprotocols=https"}, args...)
 			}
 		}
 	}
