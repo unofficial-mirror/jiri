@@ -567,14 +567,17 @@ func overrideImport(jirix *jiri.X, remote Import, projectOverrides map[string]Pr
 	return remote, nil
 }
 
-func cacheDirPathFromRemote(cacheRoot, remote string) (string, error) {
-	if cacheRoot != "" {
+func cacheDirPathFromRemote(jirix *jiri.X, remote string) (string, error) {
+	if jirix.Cache != "" {
 		url, err := url.Parse(remote)
 		if err != nil {
 			return "", err
 		}
 		dirname := url.Host + strings.Replace(strings.Replace(url.Path, "-", "--", -1), "/", "-", -1)
-		referenceDir := filepath.Join(cacheRoot, dirname)
+		referenceDir := filepath.Join(jirix.Cache, dirname)
+		if jirix.Partial {
+			referenceDir = filepath.Join(jirix.Cache, "partial", dirname)
+		}
 		return referenceDir, nil
 	}
 	return "", nil
@@ -583,7 +586,7 @@ func cacheDirPathFromRemote(cacheRoot, remote string) (string, error) {
 // CacheDirPath returns a generated path to a directory that can be used as a reference repo
 // for the given project.
 func (p *Project) CacheDirPath(jirix *jiri.X) (string, error) {
-	return cacheDirPathFromRemote(jirix.Cache, p.Remote)
+	return cacheDirPathFromRemote(jirix, p.Remote)
 
 }
 

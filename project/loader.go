@@ -555,7 +555,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		remote.Name = filepath.Join(nextRoot, remote.Name)
 		key := remote.ProjectKey()
 		p, ok := ld.localProjects[key]
-		cacheDirPath, err := cacheDirPathFromRemote(jirix.Cache, remote.Remote)
+		cacheDirPath, err := cacheDirPathFromRemote(jirix, remote.Remote)
 		if err != nil {
 			return err
 		}
