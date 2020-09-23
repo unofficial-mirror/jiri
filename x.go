@@ -61,7 +61,7 @@ type Config struct {
 	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
 	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
 	Partial           bool   `xml:"partial,omitempty"`
-	OffloadPackfiles  bool   `xml:"offloadPackfiles,omitempty`
+	OffloadPackfiles  bool   `xml:"offloadPackfiles,omitempty"`
 	// version user has opted-in to
 	AnalyticsVersion string `xml:"analytics>version,omitempty"`
 	KeepGitHooks     bool   `xml:"keepGitHooks,omitempty"`
