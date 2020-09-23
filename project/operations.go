@@ -153,6 +153,9 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		if (cache == r || cache == "") && jirix.Partial {
 			opts = append(opts, gitutil.OmitBlobsOpt(true))
 		}
+		if jirix.OffloadPackfiles {
+			opts = append(opts, gitutil.OffloadPackfilesOpt(true))
+		}
 		if err = clone(jirix, r, op.destination, opts...); err != nil {
 			return err
 		}

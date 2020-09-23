@@ -2165,6 +2165,9 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		} else {
 			opts = append(opts, gitutil.BareOpt(true))
 		}
+		if jirix.OffloadPackfiles {
+			opts = append(opts, gitutil.OffloadPackfilesOpt(true))
+		}
 		if err := gitutil.New(jirix).Clone(remote, dir, opts...); err != nil {
 			return err
 		}
