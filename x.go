@@ -48,20 +48,21 @@ const (
 
 // Config represents jiri global config
 type Config struct {
-	CachePath         string `xml:"cache>path,omitempty"`
-	CipdParanoidMode  string `xml:"cipd_paranoid_mode,omitempty"`
-	CipdMaxThreads    int    `xml:"cipd_max_threads,omitempty"`
-	Shared            bool   `xml:"cache>shared,omitempty"`
-	RewriteSsoToHttps bool   `xml:"rewriteSsoToHttps,omitempty"`
-	SsoCookiePath     string `xml:"SsoCookiePath,omitempty"`
-	LockfileEnabled   string `xml:"lockfile>enabled,omitempty"`
-	LockfileName      string `xml:"lockfile>name,omitempty"`
-	PrebuiltJSON      string `xml:"prebuilt>JSON,omitempty"`
-	FetchingAttrs     string `xml:"fetchingAttrs,omitempty"`
-	AnalyticsOptIn    string `xml:"analytics>optin,omitempty"`
-	AnalyticsUserId   string `xml:"analytics>userId,omitempty"`
-	Partial           bool   `xml:"partial,omitempty"`
-	OffloadPackfiles  bool   `xml:"offloadPackfiles,omitempty"`
+	CachePath         string   `xml:"cache>path,omitempty"`
+	CipdParanoidMode  string   `xml:"cipd_paranoid_mode,omitempty"`
+	CipdMaxThreads    int      `xml:"cipd_max_threads,omitempty"`
+	Shared            bool     `xml:"cache>shared,omitempty"`
+	RewriteSsoToHttps bool     `xml:"rewriteSsoToHttps,omitempty"`
+	SsoCookiePath     string   `xml:"SsoCookiePath,omitempty"`
+	LockfileEnabled   string   `xml:"lockfile>enabled,omitempty"`
+	LockfileName      string   `xml:"lockfile>name,omitempty"`
+	PrebuiltJSON      string   `xml:"prebuilt>JSON,omitempty"`
+	FetchingAttrs     string   `xml:"fetchingAttrs,omitempty"`
+	AnalyticsOptIn    string   `xml:"analytics>optin,omitempty"`
+	AnalyticsUserId   string   `xml:"analytics>userId,omitempty"`
+	Partial           bool     `xml:"partial,omitempty"`
+	PartialSkip       []string `xml:"partialSkip,omitempty"`
+	OffloadPackfiles  bool     `xml:"offloadPackfiles,omitempty"`
 	// version user has opted-in to
 	AnalyticsVersion string `xml:"analytics>version,omitempty"`
 	KeepGitHooks     bool   `xml:"keepGitHooks,omitempty"`
@@ -118,6 +119,7 @@ type X struct {
 	OffloadPackfiles    bool
 	SsoCookiePath       string
 	Partial             bool
+	PartialSkip         []string
 	PrebuiltJSON        string
 	FetchingAttrs       string
 	UsingSnapshot       bool
@@ -152,6 +154,18 @@ func (jirix *X) RunCleanup() {
 		// defer so that cleanups are executed in LIFO order
 		defer fn()
 	}
+}
+
+func (jirix *X) UsePartialClone(remote string) bool {
+	if jirix.Partial {
+		for _, r := range jirix.PartialSkip {
+			if remote == r {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 var (
@@ -291,6 +305,7 @@ func NewX(env *cmdline.Env) (*X, error) {
 		}
 		x.Shared = x.config.Shared
 		x.Partial = x.config.Partial
+		x.PartialSkip = x.config.PartialSkip
 		x.OffloadPackfiles = x.config.OffloadPackfiles
 	}
 	x.Cache, err = findCache(root, x.config)

@@ -107,7 +107,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 				return err
 			}
 		}
-		if jirix.Partial {
+		if jirix.UsePartialClone(op.project.Remote) {
 			if err := scm.Config("extensions.partialClone", "origin"); err != nil {
 				return err
 			}
@@ -122,7 +122,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 		}
 		if cache != "" {
 			objPath := "objects"
-			if jirix.Partial {
+			if jirix.UsePartialClone(op.project.Remote) {
 				objPath = ".git/objects"
 			}
 			if err := ioutil.WriteFile(filepath.Join(op.destination, ".git/objects/info/alternates"), []byte(filepath.Join(cache, objPath)+"\n"), 0644); err != nil {
@@ -150,7 +150,7 @@ func (op createOperation) checkoutProject(jirix *jiri.X, cache string) error {
 			opts = append(opts, gitutil.ReferenceOpt(cache))
 		}
 		// Passing --filter=blob:none for a local clone is a no-op.
-		if (cache == r || cache == "") && jirix.Partial {
+		if (cache == r || cache == "") && jirix.UsePartialClone(op.project.Remote) {
 			opts = append(opts, gitutil.OmitBlobsOpt(true))
 		}
 		if jirix.OffloadPackfiles {

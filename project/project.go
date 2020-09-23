@@ -575,7 +575,7 @@ func cacheDirPathFromRemote(jirix *jiri.X, remote string) (string, error) {
 		}
 		dirname := url.Host + strings.Replace(strings.Replace(url.Path, "-", "--", -1), "/", "-", -1)
 		referenceDir := filepath.Join(jirix.Cache, dirname)
-		if jirix.Partial {
+		if jirix.UsePartialClone(remote) {
 			referenceDir = filepath.Join(jirix.Cache, "partial", dirname)
 		}
 		return referenceDir, nil
@@ -2048,7 +2048,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 	updateCache := func() error {
 		// Test if git cache is intact
 		var objectsDir string
-		if jirix.Partial {
+		if jirix.UsePartialClone(remote) {
 			// Partial clones do not use --bare so objects is in .git/
 			objectsDir = filepath.Join(dir, ".git", "objects")
 		} else {
@@ -2076,7 +2076,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 			jirix.Logger.Warningf("set remote.origin.fetch failed under git cache directory %q due to error: %v", dir, err)
 			return errCacheCorruption
 		}
-		if jirix.Partial {
+		if jirix.UsePartialClone(remote) {
 			if err := scm.AddOrReplacePartialRemote("origin", remote); err != nil {
 				return err
 			}
@@ -2088,7 +2088,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		defer t.Done()
 		// Cache already present, update it
 		// TODO : update this after implementing FetchAll using g
-		if scm.IsRevAvailable(jirix, revision) {
+		if scm.IsRevAvailable(jirix, remote, revision) {
 			jirix.Logger.Debugf("%s(%s) cache up-to-date; skipping\n", remote, dir)
 			return nil
 		}
@@ -2102,7 +2102,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 				gitutil.DepthOpt(depth), gitutil.PruneOpt(true), gitutil.UpdateShallowOpt(true), gitutil.UpdateHeadOkOpt(true)); err != nil {
 				return err
 			}
-			if jirix.Partial {
+			if jirix.UsePartialClone(remote) {
 				if err := scm.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 					return err
 				}
@@ -2152,7 +2152,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		defer t.Done()
 		// Try use clone.bundle to speed up the initialization of git cache.
 		os.MkdirAll(dir, 0755)
-		if !jirix.Partial {
+		if !jirix.UsePartialClone(remote) {
 			if err := createCacheThroughBundle(); err != nil {
 				jirix.Logger.Debugf("create git cache for %q through clone.bundle failed due to error: %v", remote, err)
 				os.RemoveAll(dir)
@@ -2163,7 +2163,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		}
 
 		opts := []gitutil.CloneOpt{gitutil.DepthOpt(depth)}
-		if jirix.Partial {
+		if jirix.UsePartialClone(remote) {
 			opts = append(opts, gitutil.NoCheckoutOpt(true), gitutil.OmitBlobsOpt(true))
 		} else {
 			opts = append(opts, gitutil.BareOpt(true))
@@ -2181,7 +2181,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 				return err
 			}
 		}
-		if jirix.Partial {
+		if jirix.UsePartialClone(remote) {
 			if err := git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 				return err
 			}

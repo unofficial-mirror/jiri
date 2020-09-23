@@ -241,13 +241,13 @@ func (g *Git) GetAllBranchesInfo() ([]Branch, error) {
 }
 
 // IsRevAvailable checks if a commit hash is available locally.
-func (g *Git) IsRevAvailable(jirix *jiri.X, rev string) bool {
+func (g *Git) IsRevAvailable(jirix *jiri.X, remote, rev string) bool {
 	// If it wants HEAD, always fetch.
 	if rev == "HEAD" {
 		return false
 	}
 	// Ensure the revision is present.
-	if jirix.Partial {
+	if jirix.UsePartialClone(remote) {
 		currentRevision, err := g.CurrentRevision()
 		if err != nil {
 			jirix.Logger.Errorf("could not get current revision\n")
