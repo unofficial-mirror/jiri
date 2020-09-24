@@ -72,7 +72,7 @@ func init() {
 	// use empty string to clear existing saved attributes.
 	cmdInit.Flags.StringVar(&optionalAttrs, "fetch-optional", optionalAttrsNotSet, "Set up attributes of optional projects and packages that should be fetched by jiri.")
 	cmdInit.Flags.BoolVar(&partialFlag, "partial", false, "Whether to use a partial checkout.")
-	cmdInit.Flags.Var(&partialSkipFlag, "partialSkip", "Skip using partial checkouts for these remotes.")
+	cmdInit.Flags.Var(&partialSkipFlag, "skip-partial", "Skip using partial checkouts for these remotes.")
 	cmdInit.Flags.BoolVar(&offloadPackfilesFlag, "offload-packfiles", false, "Whether to use a CDN for packfiles if available.")
 	cmdInit.Flags.StringVar(&cipdParanoidFlag, "cipd-paranoid-mode", "", "Whether to use paranoid mode in cipd.")
 	// Default (0) causes CIPD to use as many threads as there are CPUs.
