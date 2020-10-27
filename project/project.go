@@ -1754,10 +1754,8 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 	}
 	jirix.Logger.Debugf("Checkout %s to head revision %s failed, fallback to fetch: %v", project.Name, revision, err)
 	if project.Revision != "" && project.Revision != "HEAD" {
-		//might be a tag
-		if err2 := fetch(jirix, project.Path, "origin", gitutil.FetchTagOpt(project.Revision)); err2 != nil {
-			// error while fetching tag, return original err and debug log this err
-			return fmt.Errorf("error while fetching tag after failed to checkout revision %s for project %s (%s): %s\ncheckout error: %v", revision, project.Name, project.Path, err2, err)
+		if err2 := git.FetchRefspec("origin", project.Revision); err2 != nil {
+			return fmt.Errorf("error while fetching after failed to checkout revision %s for project %s (%s): %s\ncheckout error: %v", revision, project.Name, project.Path, err2, err)
 		}
 		return git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
 	}
