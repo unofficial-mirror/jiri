@@ -2154,7 +2154,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 		if err := git.Config("uploadpack.allowFilter", "true"); err != nil {
 			return err
 		}
-		return nil
+		return updateCache()
 	}
 
 	if isPathDir(dir) {
