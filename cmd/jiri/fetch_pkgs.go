@@ -44,11 +44,10 @@ func runFetchPkgs(jirix *jiri.X, args []string) (err error) {
 
 	// Get pkgs.
 	var pkgs project.Packages
-	var projs project.Projects
 	if !fetchPkgsFlags.localManifest {
-		projs, _, pkgs, err = project.LoadUpdatedManifest(jirix, localProjects, fetchPkgsFlags.localManifest)
+		_, _, pkgs, err = project.LoadUpdatedManifest(jirix, localProjects, fetchPkgsFlags.localManifest)
 	} else {
-		projs, _, pkgs, err = project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, fetchPkgsFlags.localManifest)
+		_, _, pkgs, err = project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, fetchPkgsFlags.localManifest)
 	}
 	if err != nil {
 		return err
@@ -57,7 +56,7 @@ func runFetchPkgs(jirix *jiri.X, args []string) (err error) {
 		return err
 	}
 	if len(pkgs) > 0 {
-		return project.FetchPackages(jirix, projs, pkgs, fetchPkgsFlags.fetchPkgsTimeout)
+		return project.FetchPackages(jirix, pkgs, fetchPkgsFlags.fetchPkgsTimeout)
 	}
 	return nil
 }

@@ -45,13 +45,12 @@ func runHooks(jirix *jiri.X, args []string) (err error) {
 	jirix.Attempts = runHooksFlags.attempts
 
 	// Get hooks.
-	var projs project.Projects
 	var hooks project.Hooks
 	var pkgs project.Packages
 	if !runHooksFlags.localManifest {
-		projs, hooks, pkgs, err = project.LoadUpdatedManifest(jirix, localProjects, runHooksFlags.localManifest)
+		_, hooks, pkgs, err = project.LoadUpdatedManifest(jirix, localProjects, runHooksFlags.localManifest)
 	} else {
-		projs, hooks, pkgs, err = project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
+		_, hooks, pkgs, err = project.LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, runHooksFlags.localManifest)
 	}
 	if err != nil {
 		return err
@@ -65,7 +64,7 @@ func runHooks(jirix *jiri.X, args []string) (err error) {
 	// Get packages if the fetchPackages is true
 	if runHooksFlags.fetchPackages && len(pkgs) > 0 {
 		// Extend timeout for packages to be 5 times the timeout of a single hook.
-		return project.FetchPackages(jirix, projs, pkgs, runHooksFlags.hookTimeout*5)
+		return project.FetchPackages(jirix, pkgs, runHooksFlags.hookTimeout*5)
 	}
 	return nil
 }

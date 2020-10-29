@@ -19,7 +19,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"text/template"
@@ -794,52 +793,9 @@ func LoadUpdatedManifest(jirix *jiri.X, localProjects Projects, localManifest bo
 	return ld.Projects, ld.Hooks, ld.Packages, nil
 }
 
-// ResolveImplicitPackageVersions resolves the version field of packages if it
-// pins to a project's revision hash
-func ResolveImplicitPackageVersions(jirix *jiri.X, projects Projects, pkgs Packages) (Packages, error) {
-	// Example:
-	// <package name="fuchsia/dart-sdk/${platform}"
-	//          path="third_party/dart/tools/sdks/dart-sdk"
-	//          version="git_revision:{{(index .Projects &quot;dart/sdk&quot;).Revision}}"/>
-	// The fuchsia/dart-sdk package is pinned to current dart/sdk project's Revision
-	templateRE := regexp.MustCompile(`{{[^}]*}}`)
-	var projMap struct {
-		Projects map[string]Project
-	}
-	retPkgs := make(Packages)
-	for k, v := range pkgs {
-		retPkgs[k] = v
-	}
-	projMap.Projects = make(map[string]Project)
-	for _, proj := range projects {
-		if v, ok := projMap.Projects[proj.Name]; ok {
-			// Just a warning since jiri could handle projects with duplicated names.
-			jirix.Logger.Warningf("Found more than 1 projects have the same name: %+v:%+v", proj, v)
-		}
-		projMap.Projects[proj.Name] = proj
-	}
-
-	for _, pkg := range pkgs {
-		if !templateRE.MatchString(pkg.Version) {
-			continue
-		}
-		tpl, err := template.New("version").Parse(pkg.Version)
-		if err != nil {
-			return nil, err
-		}
-		var verBuf bytes.Buffer
-		if err := tpl.Execute(&verBuf, &projMap); err != nil {
-			return nil, err
-		}
-		pkg.Version = verBuf.String()
-		retPkgs[pkg.Key()] = pkg
-	}
-	return retPkgs, nil
-}
-
 // resovlePackageLocks resolves instance ids using versions described in given
 // pkgs using cipd.
-func resolvePackageLocks(jirix *jiri.X, projects Projects, pkgs Packages) (PackageLocks, error) {
+func resolvePackageLocks(jirix *jiri.X, pkgs Packages) (PackageLocks, error) {
 	jirix.TimerPush("resolve instance id for cipd packages")
 	defer jirix.TimerPop()
 
@@ -848,7 +804,7 @@ func resolvePackageLocks(jirix *jiri.X, projects Projects, pkgs Packages) (Packa
 		return nil, err
 	}
 
-	ensureFilePath, err := generateEnsureFile(jirix, projects, pkgs, false)
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -885,7 +841,7 @@ func resolveProjectLocks(jirix *jiri.X, projects Projects) (ProjectLocks, error)
 
 // FetchPackages fetches prebuilt packages described in given pkgs using cipd.
 // Parameter fetchTimeout is in minutes.
-func FetchPackages(jirix *jiri.X, projects Projects, pkgs Packages, fetchTimeout uint) error {
+func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	jirix.TimerPush("fetch cipd packages")
 	defer jirix.TimerPop()
 
@@ -894,7 +850,7 @@ func FetchPackages(jirix *jiri.X, projects Projects, pkgs Packages, fetchTimeout
 		return err
 	}
 
-	ensureFilePath, err := generateEnsureFile(jirix, projects, pkgsWAccess, !jirix.LockfileEnabled || jirix.UsingSnapshot)
+	ensureFilePath, err := generateEnsureFile(jirix, pkgsWAccess, !jirix.LockfileEnabled || jirix.UsingSnapshot)
 	if err != nil {
 		return err
 	}
@@ -1008,11 +964,7 @@ func writePackageJSON(jirix *jiri.X, access bool) error {
 	return ioutil.WriteFile(filepath.Join(jirix.RootMetaDir(), jirix.PrebuiltJSON), jsonData, 0644)
 }
 
-func generateEnsureFile(jirix *jiri.X, projects Projects, pkgs Packages, ignoreCryptoCheck bool) (string, error) {
-	pkgs, err := ResolveImplicitPackageVersions(jirix, projects, pkgs)
-	if err != nil {
-		return "", err
-	}
+func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (string, error) {
 	ensureFile, err := ioutil.TempFile("", "jiri*.ensure")
 	if err != nil {
 		return "", fmt.Errorf("not able to create tmp file: %v", err)

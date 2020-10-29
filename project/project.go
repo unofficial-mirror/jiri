@@ -1279,7 +1279,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 					delete(pkgsWithMultiVersionsMap, k)
 				}
 			}
-			pkgLocks, err = resolvePackageLocks(jirix, projects, pkgsToProcess)
+			pkgLocks, err = resolvePackageLocks(jirix, pkgsToProcess)
 			if err != nil {
 				return
 			}
@@ -2437,7 +2437,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 	if shouldFetchPkgs {
 		packageFetched = true
 		if len(pkgs) > 0 {
-			if err := FetchPackages(jirix, remoteProjects, pkgs, fetchTimeout); err != nil {
+			if err := FetchPackages(jirix, pkgs, fetchTimeout); err != nil {
 				return err
 			}
 		}
