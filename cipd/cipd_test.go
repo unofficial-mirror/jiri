@@ -202,6 +202,70 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 	}
 }
 
+func TestEnsureFileVerify(t *testing.T) {
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	if err != nil {
+		t.Errorf("bootstrap failed due to error: %v", err)
+	}
+	defer os.Remove(cipdPath)
+	// Write test ensure file
+	testEnsureFile, err := ioutil.TempFile("", "test_jiri*.ensure")
+	if err != nil {
+		t.Errorf("failed to create test ensure file: %v", err)
+	}
+	defer testEnsureFile.Close()
+	defer os.Remove(testEnsureFile.Name())
+	_, err = testEnsureFile.Write([]byte(`
+$ParanoidMode CheckPresence
+$VerifiedPlatform linux-amd64
+$VerifiedPlatform mac-amd64
+
+# GN
+gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
+`))
+	if err != nil {
+		t.Errorf("failed to write test ensure file: %v", err)
+	}
+	testEnsureFile.Sync()
+	if err := EnsureFileVerify(fakex, testEnsureFile.Name()); err != nil {
+		t.Error("ensure file failed verification")
+	}
+}
+
+func TestEnsureFileVerifyInvalid(t *testing.T) {
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
+	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	if err != nil {
+		t.Errorf("bootstrap failed due to error: %v", err)
+	}
+	defer os.Remove(cipdPath)
+	// Write test ensure file
+	testEnsureFile, err := ioutil.TempFile("", "test_jiri*.ensure")
+	if err != nil {
+		t.Errorf("failed to create test ensure file: %v", err)
+	}
+	defer testEnsureFile.Close()
+	defer os.Remove(testEnsureFile.Name())
+	_, err = testEnsureFile.Write([]byte(`
+$ParanoidMode CheckPresence
+$VerifiedPlatform linux-amd64
+$VerifiedPlatform mac-amd64
+
+# GN
+gn/gn/${platform} git_revision:not_a_real_version
+`))
+	if err != nil {
+		t.Errorf("failed to write test ensure file: %v", err)
+	}
+	testEnsureFile.Sync()
+	if err := EnsureFileVerify(fakex, testEnsureFile.Name()); err == nil {
+		t.Error("ensure file passed verification, should have failed")
+	}
+}
+
 func TestCheckACL(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()

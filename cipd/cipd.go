@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"fuchsia.googlesource.com/jiri"
+	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/log"
 	"fuchsia.googlesource.com/jiri/version"
 	"golang.org/x/sync/semaphore"
@@ -60,6 +61,7 @@ windows-386     sha256  59c6d695a24973ef42e731e86fb055827df4f3e060481605e36c6e2d
 windows-amd64   sha256  1d26180a78ac11c5a940e7f7a26cdf483cf81ccf0e98e29007932a2eb7d621e0
 `
 	cipdNotLoggedInStr = "Not logged in"
+	cipdManifestInvalidErr = cmdline.ErrExitCode(25)
 )
 
 var (
@@ -429,6 +431,40 @@ func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
 		err = ctx.Err()
 	}
 	return err
+}
+
+func EnsureFileVerify(jirix *jiri.X, file string) error {
+	cipdPath, err := Bootstrap(jirix.CIPDPath())
+	if err != nil {
+		return err
+	}
+	args := []string{
+		"ensure-file-verify",
+		"-ensure-file", file,
+	}
+	// If jiri is *not* running with -v, use the less verbose cipd "warning"
+	// log-level.
+	if jirix.Logger.LoggerLevel < log.DebugLevel {
+		args = append(args, "-log-level", "warning")
+	}
+
+	task := jirix.Logger.AddTaskMsg("Verifying CIPD ensure file")
+	defer task.Done()
+	jirix.Logger.Debugf("Invoke cipd with %v", args)
+
+	// Construct arguments and invoke cipd for ensure file
+	command := exec.Command(cipdPath, args...)
+	// Add User-Agent info for cipd
+	command.Env = append(os.Environ(), "CIPD_HTTP_USER_AGENT_PREFIX="+getUserAgent())
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+
+	if err := command.Run(); err != nil {
+		return cipdManifestInvalidErr
+	}
+
+	return nil
 }
 
 // TODO: Using PackageLock in project package directly will cause an import
