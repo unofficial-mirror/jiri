@@ -454,13 +454,17 @@ func EnsureFileVerify(jirix *jiri.X, file string) error {
 
 	// Construct arguments and invoke cipd for ensure file
 	command := exec.Command(cipdPath, args...)
+	var stdoutBuf, stderrBuf bytes.Buffer
 	// Add User-Agent info for cipd
 	command.Env = append(os.Environ(), "CIPD_HTTP_USER_AGENT_PREFIX="+getUserAgent())
 	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
+	// Redirect outputs since cipd will print verbose information even
+	// if log-level is set to warning
+	command.Stdout = &stdoutBuf
+	command.Stderr = &stderrBuf
 
 	if err := command.Run(); err != nil {
+		jirix.Logger.Errorf("`cipd ensure-file-verify` failed: stdout: %s\nstderr: %s", stdoutBuf.String(), stderrBuf.String())
 		return cipdManifestInvalidErr
 	}
 
