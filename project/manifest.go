@@ -1091,10 +1091,15 @@ func generateVersionFile(jirix *jiri.X, ensureFile string, pkgs Packages) (strin
 	var versionFileBuf bytes.Buffer
 	// Just pour everything in pkgLocks into version file without matching package
 	// names. cipd will do the matching for us.
-	for _, pkg := range pkgs {
-		jirix.Logger.Debugf("Generate version file using %+v", pkg)
-		for _, ins := range pkg.Instances {
-			decl := fmt.Sprintf("\n%s\n\t%s\n\t%s\n", ins.Name, pkg.Version, ins.ID)
+	pkgKeys := make(PackageKeys, 0, len(pkgs))
+	for k := range pkgs {
+		pkgKeys = append(pkgKeys, k)
+	}
+	sort.Stable(pkgKeys)
+	for _, k := range pkgKeys{
+		jirix.Logger.Debugf("Generate version file using %+v", pkgs[k])
+		for _, ins := range pkgs[k].Instances {
+			decl := fmt.Sprintf("\n%s\n\t%s\n\t%s\n", ins.Name, pkgs[k].Version, ins.ID)
 			versionFileBuf.WriteString(decl)
 		}
 	}
