@@ -857,7 +857,7 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 	defer os.Remove(ensureFilePath)
 
 	if jirix.LockfileEnabled && !jirix.UsingSnapshot {
-		versionFilePath, err := generateVersionFile(jirix, ensureFilePath, pkgs)
+		versionFilePath, err := generateVersionFile(jirix, ensureFilePath, pkgsWAccess)
 		if err != nil {
 			return err
 		}
