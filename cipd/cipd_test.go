@@ -52,6 +52,8 @@ var (
 // TestFetchBinary tests fetchiBinary method by fetching a set of
 // cipd binaries. This test requires network access
 func TestFetchBinary(t *testing.T) {
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
 	tmpDir, err := ioutil.TempDir("", "jiri-test")
 	if err != nil {
 		t.Error("failed to create temp dir for testing")
@@ -69,7 +71,7 @@ func TestFetchBinary(t *testing.T) {
 	for i, test := range tests {
 		for platform, digest := range test.digest {
 			cipdPath := path.Join(tmpDir, "cipd"+platform+test.version)
-			if err := fetchBinary(cipdPath, platform, test.version, digest); err != nil {
+			if err := fetchBinary(fakex, cipdPath, platform, test.version, digest); err != nil {
 				t.Errorf("test %d failed while retrieving cipd binary for platform %q on version %q with digest %q: %v", i, platform, test.version, digest, err)
 			}
 		}
@@ -111,6 +113,8 @@ func TestFetchDigest(t *testing.T) {
 }
 
 func TestSelfUpdate(t *testing.T) {
+	fakex, cleanup := xtest.NewX(t)
+	defer cleanup()
 	tmpDir, err := ioutil.TempDir("", "jiri-test")
 	if err != nil {
 		t.Error("failed to create temp dir for testing")
@@ -118,7 +122,7 @@ func TestSelfUpdate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	// Bootstrap cipd to version A
 	cipdPath := path.Join(tmpDir, "cipd")
-	if err := fetchBinary(cipdPath, CipdPlatform.String(), cipdVersionForTestA, digestMapA[CipdPlatform.String()]); err != nil {
+	if err := fetchBinary(fakex, cipdPath, CipdPlatform.String(), cipdVersionForTestA, digestMapA[CipdPlatform.String()]); err != nil {
 		t.Errorf("failed to bootstrap cipd with version %q: %v", cipdVersionForTestA, err)
 	}
 	// Perform cipd self update to version B
@@ -142,7 +146,7 @@ func TestSelfUpdate(t *testing.T) {
 func TestBootsrap(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if cipdPath == "" {
 		t.Errorf("bootstrap returned an empty path")
 	}
@@ -161,7 +165,7 @@ func TestBootsrap(t *testing.T) {
 func TestEnsure(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -205,7 +209,7 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 func TestEnsureFileVerify(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -237,7 +241,7 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 func TestEnsureFileVerifyInvalid(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -269,7 +273,7 @@ gn/gn/${platform} git_revision:not_a_real_version
 func TestCheckACL(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -295,7 +299,7 @@ func TestCheckACL(t *testing.T) {
 func TestResolve(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}
@@ -414,7 +418,7 @@ func TestDecl(t *testing.T) {
 func TestFloatingRefs(t *testing.T) {
 	fakex, cleanup := xtest.NewX(t)
 	defer cleanup()
-	cipdPath, err := Bootstrap(fakex.CIPDPath())
+	cipdPath, err := Bootstrap(fakex, fakex.CIPDPath())
 	if err != nil {
 		t.Errorf("bootstrap failed due to error: %v", err)
 	}

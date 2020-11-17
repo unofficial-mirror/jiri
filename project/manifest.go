@@ -1092,7 +1092,7 @@ func generateVersionFile(jirix *jiri.X, ensureFile string, pkgs Packages) (strin
 		pkgKeys = append(pkgKeys, k)
 	}
 	sort.Stable(pkgKeys)
-	for _, k := range pkgKeys{
+	for _, k := range pkgKeys {
 		jirix.Logger.Debugf("Generate version file using %+v", pkgs[k])
 		for _, ins := range pkgs[k].Instances {
 			decl := fmt.Sprintf("\n%s\n\t%s\n\t%s\n", ins.Name, pkgs[k].Version, ins.ID)

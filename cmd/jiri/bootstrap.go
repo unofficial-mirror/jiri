@@ -37,7 +37,7 @@ func runBootstrap(env *cmdline.Env, args []string) error {
 			if err != nil {
 				return err
 			}
-			cipdPath, err := cipd.Bootstrap(jirix.CIPDPath())
+			cipdPath, err := cipd.Bootstrap(jirix, jirix.CIPDPath())
 			if err != nil {
 				return err
 			}

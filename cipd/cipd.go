@@ -28,6 +28,7 @@ import (
 	"fuchsia.googlesource.com/jiri"
 	"fuchsia.googlesource.com/jiri/cmdline"
 	"fuchsia.googlesource.com/jiri/log"
+	"fuchsia.googlesource.com/jiri/retry"
 	"fuchsia.googlesource.com/jiri/version"
 	"golang.org/x/sync/semaphore"
 )
@@ -60,7 +61,7 @@ mac-amd64       sha256  7a8105e4e2bc95f2cc3060dcffb44c53391ff7e380f89be276102f61
 windows-386     sha256  59c6d695a24973ef42e731e86fb055827df4f3e060481605e36c6e2d8dfd6ff0
 windows-amd64   sha256  1d26180a78ac11c5a940e7f7a26cdf483cf81ccf0e98e29007932a2eb7d621e0
 `
-	cipdNotLoggedInStr = "Not logged in"
+	cipdNotLoggedInStr     = "Not logged in"
 	cipdManifestInvalidErr = cmdline.ErrExitCode(25)
 )
 
@@ -92,9 +93,9 @@ func init() {
 	CipdPlatform = Platform{cipdOS, cipdArch}
 }
 
-func fetchBinary(binaryPath, platform, version, digest string) error {
+func fetchBinary(jirix *jiri.X, binaryPath, platform, version, digest string) error {
 	cipdURL := fmt.Sprintf("%s/client?platform=%s&version=%s", cipdBackend, platform, version)
-	data, err := fetchFile(cipdURL)
+	data, err := fetchFile(jirix, cipdURL)
 	if err != nil {
 		return err
 	}
@@ -116,7 +117,7 @@ func fetchBinary(binaryPath, platform, version, digest string) error {
 // Bootstrap returns the path of a valid cipd binary. It will fetch cipd from
 // remote if a valid cipd binary is not found. It will update cipd if there
 // is a new version.
-func Bootstrap(binaryPath string) (string, error) {
+func Bootstrap(jirix *jiri.X, binaryPath string) (string, error) {
 	cipdBinary = binaryPath
 	bootstrap := func() error {
 		// Fetch cipd digest
@@ -130,7 +131,7 @@ func Bootstrap(binaryPath string) (string, error) {
 		if err != nil {
 			return err
 		}
-		return fetchBinary(cipdBinary, CipdPlatform.String(), cipdVersion, cipdDigest)
+		return fetchBinary(jirix, cipdBinary, CipdPlatform.String(), cipdVersion, cipdDigest)
 	}
 
 	getCipd := func() (string, error) {
@@ -264,19 +265,30 @@ func getUserAgent() string {
 	return ua
 }
 
-func fetchFile(url string) ([]byte, error) {
+func fetchFile(jirix *jiri.X, url string) ([]byte, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", getUserAgent())
-	resp, err := client.Do(req)
-	if err != nil {
+	var contents []byte
+	if err := retry.Function(jirix, func() error {
+		resp, err := client.Do(req)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode >= 400 {
+			return fmt.Errorf("got non-success response: %s", resp.Status)
+		}
+		contents, err = ioutil.ReadAll(resp.Body)
+		return err
+	}, fmt.Sprintf("bootstrapping cipd binary"), retry.AttemptsOpt(jirix.Attempts)); err != nil {
+		jirix.Logger.Errorf("error: failed to download cipd client: %v\n", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
+	return contents, nil
 }
 
 type packageACL struct {
@@ -310,7 +322,7 @@ func checkPackageACL(jirix *jiri.X, cipdPath, jsonDir string, c chan<- packageAC
 	command.Stderr = &stderrBuf
 	// Return false if cipd cannot be executed or output jsonfile contains false.
 	if err := command.Run(); err != nil {
-		jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stderrBuf.String())
+		jirix.Logger.Debugf("Error while executing cipd, err: %q, stderr: %q", err, stderrBuf.String())
 		c <- packageACL{path: cipdPath, access: false}
 		return
 	}
@@ -346,7 +358,7 @@ func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool) error {
 	// Not declared as CheckPackageACL(jirix *jiri.X, pkgs map[*package.Package]bool)
 	// due to import cycles. Package jiri/package imports jiri/cipd so here we cannot
 	// import jiri/package.
-	if _, err := Bootstrap(jirix.CIPDPath()); err != nil {
+	if _, err := Bootstrap(jirix, jirix.CIPDPath()); err != nil {
 		return err
 	}
 
@@ -372,7 +384,7 @@ func CheckPackageACL(jirix *jiri.X, pkgs map[string]bool) error {
 // if login information is found or return false if login information is not
 // found.
 func CheckLoggedIn(jirix *jiri.X) (bool, error) {
-	cipdPath, err := Bootstrap(jirix.CIPDPath())
+	cipdPath, err := Bootstrap(jirix, jirix.CIPDPath())
 	if err != nil {
 		return false, err
 	}
@@ -395,7 +407,7 @@ func CheckLoggedIn(jirix *jiri.X) (bool, error) {
 // Ensure runs cipd binary's ensure functionality over file. Fetched packages will be
 // saved to projectRoot directory. Parameter timeout is in minutes.
 func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
-	cipdPath, err := Bootstrap(jirix.CIPDPath())
+	cipdPath, err := Bootstrap(jirix, jirix.CIPDPath())
 	if err != nil {
 		return err
 	}
@@ -434,7 +446,7 @@ func Ensure(jirix *jiri.X, file, projectRoot string, timeout uint) error {
 }
 
 func EnsureFileVerify(jirix *jiri.X, file string) error {
-	cipdPath, err := Bootstrap(jirix.CIPDPath())
+	cipdPath, err := Bootstrap(jirix, jirix.CIPDPath())
 	if err != nil {
 		return err
 	}
@@ -485,7 +497,7 @@ type PackageInstance struct {
 // Resolve runs cipd binary's ensure-file-resolve functionality over file.
 // It returns a slice containing resolved packages and cipd instance ids.
 func Resolve(jirix *jiri.X, file string) ([]PackageInstance, error) {
-	cipdPath, err := Bootstrap(jirix.CIPDPath())
+	cipdPath, err := Bootstrap(jirix, jirix.CIPDPath())
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +614,7 @@ type packageFloatingRef struct {
 // CheckFloatingRefs determines if pkgs contains a floating ref which shouldn't
 // be used normally.
 func CheckFloatingRefs(jirix *jiri.X, pkgs map[PackageInstance]bool, plats map[PackageInstance][]Platform) error {
-	if _, err := Bootstrap(jirix.CIPDPath()); err != nil {
+	if _, err := Bootstrap(jirix, jirix.CIPDPath()); err != nil {
 		return err
 	}
 
