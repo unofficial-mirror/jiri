@@ -46,10 +46,10 @@ func init() {
 	cmdPatch.Flags.BoolVar(&detachedHeadFlag, "no-branch", false, `Don't create the branch for the patch.`)
 }
 
-// Use a special exit code to signal that we failed due to a rebase error.
-// The recipes will use this to detect when the failure should be considered
-// an infrastructure failure vs a failure that is addressable by the user.
-// Rebase errors are addressable by the user.
+// Use special address codes for errors that are addressable by the user. The
+// recipes will use this to detect when the failure should be considered an
+// infrastructure failure vs a failure that is addressable by the user.
+const noSuchProjectErr = cmdline.ErrExitCode(23)
 const rebaseFailedErr = cmdline.ErrExitCode(24)
 
 // cmdPatch represents the "jiri patch" command.
@@ -64,10 +64,10 @@ patchset will be used, or the the full reference. By default patch will be
 checked-out on a new branch.
 
 A new branch will be created to apply the patch to. The default name of this
-branch is "change/<changeset>/<patchset>", but this can be overriden using the
--branch flag. The command will fail if the branch already exists. The -delete
-flag will delete the branch if already exists. Use the -force flag to force
-deleting the branch even if it contains unmerged changes).
+branch is "change/<changeset>/<patchset>", but this can be overridden using
+the -branch flag. The command will fail if the branch already exists. The
+-delete flag will delete the branch if already exists. Use the -force flag to
+force deleting the branch even if it contains unmerged changes).
 
 if -topic flag is true jiri will fetch whole topic and will try to apply to
 individual projects. Patch will assume topic is of form {USER}-{BRANCH} and
@@ -322,7 +322,8 @@ func runPatch(jirix *jiri.X, args []string) error {
 		}
 		p = findProject(jirix, patchProjectFlag, projects, host, hostUrl, changeRef)
 		if p == nil {
-			return fmt.Errorf("Cannot find project for %q", patchProjectFlag)
+			jirix.Logger.Errorf("Cannot find project for %q", patchProjectFlag)
+			return noSuchProjectErr
 		}
 		// TODO: TO-592 - remove this hardcode
 		if p.RemoteBranch != "" {
