@@ -873,7 +873,14 @@ func (g *Git) HasUntrackedFiles() (bool, error) {
 // Init initializes a new git repository.
 func (g *Git) Init(path string, opts ...CloneOpt) error {
 	// TODO(fxb/65012): Add default branch detection in jiri.
-	args := []string{"init", "--initial-branch=master"}
+	args := []string{"init"}
+	major, minor, err := g.Version()
+	if err != nil {
+		return err
+	}
+	if major >= 2 && minor >= 28 {
+		args = append(args, "--initial-branch=master")
+	}
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case BareOpt:
