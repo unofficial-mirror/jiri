@@ -408,6 +408,21 @@ func (p PackageLock) Key() PackageLockKey {
 	return PackageLockKey(p.PackageName + KeySeparator + p.VersionTag)
 }
 
+// LockEqual determines whether current PackageLock has same version and
+// instance id with PackageLock O.
+func (P PackageLock) LockEqual(O PackageLock) bool {
+	if P.PackageName != O.PackageName {
+		return false
+	}
+	if P.VersionTag != O.VersionTag {
+		return false
+	}
+	if P.InstanceID != O.InstanceID {
+		return false
+	}
+	return true
+}
+
 // ResolveConfig interface provides the configuration
 // for jiri resolve command.
 type ResolveConfig interface {
