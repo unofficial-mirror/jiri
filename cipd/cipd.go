@@ -61,7 +61,7 @@ mac-amd64       sha256  7a8105e4e2bc95f2cc3060dcffb44c53391ff7e380f89be276102f61
 windows-386     sha256  59c6d695a24973ef42e731e86fb055827df4f3e060481605e36c6e2d8dfd6ff0
 windows-amd64   sha256  1d26180a78ac11c5a940e7f7a26cdf483cf81ccf0e98e29007932a2eb7d621e0
 `
-	cipdNotLoggedInStr     = "Not logged in"
+	exitCodeNoValidToken   = 1
 	cipdManifestInvalidErr = cmdline.ErrExitCode(25)
 )
 
@@ -396,10 +396,10 @@ func CheckLoggedIn(jirix *jiri.X) (bool, error) {
 	if err := command.Run(); err != nil {
 		stdErrMsg := strings.TrimSpace(stderrBuf.String())
 		jirix.Logger.Debugf("Error happend while executing cipd, err: %q, stderr: %q", err, stdErrMsg)
-		if _, ok := err.(*exec.ExitError); ok && stdErrMsg == cipdNotLoggedInStr {
+		if err, ok := err.(*exec.ExitError); ok && err.ExitCode() == exitCodeNoValidToken {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("failed to check `cipd auth-info`: %w", err)
 	}
 	return true, nil
 }
