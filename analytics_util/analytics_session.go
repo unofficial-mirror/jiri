@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"fuchsia.googlesource.com/jiri/version"
+	"go.fuchsia.dev/jiri/version"
 )
 
 var Version = "1.0v"
@@ -206,7 +206,7 @@ func (as *AnalyticsSession) SendAllAndWaitToFinish() {
 		return
 	}
 	as.lock.Lock()
-	for k, _ := range as.objects {
+	for k := range as.objects {
 		as.Send(k)
 	}
 	as.lock.Unlock()

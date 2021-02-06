@@ -14,11 +14,11 @@ import (
 	"strings"
 	"sync"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/gerrit"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cmdline"
+	"go.fuchsia.dev/jiri/gerrit"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/project"
 )
 
 var branchFlags struct {
@@ -84,7 +84,7 @@ func displayProjects(jirix *jiri.X, branch string) error {
 		return err
 	}
 	var keys project.ProjectKeys
-	for key, _ := range states {
+	for key := range states {
 		keys = append(keys, key)
 	}
 	sort.Sort(keys)
@@ -232,7 +232,7 @@ func deleteMergedBranches(jirix *jiri.X, branchToDelete string, deleteMergedCls 
 	}
 
 	workQueue := make(chan project.ProjectKey, len(states))
-	for key, _ := range states {
+	for key := range states {
 		workQueue <- key
 	}
 	close(workQueue)
@@ -487,7 +487,7 @@ func deleteBranches(jirix *jiri.X, branchToDelete string) error {
 	errors := false
 	projectFound := false
 	var keys project.ProjectKeys
-	for key, _ := range states {
+	for key := range states {
 		keys = append(keys, key)
 	}
 	sort.Sort(keys)

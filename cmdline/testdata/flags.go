@@ -7,7 +7,7 @@ package main
 import (
 	"fmt"
 
-	"fuchsia.googlesource.com/jiri/cmdline"
+	"go.fuchsia.dev/jiri/cmdline"
 )
 
 // cmdFlags represents the flags command.

@@ -20,8 +20,8 @@ import (
 	"strings"
 	"syscall"
 
-	"fuchsia.googlesource.com/jiri/osutil"
-	"fuchsia.googlesource.com/jiri/version"
+	"go.fuchsia.dev/jiri/osutil"
+	"go.fuchsia.dev/jiri/version"
 )
 
 const (

@@ -29,7 +29,7 @@
 // an init function to accomplish this:
 //
 //   package mypkg
-//   import "fuchsia.googlesource.com/jiri/metadata"
+//   import "go.fuchsia.dev/jiri/metadata"
 //
 //   func init() {
 //     metadata.Insert("myproject.myid", "value")
@@ -157,7 +157,7 @@ func (x *T) ToXML() string {
 func (x *T) toXML(indent bool) string {
 	// Write each XML <md> entry ordered by id.
 	var ids []string
-	for id, _ := range x.entries {
+	for id := range x.entries {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)

@@ -13,8 +13,8 @@ import (
 	"reflect"
 	"strings"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gitutil"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gitutil"
 )
 
 type importCache struct {
@@ -594,7 +594,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 
 	hookMap := make(map[string][]*Hook)
 
-	for idx, _ := range m.Hooks {
+	for idx := range m.Hooks {
 		hook := &m.Hooks[idx]
 		if err := hook.validate(); err != nil {
 			return err

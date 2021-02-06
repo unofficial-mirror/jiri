@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"fuchsia.googlesource.com/jiri/simplemr"
+	"go.fuchsia.dev/jiri/simplemr"
 )
 
 func newChans(chanSize int) (chan *simplemr.Record, chan *simplemr.Record) {

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/cipd"
-	"fuchsia.googlesource.com/jiri/jiritest"
+	"go.fuchsia.dev/jiri/cipd"
+	"go.fuchsia.dev/jiri/jiritest"
 )
 
 func TestManifest(t *testing.T) {

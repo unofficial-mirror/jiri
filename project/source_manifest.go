@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gerrit"
-	"fuchsia.googlesource.com/jiri/gitutil"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gerrit"
+	"go.fuchsia.dev/jiri/gitutil"
 )
 
 const (
@@ -137,7 +137,7 @@ func NewSourceManifest(jirix *jiri.X, projects Projects) (*SourceManifest, Multi
 		if branchMap["origin/"+proj.RemoteBranch] {
 			gc.FetchRef = "refs/heads/" + proj.RemoteBranch
 		} else {
-			for b, _ := range branchMap {
+			for b := range branchMap {
 				if strings.HasPrefix(b, "origin/HEAD ") {
 					continue
 				}

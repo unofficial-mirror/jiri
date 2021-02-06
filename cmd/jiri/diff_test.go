@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri/jiritest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 // Setup two snapshots and also return their diff

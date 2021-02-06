@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri/project"
 )
 
 func TestPrefixTree(t *testing.T) {
@@ -24,13 +24,13 @@ func TestPrefixTree(t *testing.T) {
 	defer cleanup()
 
 	projects := []project.Project{
-		project.Project{Name: "root", Path: "."},
-		project.Project{Name: "a", Path: "a"},
-		project.Project{Name: "b", Path: "b"},
-		project.Project{Name: "c/d/e", Path: "c/d/e"},
-		project.Project{Name: "c/d/f", Path: "c/d/f"},
-		project.Project{Name: "c/d", Path: "c/d"},
-		project.Project{Name: "c", Path: "c"},
+		{Name: "root", Path: "."},
+		{Name: "a", Path: "a"},
+		{Name: "b", Path: "b"},
+		{Name: "c/d/e", Path: "c/d/e"},
+		{Name: "c/d/f", Path: "c/d/f"},
+		{Name: "c/d", Path: "c/d"},
+		{Name: "c", Path: "c"},
 	}
 	expectedDropped := []project.Project{
 		projects[0],

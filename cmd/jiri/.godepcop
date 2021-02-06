@@ -1,9 +1,0 @@
-<godepcop>
-  <!-- The jiri tool is critical since it's used for bootstrapping the
-       codebase.
-
-       Ensure the strict rule of only allowing dependencies on fuchsia.googlesource.com/jiri, to
-       reduce the exposure to breakage.  -->
-  <pkg allow="fuchsia.googlesource.com/jiri/..."/>
-  <pkg deny="..."/>
-</godepcop>

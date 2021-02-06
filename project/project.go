@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cipd"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/log"
-	"fuchsia.googlesource.com/jiri/retry"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cipd"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/log"
+	"go.fuchsia.dev/jiri/retry"
 )
 
 var (
@@ -41,7 +41,7 @@ var (
 const (
 	JiriProject     = "release.go.jiri"
 	JiriName        = "jiri"
-	JiriPackage     = "fuchsia.googlesource.com/jiri"
+	JiriPackage     = "go.fuchsia.dev/jiri"
 	ManifestVersion = "1.1"
 )
 
@@ -982,7 +982,7 @@ func projectsExistLocally(jirix *jiri.X, projects Projects) (bool, error) {
 
 func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 	localKeysNotInRemote := make(map[ProjectKey]bool)
-	for key, _ := range localProjects {
+	for key := range localProjects {
 		if _, ok := remoteProjects[key]; !ok {
 			localKeysNotInRemote[key] = true
 		}
@@ -994,7 +994,7 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 
 	for remoteKey, remoteProject := range remoteProjects {
 		if _, ok := localProjects[remoteKey]; !ok {
-			for localKey, _ := range localKeysNotInRemote {
+			for localKey := range localKeysNotInRemote {
 				localProject := localProjects[localKey]
 				if localProject.Path == remoteProject.Path && (localProject.Name == remoteProject.Name || localProject.Remote == remoteProject.Remote) {
 					delete(localProjects, localKey)

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cmdline"
+	"go.fuchsia.dev/jiri/project"
 )
 
 var cmdProjectConfig = &cmdline.Command{

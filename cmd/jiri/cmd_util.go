@@ -10,8 +10,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/project"
 )
 
 // currentProject returns the Project containing the current working directory.

@@ -4,7 +4,7 @@
 
 package main
 
-import "fuchsia.googlesource.com/jiri/cmdline"
+import "go.fuchsia.dev/jiri/cmdline"
 
 // cmdExitCode represents the exitcode command.
 var cmdExitCode = &cmdline.Command{

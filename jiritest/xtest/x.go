@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/color"
-	"fuchsia.googlesource.com/jiri/log"
-	"fuchsia.googlesource.com/jiri/tool"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cmdline"
+	"go.fuchsia.dev/jiri/color"
+	"go.fuchsia.dev/jiri/log"
+	"go.fuchsia.dev/jiri/tool"
 )
 
 // NewX is similar to jiri.NewX, but is meant for usage in a testing environment.

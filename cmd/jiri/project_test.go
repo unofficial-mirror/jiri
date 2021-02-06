@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri/jiritest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 func TestProjectIgnoresByAttribute(t *testing.T) {

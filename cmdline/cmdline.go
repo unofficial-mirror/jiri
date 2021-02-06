@@ -51,9 +51,9 @@ import (
 	"strings"
 	"syscall"
 
-	"fuchsia.googlesource.com/jiri/envvar"
-	_ "fuchsia.googlesource.com/jiri/metadata" // for the -metadata flag
-	"fuchsia.googlesource.com/jiri/timing"
+	"go.fuchsia.dev/jiri/envvar"
+	_ "go.fuchsia.dev/jiri/metadata" // for the -metadata flag
+	"go.fuchsia.dev/jiri/timing"
 )
 
 // Command represents a single command in a command-line program.  A program
@@ -231,7 +231,7 @@ func Parse(root *Command, env *Env, args []string) (Runner, []string, error) {
 	case helpRunner, binaryRunner:
 		// The help and binary runners need the envvars to be set.
 	default:
-		for key, _ := range env.Vars {
+		for key := range env.Vars {
 			if strings.HasPrefix(key, "CMDLINE_") {
 				delete(env.Vars, key)
 				if err := os.Unsetenv(key); err != nil {

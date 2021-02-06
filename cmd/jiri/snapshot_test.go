@@ -12,11 +12,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/jiritest"
-	"fuchsia.googlesource.com/jiri/project"
-	"fuchsia.googlesource.com/jiri/tool"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/jiritest"
+	"go.fuchsia.dev/jiri/project"
+	"go.fuchsia.dev/jiri/tool"
 )
 
 func checkReadme(t *testing.T, jirix *jiri.X, project, message string) {
@@ -103,7 +103,7 @@ func TestSnapshot(t *testing.T) {
 	}
 
 	// Remove the local project repositories.
-	for i, _ := range remoteProjects {
+	for i := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
 		if err := os.RemoveAll(localProject); err != nil {
 			t.Fatalf("%v", err)
@@ -114,7 +114,7 @@ func TestSnapshot(t *testing.T) {
 	if err := project.CheckoutSnapshot(fake.X, snapshotFile, false, true /*run-hooks*/, true /*run-packages*/, project.DefaultHookTimeout, project.DefaultPackageTimeout); err != nil {
 		t.Fatalf("%s", err)
 	}
-	for i, _ := range remoteProjects {
+	for i := range remoteProjects {
 		localProject := filepath.Join(fake.X.Root, localProjectName(i))
 		checkReadme(t, fake.X, localProject, "revision 1")
 	}

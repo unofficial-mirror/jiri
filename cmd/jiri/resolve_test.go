@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri/jiritest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 func TestResolveProjects(t *testing.T) {
@@ -73,22 +73,22 @@ func TestResolvePackages(t *testing.T) {
 	// Currently jiri is hard coded to only verify cipd packages for linux-amd64 and mac-amd64.
 	// If new supported platform added, this test should be updated.
 	expectedLocks := []project.PackageLock{
-		project.PackageLock{
+		{
 			PackageName: "gn/gn/linux-amd64",
 			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
 			InstanceID:  "0uGjKAZkJXPZjtYktgEwHiNbwsut_qRsk7ZCGGxi82IC",
 		},
-		project.PackageLock{
+		{
 			PackageName: "gn/gn/mac-amd64",
 			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
 			InstanceID:  "rN2F641yR4Bj-H1q8OwC_RiqRpUYxy3hryzRfPER9wcC",
 		},
-		project.PackageLock{
+		{
 			PackageName: "infra/tools/luci/vpython/linux-amd64",
 			VersionTag:  "git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89",
 			InstanceID:  "uCjugbKg6wMIF6_H_BHECZQdcGRebhnZ6LzSodPHQ7AC",
 		},
-		project.PackageLock{
+		{
 			PackageName: "infra/tools/luci/vpython/mac-amd64",
 			VersionTag:  "git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89",
 			InstanceID:  "yAdok-mh5vfwq1vCAHprmejM9iE7R1t9Wn6RxrWmAAEC",
@@ -171,22 +171,22 @@ func TestResolvePackagesPartial(t *testing.T) {
 	// Currently jiri is hard coded to only verify cipd packages for linux-amd64 and mac-amd64.
 	// If new supported platform added, this test should be updated.
 	expectedLocks := []project.PackageLock{
-		project.PackageLock{
+		{
 			PackageName: "gn/gn/linux-amd64",
 			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
 			InstanceID:  "0uGjKAZkJXPZjtYktgEwHiNbwsut_qRsk7ZCGGxi82IC",
 		},
-		project.PackageLock{
+		{
 			PackageName: "gn/gn/mac-amd64",
 			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
 			InstanceID:  "rN2F641yR4Bj-H1q8OwC_RiqRpUYxy3hryzRfPER9wcC",
 		},
-		project.PackageLock{
+		{
 			PackageName: "infra/tools/luci/vpython/linux-amd64",
 			VersionTag:  "git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89",
 			InstanceID:  "uCjugbKg6wMIF6_H_BHECZQdcGRebhnZ6LzSodPHQ7AC",
 		},
-		project.PackageLock{
+		{
 			PackageName: "infra/tools/luci/vpython/mac-amd64",
 			VersionTag:  "git_revision:9a931a5307c46b16b1c12e01e8239d4a73830b89",
 			InstanceID:  "yAdok-mh5vfwq1vCAHprmejM9iE7R1t9Wn6RxrWmAAEC",

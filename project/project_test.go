@@ -18,12 +18,12 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cipd"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/jiritest"
-	"fuchsia.googlesource.com/jiri/jiritest/xtest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cipd"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/jiritest"
+	"go.fuchsia.dev/jiri/jiritest/xtest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 func dirExists(dirname string) error {
@@ -534,7 +534,7 @@ func TestRecursiveImport(t *testing.T) {
 	lastPRev, _ := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[lastProject.Name])).CurrentRevision()
 	lastProject.Revision = lastPRev
 	remoteManifest := &project.Manifest{
-		Projects: []project.Project{lastProject, project.Project{
+		Projects: []project.Project{lastProject, {
 			Name:   remoteManifestStr,
 			Path:   remoteManifestStr,
 			Remote: fake.Projects[remoteManifestStr],
@@ -554,7 +554,7 @@ func TestRecursiveImport(t *testing.T) {
 	}
 	commitFile(t, fake.X, fake.Projects[remoteManifestStr], "manifest", "2")
 	writeFile(t, fake.X, fake.Projects[lastProject.Name], "file1", "file1")
-	manifest.Imports = []project.Import{project.Import{
+	manifest.Imports = []project.Import{{
 		Name:     remoteManifestStr,
 		Remote:   fake.Projects[remoteManifestStr],
 		Manifest: "manifest",
@@ -625,7 +625,7 @@ func TestLoadManifestFileRecursiveImport(t *testing.T) {
 	}
 
 	remoteManifest := &project.Manifest{
-		Projects: []project.Project{lastProject, project.Project{
+		Projects: []project.Project{lastProject, {
 			Name:   remoteManifestStr,
 			Path:   remoteManifestStr,
 			Remote: fake.Projects[remoteManifestStr],
@@ -638,7 +638,7 @@ func TestLoadManifestFileRecursiveImport(t *testing.T) {
 	commitFile(t, fake.X, fake.Projects[remoteManifestStr], "manifest", "1")
 	rev, _ := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[remoteManifestStr])).CurrentRevision()
 
-	manifest.Imports = []project.Import{project.Import{
+	manifest.Imports = []project.Import{{
 		Name:     remoteManifestStr,
 		Remote:   fake.Projects[remoteManifestStr],
 		Manifest: "manifest",
@@ -687,7 +687,7 @@ func TestRecursiveImportWithLocalImport(t *testing.T) {
 	lastPRev, _ := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[lastProject.Name])).CurrentRevision()
 	lastProject.Revision = lastPRev
 	remoteManifest := &project.Manifest{
-		Projects: []project.Project{lastProject, project.Project{
+		Projects: []project.Project{lastProject, {
 			Name:   remoteManifestStr,
 			Path:   remoteManifestStr,
 			Remote: fake.Projects[remoteManifestStr],
@@ -699,7 +699,7 @@ func TestRecursiveImportWithLocalImport(t *testing.T) {
 	}
 	commitFile(t, fake.X, fake.Projects[remoteManifestStr], "manifest", "1")
 	rev, _ := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[remoteManifestStr])).CurrentRevision()
-	manifest.Imports = []project.Import{project.Import{
+	manifest.Imports = []project.Import{{
 		Name:     remoteManifestStr,
 		Remote:   fake.Projects[remoteManifestStr],
 		Manifest: "manifest",
@@ -755,7 +755,7 @@ func TestRecursiveImportWhenOriginalManifestIsImportedAgain(t *testing.T) {
 	// Remove last project from manifest and add it to local import
 	lastProject := manifest.Projects[len(manifest.Projects)-1]
 	manifest.Projects = manifest.Projects[:len(manifest.Projects)-1]
-	manifest.LocalImports = []project.LocalImport{project.LocalImport{
+	manifest.LocalImports = []project.LocalImport{{
 		File: "localmanifest",
 	}}
 	localManifest := project.Manifest{
@@ -771,7 +771,7 @@ func TestRecursiveImportWhenOriginalManifestIsImportedAgain(t *testing.T) {
 	if err := fake.CreateRemoteProject(remoteManifestStr); err != nil {
 		t.Fatal(err)
 	}
-	manifest.Imports = []project.Import{project.Import{
+	manifest.Imports = []project.Import{{
 		Name:     remoteManifestStr,
 		Remote:   fake.Projects[remoteManifestStr],
 		Manifest: "manifest",
@@ -780,12 +780,12 @@ func TestRecursiveImportWhenOriginalManifestIsImportedAgain(t *testing.T) {
 
 	// Fix last project rev
 	remoteManifest := &project.Manifest{
-		Projects: []project.Project{project.Project{
+		Projects: []project.Project{{
 			Name:   remoteManifestStr,
 			Path:   remoteManifestStr,
 			Remote: fake.Projects[remoteManifestStr],
 		}},
-		Imports: []project.Import{project.Import{
+		Imports: []project.Import{{
 			Name:     jiritest.ManifestProjectName,
 			Remote:   fake.Projects[jiritest.ManifestProjectName],
 			Manifest: "localmanifest",
@@ -2274,10 +2274,10 @@ func TestMarshalAndUnmarshalLockEntries(t *testing.T) {
 func TestGetPath(t *testing.T) {
 	t.Parallel()
 	testPkgs := []project.Package{
-		project.Package{Name: "test0", Version: "version", Path: "A/test0"},
-		project.Package{Name: "test1/${platform}", Version: "version", Path: ""},
-		project.Package{Name: "test2/${os}-${arch}", Version: "version", Path: ""},
-		project.Package{Name: "test3/${platform=linux-armv6l}", Version: "version", Path: ""},
+		{Name: "test0", Version: "version", Path: "A/test0"},
+		{Name: "test1/${platform}", Version: "version", Path: ""},
+		{Name: "test2/${os}-${arch}", Version: "version", Path: ""},
+		{Name: "test3/${platform=linux-armv6l}", Version: "version", Path: ""},
 	}
 	testResults := []string{
 		"A/test0",
@@ -2305,12 +2305,12 @@ func TestWritePackageFlags(t *testing.T) {
 	defer cleanup()
 
 	testPkgsWAS := []project.Package{
-		project.Package{Name: "test0", Version: "version", Flag: "flagfile0|internal = true|internal = false"},
-		project.Package{Name: "test1", Version: "version", Flag: "flagfile1|{\"internal\" = true}|{\"internal\" = false}"},
+		{Name: "test0", Version: "version", Flag: "flagfile0|internal = true|internal = false"},
+		{Name: "test1", Version: "version", Flag: "flagfile1|{\"internal\" = true}|{\"internal\" = false}"},
 	}
 	testPkgsWoAS := []project.Package{
-		project.Package{Name: "test2", Version: "version", Flag: "flagfile2|internal = true|internal = false"},
-		project.Package{Name: "test3", Version: "version", Flag: "flagfile3|{\"internal\" = true}|{\"internal\" = false}"},
+		{Name: "test2", Version: "version", Flag: "flagfile2|internal = true|internal = false"},
+		{Name: "test3", Version: "version", Flag: "flagfile3|{\"internal\" = true}|{\"internal\" = false}"},
 	}
 	expected := map[string]string{
 		"flagfile0": "internal = true",
@@ -2349,8 +2349,8 @@ func TestWriteProjectFlags(t *testing.T) {
 	defer cleanup()
 
 	testProjsList := []project.Project{
-		project.Project{Name: "test0", Revision: "version", Flag: "flagfile0|internal = true|internal = false"},
-		project.Project{Name: "test1", Revision: "version", Flag: ""},
+		{Name: "test0", Revision: "version", Flag: "flagfile0|internal = true|internal = false"},
+		{Name: "test1", Revision: "version", Flag: ""},
 	}
 	expected := map[string]string{
 		"flagfile0": "internal = true",
@@ -2578,16 +2578,16 @@ func TestOverrideProject(t *testing.T) {
 func TestHostnameAllowed(t *testing.T) {
 	t.Parallel()
 	tests := map[string]bool{
-		"*.google.com,fuchsia.google.com":       true,
-		"*.google.com,fuchsia.dev.google.com":   true,
-		"google.com,google.com":                 true,
-		"*google.com,fuchsiagoogle.com":         true,
-		"google.com,fuchsiagoogle.com":          false,
-		"google.com,oogle.com":                  false,
-		"fuchsia-internal,fuchsia-internal":     true,
-		"fuchsia-internal,fuchsia":              false,
-		",":                                     true,
-		"*google*.com,fuchsia.googlesource.com": false,
+		"*.google.com,fuchsia.google.com":     true,
+		"*.google.com,fuchsia.dev.google.com": true,
+		"google.com,google.com":               true,
+		"*google.com,fuchsiagoogle.com":       true,
+		"google.com,fuchsiagoogle.com":        false,
+		"google.com,oogle.com":                false,
+		"fuchsia-internal,fuchsia-internal":   true,
+		"fuchsia-internal,fuchsia":            false,
+		",":                                   true,
+		"*google*.com,go.fuchsia.dev":         false,
 	}
 	for k, v := range tests {
 		test := strings.Split(k, ",")
@@ -2614,7 +2614,7 @@ func TestCheckProjectsHostnames(t *testing.T) {
 	testProjectListsTrue := []project.Project{
 		{
 			Name:   "project1",
-			Remote: "https://fuchsia.googlesource.com/project1",
+			Remote: "https://go.fuchsia.dev/project1",
 		},
 		{
 			Name:   "project2",
@@ -2628,7 +2628,7 @@ func TestCheckProjectsHostnames(t *testing.T) {
 	testProjectListsFalse := []project.Project{
 		{
 			Name:   "project1",
-			Remote: "https://fuchsia.googlesource.com/project1",
+			Remote: "https://go.fuchsia.dev/project1",
 		},
 		{
 			Name:   "project2",

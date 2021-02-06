@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest/xtest"
+	"go.fuchsia.dev/jiri/jiritest/xtest"
 )
 
 const (
@@ -349,15 +349,15 @@ gn/gn/${platform} git_revision:bdb0fd02324b120cacde634a9235405061c8ea06
 func TestExpand(t *testing.T) {
 	t.Parallel()
 	platforms := []Platform{
-		Platform{"linux", "amd64"},
-		Platform{"linux", "arm64"},
-		Platform{"mac", "amd64"},
+		{"linux", "amd64"},
+		{"linux", "arm64"},
+		{"mac", "amd64"},
 	}
 
 	tests := map[string][]string{
-		"gn/gn/${platform}":                   []string{"gn/gn/linux-amd64", "gn/gn/linux-arm64", "gn/gn/mac-amd64"},
-		"fuchsia/sysroot/${os=linux}-${arch}": []string{"fuchsia/sysroot/linux-amd64", "fuchsia/sysroot/linux-arm64"},
-		"infra/ninja/linux-amd64":             []string{"infra/ninja/linux-amd64"},
+		"gn/gn/${platform}":                   {"gn/gn/linux-amd64", "gn/gn/linux-arm64", "gn/gn/mac-amd64"},
+		"fuchsia/sysroot/${os=linux}-${arch}": {"fuchsia/sysroot/linux-amd64", "fuchsia/sysroot/linux-arm64"},
+		"infra/ninja/linux-amd64":             {"infra/ninja/linux-amd64"},
 	}
 
 	for k, p := range tests {
@@ -391,9 +391,9 @@ func TestMustExpand(t *testing.T) {
 func TestDecl(t *testing.T) {
 	t.Parallel()
 	platforms := []Platform{
-		Platform{"linux", "amd64"},
-		Platform{"linux", "arm64"},
-		Platform{"mac", "amd64"},
+		{"linux", "amd64"},
+		{"linux", "arm64"},
+		{"mac", "amd64"},
 	}
 
 	tests := map[string]string{
@@ -424,11 +424,11 @@ func TestFloatingRefs(t *testing.T) {
 	}
 	defer os.Remove(cipdPath)
 	testExpects := map[PackageInstance]bool{
-		PackageInstance{
+		{
 			PackageName: "gn/gn/${platform}",
 			VersionTag:  "latest",
 		}: true,
-		PackageInstance{
+		{
 			PackageName: "gn/gn/${platform}",
 			VersionTag:  "git_revision:bdb0fd02324b120cacde634a9235405061c8ea06",
 		}: false,

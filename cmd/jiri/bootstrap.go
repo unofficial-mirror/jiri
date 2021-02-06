@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strings"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cipd"
-	"fuchsia.googlesource.com/jiri/cmdline"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cipd"
+	"go.fuchsia.dev/jiri/cmdline"
 )
 
 var cmdBootstrap = &cmdline.Command{

@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/jiritest/xtest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/jiritest/xtest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 // FakeJiriRoot sets up a fake root under a tmp directory.
@@ -73,7 +73,7 @@ func NewFakeJiriRoot(t *testing.T) (*FakeJiriRoot, func()) {
 	// Create a .jiri_manifest file which imports the manifest created above.
 	if err := fake.WriteJiriManifest(&project.Manifest{
 		Imports: []project.Import{
-			project.Import{
+			{
 				Manifest: ManifestFileName,
 				Name:     ManifestProjectName,
 				Remote:   filepath.Join(fake.remote, ManifestProjectPath),

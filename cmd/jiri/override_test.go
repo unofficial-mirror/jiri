@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/jiritest/xtest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri/jiritest/xtest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 type overrideTestCase struct {
@@ -302,7 +302,7 @@ func testOverride(t *testing.T, test overrideTestCase) error {
 	// Create a .jiri_manifest file which imports the manifest created above.
 	manifest := project.Manifest{
 		Imports: []project.Import{
-			project.Import{
+			{
 				Manifest: "manifest",
 				Name:     "foo",
 				Remote:   "https://github.com/new.git",

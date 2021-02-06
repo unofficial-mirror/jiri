@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/analytics_util"
-	"fuchsia.googlesource.com/jiri/cmdline"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/analytics_util"
+	"go.fuchsia.dev/jiri/cmdline"
 )
 
 var cmdInit = &cmdline.Command{

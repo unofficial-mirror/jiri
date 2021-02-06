@@ -11,9 +11,9 @@ import (
 	"sort"
 	"testing"
 
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/jiritest"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/jiritest"
+	"go.fuchsia.dev/jiri/project"
 )
 
 func setDefaultGrepFlags() {

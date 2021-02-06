@@ -1,4 +1,4 @@
-module fuchsia.googlesource.com/jiri
+module go.fuchsia.dev/jiri
 
 go 1.13
 

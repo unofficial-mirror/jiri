@@ -7,9 +7,9 @@ package project
 import (
 	"fmt"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/tool"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/tool"
 )
 
 type ReferenceState struct {
@@ -97,7 +97,7 @@ func GetProjectStates(jirix *jiri.X, projects Projects, checkDirty bool) (map[Pr
 		// jirix is not threadsafe, so we make a clone for each goroutine.
 		go setProjectState(jirix.Clone(tool.ContextOpts{}), state, checkDirty, sem)
 	}
-	for _ = range projects {
+	for range projects {
 		err := <-sem
 		if err != nil {
 			return nil, err

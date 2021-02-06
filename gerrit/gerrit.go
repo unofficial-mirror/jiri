@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/collect"
-	"fuchsia.googlesource.com/jiri/envvar"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/collect"
+	"go.fuchsia.dev/jiri/envvar"
 )
 
 var (

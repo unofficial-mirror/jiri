@@ -12,10 +12,10 @@ import (
 	"sort"
 	"text/template"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/cipd"
-	"fuchsia.googlesource.com/jiri/cmdline"
-	"fuchsia.googlesource.com/jiri/project"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/cipd"
+	"go.fuchsia.dev/jiri/cmdline"
+	"go.fuchsia.dev/jiri/project"
 )
 
 // cmd represents the "jiri project" command.

@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gitutil"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gitutil"
 	"golang.org/x/net/publicsuffix"
 )
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"fuchsia.googlesource.com/jiri/isatty"
+	"go.fuchsia.dev/jiri/isatty"
 )
 
 type Colorfn func(format string, a ...interface{}) string

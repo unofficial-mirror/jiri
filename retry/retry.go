@@ -12,7 +12,7 @@ import (
 	"math/rand"
 	"time"
 
-	"fuchsia.googlesource.com/jiri"
+	"go.fuchsia.dev/jiri"
 )
 
 type RetryOpt interface {

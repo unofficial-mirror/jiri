@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"fuchsia.googlesource.com/jiri/version"
+	"go.fuchsia.dev/jiri/version"
 )
 
 func TestAnalyticsDisabled(t *testing.T) {

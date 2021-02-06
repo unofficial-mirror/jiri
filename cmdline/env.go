@@ -10,10 +10,10 @@ import (
 	"os"
 	"strconv"
 
-	"fuchsia.googlesource.com/jiri/envvar"
-	"fuchsia.googlesource.com/jiri/lookpath"
-	"fuchsia.googlesource.com/jiri/textutil"
-	"fuchsia.googlesource.com/jiri/timing"
+	"go.fuchsia.dev/jiri/envvar"
+	"go.fuchsia.dev/jiri/lookpath"
+	"go.fuchsia.dev/jiri/textutil"
+	"go.fuchsia.dev/jiri/timing"
 )
 
 // EnvFromOS returns a new environment based on the operating system.

@@ -13,10 +13,10 @@ import (
 	"runtime"
 	"sort"
 
-	"fuchsia.googlesource.com/jiri"
-	"fuchsia.googlesource.com/jiri/gitutil"
-	"fuchsia.googlesource.com/jiri/osutil"
-	"fuchsia.googlesource.com/jiri/retry"
+	"go.fuchsia.dev/jiri"
+	"go.fuchsia.dev/jiri/gitutil"
+	"go.fuchsia.dev/jiri/osutil"
+	"go.fuchsia.dev/jiri/retry"
 )
 
 func isFile(file string) (bool, error) {
