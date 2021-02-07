@@ -2578,16 +2578,16 @@ func TestOverrideProject(t *testing.T) {
 func TestHostnameAllowed(t *testing.T) {
 	t.Parallel()
 	tests := map[string]bool{
-		"*.google.com,fuchsia.google.com":     true,
-		"*.google.com,fuchsia.dev.google.com": true,
-		"google.com,google.com":               true,
-		"*google.com,fuchsiagoogle.com":       true,
-		"google.com,fuchsiagoogle.com":        false,
-		"google.com,oogle.com":                false,
-		"fuchsia-internal,fuchsia-internal":   true,
-		"fuchsia-internal,fuchsia":            false,
-		",":                                   true,
-		"*google*.com,go.fuchsia.dev":         false,
+		"*.google.com,fuchsia.google.com":       true,
+		"*.google.com,fuchsia.dev.google.com":   true,
+		"google.com,google.com":                 true,
+		"*google.com,fuchsiagoogle.com":         true,
+		"google.com,fuchsiagoogle.com":          false,
+		"google.com,oogle.com":                  false,
+		"fuchsia-internal,fuchsia-internal":     true,
+		"fuchsia-internal,fuchsia":              false,
+		",":                                     true,
+		"*google*.com,fuchsia.googlesource.com": false,
 	}
 	for k, v := range tests {
 		test := strings.Split(k, ",")
@@ -2614,7 +2614,7 @@ func TestCheckProjectsHostnames(t *testing.T) {
 	testProjectListsTrue := []project.Project{
 		{
 			Name:   "project1",
-			Remote: "https://go.fuchsia.dev/project1",
+			Remote: "https://fuchsia.googlesource.com/project1",
 		},
 		{
 			Name:   "project2",
@@ -2628,7 +2628,7 @@ func TestCheckProjectsHostnames(t *testing.T) {
 	testProjectListsFalse := []project.Project{
 		{
 			Name:   "project1",
-			Remote: "https://go.fuchsia.dev/project1",
+			Remote: "https://fuchsia.googlesource.com/project1",
 		},
 		{
 			Name:   "project2",
