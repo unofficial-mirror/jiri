@@ -163,12 +163,13 @@ func (m *Manifest) ToFile(jirix *jiri.X, filename string) error {
 		}
 		projects = append(projects, project)
 	}
-	// Sort the projects and hooks to ensure that the output of "jiri
-	// snapshot" is deterministic.  Sorting the hooks by name allows
+	// Sort the packages, projects and hooks to ensure that the output of
+	// "jiri snapshot" is deterministic.  Sorting the hooks by name allows
 	// some control over the ordering of the hooks in case that is
 	// necessary.
 	sort.Sort(ProjectsByPath(projects))
 	m.Projects = projects
+	sort.Sort(PackagesByKey(m.Packages))
 	sort.Sort(HooksByName(m.Hooks))
 	data, err := m.ToBytes()
 	if err != nil {
@@ -508,6 +509,20 @@ type Package struct {
 
 	// ManifestPath stores the absolute path of the manifest.
 	ManifestPath string `xml:"-"`
+}
+
+// PackagesByKey implements the Sort interface. It sorts Packages by
+// the synthesized PackageKey.
+type PackagesByKey []Package
+
+func (packages PackagesByKey) Len() int {
+	return len(packages)
+}
+func (packages PackagesByKey) Swap(i, j int) {
+	packages[i], packages[j] = packages[j], packages[i]
+}
+func (packages PackagesByKey) Less(i, j int) bool {
+	return packages[i].Key() < packages[j].Key()
 }
 
 type PackageKey string
