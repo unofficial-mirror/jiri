@@ -1463,34 +1463,25 @@ func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks,
 
 	latestLink, secondLatestLink := jirix.UpdateHistoryLatestLink(), jirix.UpdateHistorySecondLatestLink()
 
-	// If the "latest" symlink exists, point the "second-latest" symlink to its value.
+	// If the "latest" hardlink exists, point the "second-latest" hardlink to its value.
 	latestLinkExists, err := isFile(latestLink)
 	if err != nil {
 		return err
 	}
 	if latestLinkExists {
-		latestFile, err := os.Readlink(latestLink)
-		if err != nil {
-			return fmtError(err)
-		}
 		if err := os.RemoveAll(secondLatestLink); err != nil {
 			return fmtError(err)
 		}
-		if err := os.Symlink(latestFile, secondLatestLink); err != nil {
+		if err := os.Link(latestLink, secondLatestLink); err != nil {
 			return fmtError(err)
 		}
 	}
 
-	// Point the "latest" update history symlink to the new snapshot file.  Try
-	// to keep the symlink relative, to make it easy to move or copy the entire
-	// update_history directory.
-	if rel, err := filepath.Rel(filepath.Dir(latestLink), snapshotFile); err == nil {
-		snapshotFile = rel
-	}
+	// Point the "latest" update history hardlink to the new snapshot file.
 	if err := os.RemoveAll(latestLink); err != nil {
 		return fmtError(err)
 	}
-	return fmtError(os.Symlink(snapshotFile, latestLink))
+	return fmtError(os.Link(snapshotFile, latestLink))
 }
 
 // CleanupProjects restores the given jiri projects back to their detached

@@ -463,13 +463,13 @@ func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
 }
 
-// UpdateHistoryLatestLink returns the path to a symlink that points to the
+// UpdateHistoryLatestLink returns the path to a hard link that points to the
 // latest update in the update history directory.
 func (x *X) UpdateHistoryLatestLink() string {
 	return filepath.Join(x.UpdateHistoryDir(), "latest")
 }
 
-// UpdateHistorySecondLatestLink returns the path to a symlink that points to
+// UpdateHistorySecondLatestLink returns the path to a hard link that points to
 // the second latest update in the update history directory.
 func (x *X) UpdateHistorySecondLatestLink() string {
 	return filepath.Join(x.UpdateHistoryDir(), "second-latest")
