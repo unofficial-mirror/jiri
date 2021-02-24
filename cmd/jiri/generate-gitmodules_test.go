@@ -100,16 +100,16 @@ git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed
 git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed28 "path-1"
 git update-index --add --cacheinfo 160000 87f863bcbc7cd2177bac17c61e31093de6eeed28 "path-2"`)
 
-	goldenModule := []byte(`[submodule "manifest"]
+	goldenModule := []byte(`[submodule "manifest-31b42b3e96"]
 	path = manifest
 	url = /tmp/115893653/manifest
-[submodule "project-0"]
+[submodule "project-0-50299b644d"]
 	path = path-0
 	url = /tmp/115893653/project-0
-[submodule "project-1"]
+[submodule "project-1-743aa3e46a"]
 	path = path-1
 	url = /tmp/115893653/project-1
-[submodule "project-2"]
+[submodule "project-2-1615f49046"]
 	path = path-2
 	url = /tmp/115893653/project-2`)
 
@@ -240,6 +240,14 @@ func verifyModules(golden, tests []byte) error {
 			goldenPath = goldenPathFields[len(goldenPathFields)-1]
 			if testPath != goldenPath {
 				return fmt.Errorf("path mismatch, expecting %q, got %q", goldenPath, testPath)
+			}
+			continue
+		}
+		if strings.HasPrefix(testLine, "[submodule ") {
+			testProjectName := testLine[:strings.LastIndex(testLine, "-")]
+			goldenProjectName := goldenLine[:strings.LastIndex(testLine, "-")]
+			if testProjectName != goldenProjectName {
+				return fmt.Errorf("project name mismatch, expection %q, got %q", goldenProjectName, testProjectName)
 			}
 			continue
 		}

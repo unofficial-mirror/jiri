@@ -6,6 +6,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -303,7 +305,8 @@ func makePathRel(basepath, targpath string) (string, error) {
 
 func moduleDecl(p project.Project) string {
 	tmpl := "[submodule \"%s\"]\n\tpath = %s\n\turl = %s"
-	return fmt.Sprintf(tmpl, p.Name, p.Path, p.Remote)
+	hashBytes := (sha256.Sum256([]byte(p.Key())))
+	return fmt.Sprintf(tmpl, p.Name+"-"+hex.EncodeToString(hashBytes[:5]), p.Path, p.Remote)
 }
 
 func commandDecl(p project.Project) string {
