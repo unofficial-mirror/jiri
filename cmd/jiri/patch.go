@@ -22,6 +22,7 @@ import (
 var (
 	patchRebaseFlag     bool
 	patchRebaseRevision string
+	patchRebaseBranch   string
 	patchTopicFlag      bool
 	patchBranchFlag     string
 	patchDeleteFlag     bool
@@ -39,6 +40,7 @@ func init() {
 	cmdPatch.Flags.BoolVar(&patchForceFlag, "force", false, "Use force when deleting the existing branch")
 	cmdPatch.Flags.BoolVar(&patchRebaseFlag, "rebase", false, "Rebase the change after downloading")
 	cmdPatch.Flags.StringVar(&patchRebaseRevision, "rebase-revision", "", "Rebase the change to a specific revision after downloading")
+	cmdPatch.Flags.StringVar(&patchRebaseBranch, "rebase-branch", "", "The branch to rebase the change onto")
 	cmdPatch.Flags.StringVar(&patchHostFlag, "host", "", `Gerrit host to use. Defaults to gerrit host specified in manifest.`)
 	cmdPatch.Flags.StringVar(&patchProjectFlag, "project", "", `Project to apply patch to. This cannot be passed with topic flag.`)
 	cmdPatch.Flags.BoolVar(&patchTopicFlag, "topic", false, `Patch whole topic.`)
@@ -326,8 +328,10 @@ func runPatch(jirix *jiri.X, args []string) error {
 			return noSuchProjectErr
 		}
 		// TODO: TO-592 - remove this hardcode
-		if p.RemoteBranch != "" {
+		if patchRebaseBranch == "" && p.RemoteBranch != "" {
 			remoteBranch = p.RemoteBranch
+		} else if patchRebaseBranch != "" {
+			remoteBranch = patchRebaseBranch
 		} else {
 			remoteBranch = "master"
 		}
