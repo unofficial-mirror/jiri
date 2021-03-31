@@ -120,9 +120,9 @@ func (projects ProjectsByPath) Less(i, j int) bool {
 // ProjectKey is a unique string for a project.
 type ProjectKey string
 
-// MakeProjectKey returns the project key, given the project name and remote.
+// MakeProjectKey returns the project key, given the project name and normalized remote.
 func MakeProjectKey(name, remote string) ProjectKey {
-	return ProjectKey(name + KeySeparator + remote)
+	return ProjectKey(name + KeySeparator + rewriteAndNormalizeRemote(remote))
 }
 
 // KeySeparator is a reserved string used in ProjectKeys and HookKeys.
@@ -899,6 +899,20 @@ func rewriteRemote(jirix *jiri.X, remote string) string {
 	return remote
 }
 
+// rewriteAndNormalizeRemote rewrites sso:// prefixed remotes and removes the
+// scheme (e.g. https://) from the remote.
+func rewriteAndNormalizeRemote(remote string) string {
+	if strings.HasPrefix(remote, "sso://") {
+		remote = ssoRe.ReplaceAllString(remote, "https://$1.googlesource.com/")
+	}
+	u, err := url.Parse(remote)
+	if err != nil {
+		// If remote isn't parseable don't try to remove schema
+		return remote
+	}
+	return strings.TrimPrefix(remote, u.Scheme)
+}
+
 // LocalProjects returns projects on the local filesystem.  If all projects in
 // the manifest exist locally and scanMode is set to FastScan, then only the
 // projects in the manifest that exist locally will be returned.  Otherwise, a
@@ -996,7 +1010,8 @@ func MatchLocalWithRemote(localProjects, remoteProjects Projects) {
 		if _, ok := localProjects[remoteKey]; !ok {
 			for localKey := range localKeysNotInRemote {
 				localProject := localProjects[localKey]
-				if localProject.Path == remoteProject.Path && (localProject.Name == remoteProject.Name || localProject.Remote == remoteProject.Remote) {
+				if localProject.Path == remoteProject.Path &&
+					(localProject.Name == remoteProject.Name || rewriteAndNormalizeRemote(localProject.Remote) == rewriteAndNormalizeRemote(remoteProject.Remote)) {
 					delete(localProjects, localKey)
 					delete(localKeysNotInRemote, localKey)
 					// Change local project key
@@ -1367,7 +1382,6 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 // removed.
 func UpdateUniverse(jirix *jiri.X, gc, localManifest, rebaseTracked, rebaseUntracked, rebaseAll, runHooks, fetchPkgs bool, runHookTimeout, fetchTimeout uint) (e error) {
 	jirix.Logger.Infof("Updating all projects")
-
 	updateFn := func(scanMode ScanMode) error {
 		jirix.TimerPush(fmt.Sprintf("update universe: %s", scanMode))
 		defer jirix.TimerPop()
@@ -1377,7 +1391,6 @@ func UpdateUniverse(jirix *jiri.X, gc, localManifest, rebaseTracked, rebaseUntra
 		if err != nil {
 			return err
 		}
-
 		// Determine the set of remote projects and match them up with the locals.
 		remoteProjects, hooks, pkgs, err := LoadUpdatedManifest(jirix, localProjects, localManifest)
 		MatchLocalWithRemote(localProjects, remoteProjects)

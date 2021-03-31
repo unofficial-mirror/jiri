@@ -145,6 +145,49 @@ func checkProjectsMatchPaths(t *testing.T, gotProjects project.Projects, wantPro
 	}
 }
 
+// TestProjectKeysMatch tests that projects with same remote match when
+// accessed with different URL schemes.
+func TestProjectKeysMatch(t *testing.T) {
+	expected := project.Project{
+		Name:   "project1",
+		Remote: "https://fuchsia.googlesource.com/project1",
+	}
+	testProjectListsTrue := []project.Project{
+		{
+			Name:   "project1",
+			Remote: "persistent-https://fuchsia.googlesource.com/project1",
+		},
+		{
+			Name:   "project1",
+			Remote: "sso://fuchsia/project1",
+		},
+	}
+	testProjectListsFalse := []project.Project{
+		{
+			Name:   "project2",
+			Remote: "https://fuchsia.googlesource.com/project2",
+		},
+		{
+			Name:   "project1",
+			Remote: "https://fuchsia.googlesource.com/project2",
+		},
+		{
+			Name:   "project1",
+			Remote: "sso://fuchia/project2",
+		},
+	}
+	for _, item := range testProjectListsTrue {
+		if item.Key() != expected.Key() {
+			t.Errorf("expecting Key() to match between Projects %v and %v", expected, item)
+		}
+	}
+	for _, item := range testProjectListsFalse {
+		if item.Key() == expected.Key() {
+			t.Errorf("expecting Key() to not match between Projects %v and %v", expected, item)
+		}
+	}
+}
+
 // TestLocalProjects tests the behavior of the LocalProjects method with
 // different ScanModes.
 func TestLocalProjects(t *testing.T) {
