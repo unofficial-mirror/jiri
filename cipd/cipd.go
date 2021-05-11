@@ -276,10 +276,10 @@ func fetchFile(jirix *jiri.X, url string) ([]byte, error) {
 	var contents []byte
 	if err := retry.Function(jirix, func() error {
 		resp, err := client.Do(req)
-		defer resp.Body.Close()
 		if err != nil {
 			return err
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			return fmt.Errorf("got non-success response: %s", resp.Status)
 		}
