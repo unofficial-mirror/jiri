@@ -11,9 +11,10 @@ import (
 )
 
 var fetchPkgsFlags struct {
-	localManifest    bool
-	fetchPkgsTimeout uint
-	attempts         uint
+	localManifest     bool
+	fetchPkgsTimeout  uint
+	attempts          uint
+	skipLocalProjects bool
 }
 
 var cmdFetchPkgs = &cmdline.Command{
@@ -30,12 +31,16 @@ func init() {
 	cmdFetchPkgs.Flags.BoolVar(&fetchPkgsFlags.localManifest, "local-manifest", false, "Use local checked out manifest.")
 	cmdFetchPkgs.Flags.UintVar(&fetchPkgsFlags.fetchPkgsTimeout, "fetch-packages-timeout", project.DefaultPackageTimeout, "Timeout in minutes for fetching prebuilt packages using cipd.")
 	cmdFetchPkgs.Flags.UintVar(&fetchPkgsFlags.attempts, "attempts", 1, "Number of attempts before failing.")
+	cmdFetchPkgs.Flags.BoolVar(&fetchPkgsFlags.skipLocalProjects, "skip-local-projects", false, "Skip checking local project state.")
 }
 
 func runFetchPkgs(jirix *jiri.X, args []string) (err error) {
-	localProjects, err := project.LocalProjects(jirix, project.FastScan)
-	if err != nil {
-		return err
+	localProjects := project.Projects{}
+	if !fetchPkgsFlags.skipLocalProjects {
+		localProjects, err = project.LocalProjects(jirix, project.FastScan)
+		if err != nil {
+			return err
+		}
 	}
 	if fetchPkgsFlags.attempts < 1 {
 		return jirix.UsageErrorf("Number of attempts should be >= 1")
