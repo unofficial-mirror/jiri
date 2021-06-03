@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 
@@ -42,6 +43,7 @@ returned json:
 		{
 			name: name,
 			path: path,
+			relative_path: relative-path,
 			remote: remote,
 			revision: rev
 		},{...}...
@@ -50,6 +52,7 @@ returned json:
 		{
 			name: name,
 			path: path,
+			relative_path: relative-path,
 			remote: remote,
 			revision: rev
 		},{...}...
@@ -58,10 +61,12 @@ returned json:
 		{
 			name: name,
 			path: path,
+			relative_path: relative-path,
 			remote: remote,
 			revision: rev
 			old_revision: old-rev, // if updated
 			old_path: old-path //if moved
+			old_relative_path: old-relative-path //if moved
 			cls:[
 				{
 					number: num,
@@ -93,15 +98,17 @@ type DiffCl struct {
 }
 
 type DiffProject struct {
-	Name        string   `json:"name"`
-	Remote      string   `json:"remote"`
-	Path        string   `json:"path"`
-	OldPath     string   `json:"old_path,omitempty"`
-	Revision    string   `json:"revision"`
-	OldRevision string   `json:"old_revision,omitempty"`
-	Cls         []DiffCl `json:"cls,omitempty"`
-	Error       string   `json:"error,omitempty"`
-	HasMoreCls  bool     `json:"has_more_cls,omitempty"`
+	Name            string   `json:"name"`
+	Remote          string   `json:"remote"`
+	Path            string   `json:"path"`
+	RelativePath    string   `json:"relative_path"`
+	OldPath         string   `json:"old_path,omitempty"`
+	OldRelativePath string   `json:"old_relative_path,omitempty"`
+	Revision        string   `json:"revision"`
+	OldRevision     string   `json:"old_revision,omitempty"`
+	Cls             []DiffCl `json:"cls,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	HasMoreCls      bool     `json:"has_more_cls,omitempty"`
 }
 
 type DiffProjectsByName []DiffProject
@@ -169,11 +176,17 @@ func getDiff(jirix *jiri.X, snapshot1, snapshot2 string) (*Diff, error) {
 	// Get deleted projects
 	for key, p1 := range projects1 {
 		if _, ok := projects2[key]; !ok {
+			rp, err := filepath.Rel(jirix.Root, p1.Path)
+			if err != nil {
+				// should not happen
+				panic(err)
+			}
 			diff.DeletedProjects = append(diff.DeletedProjects, DiffProject{
-				Name:     p1.Name,
-				Remote:   p1.Remote,
-				Path:     p1.Path,
-				Revision: p1.Revision,
+				Name:         p1.Name,
+				Remote:       p1.Remote,
+				Path:         p1.Path,
+				RelativePath: rp,
+				Revision:     p1.Revision,
 			})
 		}
 	}
@@ -182,11 +195,18 @@ func getDiff(jirix *jiri.X, snapshot1, snapshot2 string) (*Diff, error) {
 	updatedProjectKeys := make(chan project.ProjectKey, len(projects2))
 	for key, p2 := range projects2 {
 		if p1, ok := projects1[key]; !ok {
+			rp, err := filepath.Rel(jirix.Root, p2.Path)
+			if err != nil {
+				// should not happen
+				panic(err)
+			}
+
 			diff.NewProjects = append(diff.NewProjects, DiffProject{
-				Name:     p2.Name,
-				Remote:   p2.Remote,
-				Path:     p2.Path,
-				Revision: p2.Revision,
+				Name:         p2.Name,
+				Remote:       p2.Remote,
+				Path:         p2.Path,
+				RelativePath: rp,
+				Revision:     p2.Revision,
 			})
 		} else {
 			if p1.Path != p2.Path || p1.Revision != p2.Revision {
@@ -200,14 +220,26 @@ func getDiff(jirix *jiri.X, snapshot1, snapshot2 string) (*Diff, error) {
 	processUpdatedProject := func(key project.ProjectKey) DiffProject {
 		p1 := projects1[key]
 		p2 := projects2[key]
+		rp, err := filepath.Rel(jirix.Root, p2.Path)
+		if err != nil {
+			// should not happen
+			panic(err)
+		}
 		diffP := DiffProject{
-			Name:     p2.Name,
-			Remote:   p2.Remote,
-			Path:     p2.Path,
-			Revision: p2.Revision,
+			Name:         p2.Name,
+			Remote:       p2.Remote,
+			Path:         p2.Path,
+			RelativePath: rp,
+			Revision:     p2.Revision,
 		}
 		if p1.Path != p2.Path {
+			rp, err := filepath.Rel(jirix.Root, p1.Path)
+			if err != nil {
+				// should not happen
+				panic(err)
+			}
 			diffP.OldPath = p1.Path
+			diffP.OldRelativePath = rp
 		}
 		if p1.Revision != p2.Revision {
 			diffP.OldRevision = p1.Revision

@@ -44,23 +44,27 @@ func setUpSnapshots(t *testing.T, rootDir string) ([]byte, []byte, *Diff) {
 	d.DeletedProjects[0].Name = m1.Projects[i].Name
 	d.DeletedProjects[0].Remote = m1.Projects[i].Remote
 	d.DeletedProjects[0].Path = filepath.Join(rootDir, m1.Projects[i].Path)
+	d.DeletedProjects[0].RelativePath = m1.Projects[i].Path
 	d.DeletedProjects[0].Revision = m1.Projects[i].Revision
 	d.NewProjects[0] = d.DeletedProjects[0]
 	m2.Projects[i].Name = fmt.Sprintf("new-project-%d", i)
 	m2.Projects[i].Path = fmt.Sprintf("new-path-%d", i)
 	d.NewProjects[0].Name = m2.Projects[i].Name
 	d.NewProjects[0].Path = filepath.Join(rootDir, m2.Projects[i].Path)
+	d.NewProjects[0].RelativePath = m2.Projects[i].Path
 
 	i = 4
 	d.DeletedProjects[1].Name = m1.Projects[i].Name
 	d.DeletedProjects[1].Remote = m1.Projects[i].Remote
 	d.DeletedProjects[1].Path = filepath.Join(rootDir, m1.Projects[i].Path)
+	d.DeletedProjects[1].RelativePath = m1.Projects[i].Path
 	d.DeletedProjects[1].Revision = m1.Projects[i].Revision
 	d.NewProjects[1] = d.DeletedProjects[1]
 	m2.Projects[i].Name = fmt.Sprintf("new-project-%d", i)
 	m2.Projects[i].Path = fmt.Sprintf("new-path-%d", i)
 	d.NewProjects[1].Name = m2.Projects[i].Name
 	d.NewProjects[1].Path = filepath.Join(rootDir, m2.Projects[i].Path)
+	d.NewProjects[1].RelativePath = m2.Projects[i].Path
 
 	// update revision
 	i = 0
@@ -68,6 +72,7 @@ func setUpSnapshots(t *testing.T, rootDir string) ([]byte, []byte, *Diff) {
 	d.UpdatedProjects[0].Name = m1.Projects[i].Name
 	d.UpdatedProjects[0].Remote = m1.Projects[i].Remote
 	d.UpdatedProjects[0].Path = filepath.Join(rootDir, m1.Projects[i].Path)
+	d.UpdatedProjects[0].RelativePath = m1.Projects[i].Path
 	d.UpdatedProjects[0].OldRevision = m1.Projects[i].Revision
 	d.UpdatedProjects[0].Revision = m2.Projects[i].Revision
 	d.UpdatedProjects[0].Error = "no gerrit host"
@@ -78,7 +83,9 @@ func setUpSnapshots(t *testing.T, rootDir string) ([]byte, []byte, *Diff) {
 	d.UpdatedProjects[1].Name = m1.Projects[i].Name
 	d.UpdatedProjects[1].Remote = m1.Projects[i].Remote
 	d.UpdatedProjects[1].Path = filepath.Join(rootDir, m2.Projects[i].Path)
+	d.UpdatedProjects[1].RelativePath = m2.Projects[i].Path
 	d.UpdatedProjects[1].OldPath = filepath.Join(rootDir, m1.Projects[i].Path)
+	d.UpdatedProjects[1].OldRelativePath = m1.Projects[i].Path
 	d.UpdatedProjects[1].Revision = m1.Projects[i].Revision
 
 	// rename project
