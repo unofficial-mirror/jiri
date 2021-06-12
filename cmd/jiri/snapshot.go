@@ -10,6 +10,14 @@ import (
 	"go.fuchsia.dev/jiri/project"
 )
 
+var (
+	submoduleFlag bool
+)
+
+func init() {
+	cmdSnapshot.Flags.BoolVar(&submoduleFlag, "submodule", false, "Filter snapshot for use with git submodules.")
+}
+
 var cmdSnapshot = &cmdline.Command{
 	Runner: jiri.RunnerFunc(runSnapshot),
 	Name:   "snapshot",
@@ -26,5 +34,5 @@ func runSnapshot(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
-	return project.CreateSnapshot(jirix, args[0], nil, nil, true)
+	return project.CreateSnapshot(jirix, args[0], nil, nil, true, submoduleFlag)
 }

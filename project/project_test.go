@@ -2707,3 +2707,77 @@ func TestCheckProjectsHostnames(t *testing.T) {
 		t.Errorf("expecting error from CheckProjectsHostnames, but got nil")
 	}
 }
+
+func TestPrefixTree(t *testing.T) {
+	jirix, cleanup := xtest.NewX(t)
+	defer cleanup()
+
+	projectList := []project.Project{
+		{Name: "root", Path: "."},
+		{Name: "a", Path: "a"},
+		{Name: "b", Path: "b"},
+		{Name: "c/d/e", Path: "c/d/e"},
+		{Name: "c/d/f", Path: "c/d/f"},
+		{Name: "c/d", Path: "c/d"},
+		{Name: "c", Path: "c"},
+	}
+	projects := make(project.Projects)
+	for _, p := range projectList {
+		projects[p.Key()] = p
+	}
+	expectedDropped := []project.Project{
+		projectList[0],
+		projectList[3],
+		projectList[4],
+		projectList[5],
+	}
+
+	// Fill projects into prefix tree
+	_, treeRoot, err := project.GenerateSubmoduleTree(jirix, projects)
+	if err != nil {
+		t.Errorf("GenerateSubmoduleTree failed due to error: %v", err)
+	}
+
+	// generate logs when test failed
+	failedDropped := func() {
+		t.Logf("wrong nested projects list")
+		t.Logf("expecting: ")
+		for _, v := range expectedDropped {
+			t.Logf("\tproject:%q", v.Path)
+		}
+		t.Logf("got:")
+		for _, v := range treeRoot.Dropped {
+			t.Logf("\tproject:%q", v.Path)
+		}
+		t.Fail()
+	}
+
+	// Verify nested projects
+	if len(treeRoot.Dropped) != len(expectedDropped) {
+		failedDropped()
+	}
+	for _, v := range expectedDropped {
+		if _, ok := treeRoot.Dropped[v.Key()]; !ok {
+			failedDropped()
+			break
+		}
+	}
+
+	root := treeRoot.Root
+	// Verify the shape of prefix tree
+	if len(root.Children) == 3 {
+		prefixes := []string{"a", "b", "c"}
+		for _, v := range prefixes {
+			if _, ok := root.Children[v]; !ok {
+				t.Errorf("root node does not contain project %q", v)
+			}
+		}
+		for _, v := range root.Children {
+			if len(v.Children) != 0 {
+				t.Errorf("more than 1 level of nodes found in prefix tree")
+			}
+		}
+	} else {
+		t.Errorf("expecting %v first level nodes, but got %v", 3, len(root.Children))
+	}
+}

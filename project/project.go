@@ -738,7 +738,7 @@ func (sm ScanMode) String() string {
 // HEAD of all projects and writes this snapshot out to the given file.
 // if hooks are not passed, jiri will read JiriManifestFile and get hooks from there,
 // so always pass hooks incase updating from a snapshot
-func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, localManifest bool) error {
+func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, localManifest bool, submodules bool) error {
 	jirix.TimerPush("create snapshot")
 	defer jirix.TimerPop()
 
@@ -753,6 +753,19 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, loca
 	localProjects, err := LocalProjects(jirix, FullScan)
 	if err != nil {
 		return err
+	}
+
+	if submodules {
+		_, treeRoot, err := GenerateSubmoduleTree(jirix, localProjects)
+		if err != nil {
+			return err
+		}
+		// Remove dropped projects
+		for _, project := range localProjects {
+			if _, ok := treeRoot.Dropped[project.Key()]; ok {
+				delete(localProjects, project.Key())
+			}
+		}
 	}
 
 	for _, project := range localProjects {
@@ -772,10 +785,12 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, loca
 		}
 	}
 
-	for _, hook := range hooks {
-		manifest.Hooks = append(manifest.Hooks, hook)
+	// Skip hooks for submodules
+	if !submodules {
+		for _, hook := range hooks {
+			manifest.Hooks = append(manifest.Hooks, hook)
+		}
 	}
-
 	for _, pack := range pkgs {
 		manifest.Packages = append(manifest.Packages, pack)
 	}
@@ -1470,7 +1485,7 @@ func WriteUpdateHistoryLog(jirix *jiri.X) error {
 // projects and writes it to the update history directory.
 func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks, pkgs Packages, localManifest bool) error {
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
-	if err := CreateSnapshot(jirix, snapshotFile, hooks, pkgs, localManifest); err != nil {
+	if err := CreateSnapshot(jirix, snapshotFile, hooks, pkgs, localManifest, false); err != nil {
 		return err
 	}
 
@@ -2570,4 +2585,166 @@ func writeAttributesJSON(jirix *jiri.X) error {
 	}
 	jirix.Logger.Debugf("package optional attributes written to %s", jsonFile)
 	return nil
+}
+
+type ProjectTree struct {
+	project  *Project
+	Children map[string]*ProjectTree
+}
+
+type ProjectTreeRoot struct {
+	Root    *ProjectTree
+	Dropped Projects
+}
+
+func GenerateSubmoduleTree(jirix *jiri.X, projects Projects) ([]Project, *ProjectTreeRoot, error) {
+	projEntries := make([]Project, len(projects))
+
+	// relativize the paths and copy projects from map to slice for sorting.
+	i := 0
+	for _, v := range projects {
+		relPath, err := makePathRel(jirix.Root, v.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		v.Path = relPath
+		projEntries[i] = v
+		i++
+	}
+	sort.Slice(projEntries, func(i, j int) bool {
+		return string(projEntries[i].Key()) < string(projEntries[j].Key())
+	})
+
+	// Create path prefix tree to collect all nested projects
+	root := ProjectTree{nil, make(map[string]*ProjectTree)}
+	treeRoot := ProjectTreeRoot{&root, make(Projects)}
+	for _, v := range projEntries {
+		if err := treeRoot.add(jirix, v); err != nil {
+			return nil, nil, err
+		}
+	}
+	return projEntries, &treeRoot, nil
+}
+
+func (p *ProjectTreeRoot) add(jirix *jiri.X, proj Project) error {
+	if p == nil || p.Root == nil {
+		return errors.New("add called with nil root pointer")
+	}
+
+	if proj.Path == "." || proj.Path == "" || proj.Path == string(filepath.Separator) {
+		// Skip fuchsia.git project
+		p.Dropped[proj.Key()] = proj
+		return nil
+	}
+
+	// git submodule does not support one submodule to be placed under the path
+	// of another submodule, therefore, it is necessary to detect nested
+	// projects in jiri manifests and drop them from gitmodules file.
+	//
+	// The nested project detection is based on only 1 rule:
+	// If the path of project A (pathA) is the parent directory of project B,
+	// project B will be considered as nested under project A. It will be recorded
+	// in "dropped" map.
+	//
+	// Due to the introduction of fuchsia.git, based on the rule above, all
+	// other projects will be considered as nested project under fuchsia.git,
+	// therefore, fuchsia.git is excluded in this detection process.
+	//
+	// The detection algorithm works in following ways:
+	//
+	// Assuming we have two project: "projA" and "projB", "projA" is located at
+	// "$JIRI_ROOT/a" and projB is located as "$JIRI_ROOT/b/c".
+	// The projectTree will look like the following chart:
+	//
+	//                   a    +-------+
+	//               +--------+ projA |
+	//               |        +-------+
+	// +---------+   |
+	// |nil(root)+---+
+	// +---------+   |
+	//               |   b    +-------+   c   +-------+
+	//               +--------+  nil  +-------+ projB |
+	//                        +-------+       +-------+
+	//
+	// The text inside each block represents the projectTree.project field,
+	// each edge represents a key of projectTree.children field.
+	//
+	// Assuming we adds project "projC" whose path is "$JIRI_ROOT/a/d", it will
+	// be dropped as the children of root already have key "a" and
+	// children["a"].project is not pointed to nil, which means "projC" is
+	// nested under "projA".
+	//
+	// Assuming we adds project "projD" whose path is "$JIRI_ROOT/d", it will
+	// be added successfully since root.children does not have key "d" yet,
+	// which means "projD" is not nested under any known project and no project
+	// is currently nested under "projD" yet.
+	//
+	// Assuming we adds project "projE" whose path is "$JIRI_ROOT/b", it will
+	// be added successfully and "projB" will be dropped. The reason is that
+	// root.children["b"].project is nil but root.children["b"].children is not
+	// empty, so any projects that can be reached from root.children["b"]
+	// should be dropped as they are nested under "projE".
+	elmts := strings.Split(proj.Path, string(filepath.Separator))
+	pin := p.Root
+	for i := 0; i < len(elmts); i++ {
+		if child, ok := pin.Children[elmts[i]]; ok {
+			if child.project != nil {
+				// proj is nested under next.project, drop proj
+				jirix.Logger.Debugf("project %q:%q nested under project %q:%q", proj.Path, proj.Remote, proj.Path, child.project.Remote)
+				p.Dropped[proj.Key()] = proj
+				return nil
+			}
+			pin = child
+		} else {
+			child = &ProjectTree{nil, make(map[string]*ProjectTree)}
+			pin.Children[elmts[i]] = child
+			pin = child
+		}
+	}
+	if len(pin.Children) != 0 {
+		// There is one or more project nested under proj.
+		jirix.Logger.Debugf("following project nested under project %q:%q", proj.Path, proj.Remote)
+		if err := p.prune(jirix, pin); err != nil {
+			return err
+		}
+		jirix.Logger.Debugf("\n")
+	}
+	pin.project = &proj
+	return nil
+}
+
+func (p *ProjectTreeRoot) prune(jirix *jiri.X, node *ProjectTree) error {
+	// Looking for projects nested under node using BFS
+	workList := make([]*ProjectTree, 0)
+	workList = append(workList, node)
+
+	for len(workList) > 0 {
+		item := workList[0]
+		if item == nil {
+			return errors.New("purgeLeaves encountered a nil node")
+		}
+		workList = workList[1:]
+		if item.project != nil {
+			p.Dropped[item.project.Key()] = *item.project
+			jirix.Logger.Debugf("\tnested project %q:%q", item.project.Path, item.project.Remote)
+		}
+		for _, v := range item.Children {
+			workList = append(workList, v)
+		}
+	}
+
+	// Purge leaves under node
+	node.Children = make(map[string]*ProjectTree)
+	return nil
+}
+
+func makePathRel(basepath, targpath string) (string, error) {
+	if filepath.IsAbs(targpath) {
+		relPath, err := filepath.Rel(basepath, targpath)
+		if err != nil {
+			return "", err
+		}
+		return relPath, nil
+	}
+	return targpath, nil
 }
