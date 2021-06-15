@@ -30,7 +30,7 @@ Usage:
 
 A typical bootstrap workflow looks like this:
 
-$ curl -s https://fuchsia.googlesource.com/jiri/+/master/scripts/bootstrap_jiri?format=TEXT | base64 --decode | bash -s myroot
+$ curl -s https://fuchsia.googlesource.com/jiri/+/main/scripts/bootstrap_jiri?format=TEXT | base64 --decode | bash -s myroot
 $ export PATH=myroot/.jiri_root/bin:$PATH
 $ cd myroot
 $ jiri import manifest https://example.com/manifest
@@ -82,8 +82,8 @@ if [[ ${HOST_OS} == "darwin" ]]; then
   HOST_OS="mac"
 fi
 readonly TARGET="${HOST_OS}-${ARCH}"
-readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/master?format=JSON"
-readonly LOG_URL="${JIRI_REPO_URL}/+log/refs/heads/master?format=JSON"
+readonly COMMIT_URL="${JIRI_REPO_URL}/+refs/heads/main?format=JSON"
+readonly LOG_URL="${JIRI_REPO_URL}/+log/refs/heads/main?format=JSON"
 readonly VERSION=$(curl -sSf "${COMMIT_URL}" | sed -n 's/.*"value": "\([0-9a-f]\{40\}\)"/\1/p')
 readonly VERSIONS=$(curl -sSf "${LOG_URL}" | sed -n 's/.*"commit": "\([0-9a-f]\{40\}\)".*/\1/p')
 readonly TEMP_FILE=$(mktemp)
