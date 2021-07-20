@@ -317,7 +317,7 @@ func (i *Import) ProjectKey() ProjectKey {
 func (i *Import) projectKeyFileName() string {
 	// TODO(toddw): Disallow weird characters from project names.
 	hash := fnv.New64a()
-	hash.Write([]byte(i.ProjectKey()))
+	_, _ = io.WriteString(hash, i.ProjectKey().String())
 	return fmt.Sprintf("%s_%x", i.Name, hash.Sum64())
 }
 
@@ -429,8 +429,11 @@ type Hook struct {
 	ActionPath  string   `xml:"-"`
 }
 
-// HookKey is a unique string for a project.
-type HookKey string
+// HookKey is a map key for a project.
+type HookKey struct {
+	name        string
+	projectName string
+}
 
 type Hooks map[HookKey]Hook
 
@@ -441,7 +444,7 @@ func (h Hook) Key() HookKey {
 
 // MakeHookKey returns the hook key, given the hook and project name.
 func MakeHookKey(name, projectName string) HookKey {
-	return HookKey(name + KeySeparator + projectName)
+	return HookKey{name: name, projectName: projectName}
 }
 
 func (h *Hook) validate() error {
@@ -522,21 +525,34 @@ func (packages PackagesByKey) Swap(i, j int) {
 	packages[i], packages[j] = packages[j], packages[i]
 }
 func (packages PackagesByKey) Less(i, j int) bool {
-	return packages[i].Key() < packages[j].Key()
+	return packages[i].Key().Less(packages[j].Key())
 }
 
-type PackageKey string
+type PackageKey struct {
+	path string
+	name string
+}
+
+func (k PackageKey) Less(other PackageKey) bool {
+	if k.path < other.path {
+		return true
+	}
+	if k.name < other.name {
+		return true
+	}
+	return false
+}
 
 type Packages map[PackageKey]Package
 
 type PackageKeys []PackageKey
 
 func (p Package) Key() PackageKey {
-	return PackageKey(p.Path + KeySeparator + p.Name)
+	return PackageKey{path: p.Path, name: p.Name}
 }
 
 func (pks PackageKeys) Len() int           { return len(pks) }
-func (pks PackageKeys) Less(i, j int) bool { return string(pks[i]) < string(pks[j]) }
+func (pks PackageKeys) Less(i, j int) bool { return pks[i].Less(pks[j]) }
 func (pks PackageKeys) Swap(i, j int)      { pks[i], pks[j] = pks[j], pks[i] }
 
 // FilterACL returns a new Packages map without any inaccessible packages.
@@ -720,7 +736,7 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 				return err
 			}
 			for _, pkg := range pkgs {
-				if pkgLock, ok := ld.PackageLocks[PackageLockKey(pkg+KeySeparator+v.Version)]; ok {
+				if pkgLock, ok := ld.PackageLocks[MakePackageLockKey(pkg, v.Version)]; ok {
 					if pkgLock.VersionTag != v.Version && !jirix.IgnoreLockConflicts {
 						// Package version conflicts detected. Treated it as an error.
 						s := fmt.Sprintf("package %q has conflicting version in manifest and jiri.lock: %s:%s", v.Name, v.Version, pkgLock.VersionTag)

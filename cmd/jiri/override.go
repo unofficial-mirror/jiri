@@ -191,12 +191,12 @@ func runOverride(jirix *jiri.X, args []string) error {
 		remote := args[1]
 		overrideKeys := make(map[string]bool)
 		for _, p := range manifest.ProjectOverrides {
-			overrideKeys[string(p.Key())] = true
+			overrideKeys[p.Key().String()] = true
 		}
 		for _, p := range manifest.ImportOverrides {
-			overrideKeys[string(p.ProjectKey())] = true
+			overrideKeys[p.ProjectKey().String()] = true
 		}
-		if _, ok := overrideKeys[string(project.MakeProjectKey(name, remote))]; !ok {
+		if _, ok := overrideKeys[project.MakeProjectKey(name, remote).String()]; !ok {
 			if overrideFlags.importManifest != "" {
 				importOverride := project.Import{
 					Name:     name,

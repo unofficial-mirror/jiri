@@ -105,7 +105,7 @@ func projectNames(mapInputs map[project.ProjectKey]*mapInput) []string {
 func projectKeys(mapInputs map[project.ProjectKey]*mapInput) []string {
 	n := []string{}
 	for key := range mapInputs {
-		n = append(n, string(key))
+		n = append(n, key.String())
 	}
 	sort.Strings(n)
 	return n
@@ -351,7 +351,7 @@ func runRunp(jirix *jiri.X, args []string) error {
 	for _, localProject := range projects {
 		key := localProject.Key()
 		if keysRE != nil {
-			if !keysRE.MatchString(string(key)) {
+			if !keysRE.MatchString(key.String()) {
 				continue
 			}
 		}
@@ -416,7 +416,7 @@ func runRunp(jirix *jiri.X, args []string) error {
 	go func() { <-sigch; mr.Cancel() }()
 	go mr.Run(in, out, runner, runner)
 	for _, key := range keys {
-		in <- &simplemr.Record{string(key), []interface{}{mapInputs[key]}}
+		in <- &simplemr.Record{key.String(), []interface{}{mapInputs[key]}}
 	}
 	close(in)
 	<-out

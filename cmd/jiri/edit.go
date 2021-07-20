@@ -222,7 +222,7 @@ func updateLocks(jirix *jiri.X, tempDir, lockfile string, backup, projects map[s
 
 	found := false
 	for k, v := range projectLocks {
-		if newRev, ok := projects[string(k)]; ok {
+		if newRev, ok := projects[k.String()]; ok {
 			v.Revision = newRev
 			projectLocks[k] = v
 			found = true
@@ -344,7 +344,7 @@ func updateManifest(jirix *jiri.X, manifestPath string, projects, imports, packa
 				return err
 			}
 		}
-		editedProjects[string(p.Key())] = newRevision
+		editedProjects[p.Key().String()] = newRevision
 		ec.Projects = append(ec.Projects, projectChanges{
 			Name:   p.Name,
 			Remote: p.Remote,

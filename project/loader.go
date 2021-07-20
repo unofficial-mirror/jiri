@@ -513,13 +513,13 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		for _, p := range m.ProjectOverrides {
 			// Reuse the MakeProjectKey function in case it is changed
 			// in the future.
-			key := string(p.Key())
+			key := p.Key().String()
 			ld.ProjectOverrides[key] = p
 		}
 		for _, p := range m.ImportOverrides {
 			// Reuse the MakeProjectKey function in case it is changed
 			// in the future.
-			key := string(p.ProjectKey())
+			key := p.ProjectKey().String()
 			if !jirix.UsingImportOverride {
 				jirix.UsingImportOverride = true
 			}

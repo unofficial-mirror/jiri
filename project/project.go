@@ -117,12 +117,37 @@ func (projects ProjectsByPath) Less(i, j int) bool {
 	return projects[i].Path+string(filepath.Separator) < projects[j].Path+string(filepath.Separator)
 }
 
-// ProjectKey is a unique string for a project.
-type ProjectKey string
+// ProjectKey is a map key for a project.
+type ProjectKey struct {
+	name   string
+	remote string
+}
+
+func (k ProjectKey) Less(other ProjectKey) bool {
+	if k.name < other.name {
+		return true
+	}
+	if k.remote < other.remote {
+		return true
+	}
+	return false
+}
+
+func (k ProjectKey) String() string {
+	return strings.Join([]string{k.name, k.remote}, KeySeparator)
+}
+
+func ProjectKeyFromString(s string) (ProjectKey, bool) {
+	parts := strings.SplitN(s, KeySeparator, 2)
+	if len(parts) != 2 {
+		return ProjectKey{}, false
+	}
+	return MakeProjectKey(parts[0], parts[1]), true
+}
 
 // MakeProjectKey returns the project key, given the project name and normalized remote.
 func MakeProjectKey(name, remote string) ProjectKey {
-	return ProjectKey(name + KeySeparator + rewriteAndNormalizeRemote(remote))
+	return ProjectKey{name: name, remote: rewriteAndNormalizeRemote(remote)}
 }
 
 // KeySeparator is a reserved string used in ProjectKeys and HookKeys.
@@ -133,7 +158,7 @@ const KeySeparator = "="
 type ProjectKeys []ProjectKey
 
 func (pks ProjectKeys) Len() int           { return len(pks) }
-func (pks ProjectKeys) Less(i, j int) bool { return string(pks[i]) < string(pks[j]) }
+func (pks ProjectKeys) Less(i, j int) bool { return pks[i].Less(pks[j]) }
 func (pks ProjectKeys) Swap(i, j int)      { pks[i], pks[j] = pks[j], pks[i] }
 
 // ProjectFromFile returns a project parsed from the contents of filename,
@@ -209,7 +234,7 @@ func (p *Project) relativizePaths(basepath string) error {
 
 // Key returns the unique ProjectKey for the project.
 func (p Project) Key() ProjectKey {
-	if p.ComputedKey == "" {
+	if p.ComputedKey == (ProjectKey{}) {
 		p.ComputedKey = MakeProjectKey(p.Name, p.Remote)
 	}
 	return p.ComputedKey
@@ -381,13 +406,20 @@ type ProjectLock struct {
 }
 
 // ProjectLockKey defines the key used in ProjectLocks type
-type ProjectLockKey string
+type ProjectLockKey struct {
+	name   string
+	remote string
+}
+
+func (k ProjectLockKey) String() string {
+	return strings.Join([]string{k.name, k.remote}, KeySeparator)
+}
 
 // ProjectLocks type is a map wrapper over ProjectLock for faster look up.
 type ProjectLocks map[ProjectLockKey]ProjectLock
 
 func (p ProjectLock) Key() ProjectLockKey {
-	return ProjectLockKey(p.Name + KeySeparator + p.Remote)
+	return ProjectLockKey{name: p.Name, remote: p.Remote}
 }
 
 // PackageLock describes locked version information for a jiri managed package.
@@ -399,13 +431,20 @@ type PackageLock struct {
 }
 
 // PackageLockKey defines the key used in PackageLocks type
-type PackageLockKey string
+type PackageLockKey struct {
+	packageName string
+	versionTag  string
+}
+
+func MakePackageLockKey(packageName string, versionTag string) PackageLockKey {
+	return PackageLockKey{packageName: packageName, versionTag: versionTag}
+}
 
 // PackageLocks type is map wrapper over PackageLock for faster look up
 type PackageLocks map[PackageLockKey]PackageLock
 
 func (p PackageLock) Key() PackageLockKey {
-	return PackageLockKey(p.PackageName + KeySeparator + p.VersionTag)
+	return MakePackageLockKey(p.PackageName, p.VersionTag)
 }
 
 // LockEqual determines whether current PackageLock has same version and
@@ -531,7 +570,7 @@ func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byt
 // in manifest. It will return the original project if no suitable match is found.
 func overrideProject(jirix *jiri.X, project Project, projectOverrides map[string]Project, importOverrides map[string]Import) (Project, error) {
 
-	key := string(project.Key())
+	key := project.Key().String()
 	if remoteOverride, ok := importOverrides[key]; ok {
 		project.Revision = remoteOverride.Revision
 		if _, ok := projectOverrides[key]; ok {
@@ -548,7 +587,7 @@ func overrideProject(jirix *jiri.X, project Project, projectOverrides map[string
 // overrideImport performs override on remote import if matching override declaration is found
 // in manifest. It will return the original remote import if no suitable match is found
 func overrideImport(jirix *jiri.X, remote Import, projectOverrides map[string]Project, importOverrides map[string]Import) (Import, error) {
-	key := string(remote.ProjectKey())
+	key := remote.ProjectKey().String()
 	if _, ok := projectOverrides[key]; ok {
 		return remote, fmt.Errorf("project override \"%s:%s\" cannot be used to override an import", remote.Name, remote.Remote)
 	}
@@ -660,37 +699,27 @@ func (ps Projects) toSlice() []Project {
 	return pSlice
 }
 
-// Find returns all projects in Projects with the given key or name.
-func (ps Projects) Find(keyOrName string) Projects {
-	projects := Projects{}
-	if p, ok := ps[ProjectKey(keyOrName)]; ok {
-		projects[ProjectKey(keyOrName)] = p
-	} else {
-		for key, p := range ps {
-			if keyOrName == p.Name {
-				projects[key] = p
-			}
-		}
-	}
-	return projects
-}
-
 // FindUnique returns the project in Projects with the given key or name, and
 // returns an error if none or multiple matching projects are found.
 func (ps Projects) FindUnique(keyOrName string) (Project, error) {
-	var p Project
-	projects := ps.Find(keyOrName)
+	if key, ok := ProjectKeyFromString(keyOrName); ok {
+		if p, ok := ps[key]; ok {
+			return p, nil
+		}
+	}
+	var projects []Project
+	for _, p := range ps {
+		if keyOrName == p.Name {
+			projects = append(projects, p)
+		}
+	}
 	if len(projects) == 0 {
-		return p, fmt.Errorf("no projects found with key or name %q", keyOrName)
+		return Project{}, fmt.Errorf("no projects found with key or name %q", keyOrName)
 	}
 	if len(projects) > 1 {
-		return p, fmt.Errorf("multiple projects found with name %q", keyOrName)
+		return Project{}, fmt.Errorf("multiple projects found with name %q", keyOrName)
 	}
-	// Return the only project in projects.
-	for _, project := range projects {
-		p = project
-	}
-	return p, nil
+	return projects[0], nil
 }
 
 // ScanMode determines whether LocalProjects should scan the local filesystem
@@ -1320,7 +1349,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 				pkgKeys = append(pkgKeys, k)
 			}
 			sort.Slice(pkgKeys, func(i, j int) bool {
-				return pkgKeys[i] < pkgKeys[j]
+				return pkgKeys[i].Less(pkgKeys[j])
 			})
 			for _, k := range pkgKeys {
 				v := pkgs[k]
@@ -1334,7 +1363,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 						return nil, nil, err
 					}
 					for _, expandedName := range expandedNames {
-						lockKey := PackageLockKey(expandedName + KeySeparator + v.Version)
+						lockKey := MakePackageLockKey(expandedName, v.Version)
 						lockEntry, ok := pkgLocks[lockKey]
 						if !ok {
 							jirix.Logger.Errorf("lock key not found in pkgLocks: %v, package: %+v", lockKey, v)
@@ -2589,7 +2618,7 @@ func GenerateSubmoduleTree(jirix *jiri.X, projects Projects) ([]Project, *Projec
 		i++
 	}
 	sort.Slice(projEntries, func(i, j int) bool {
-		return string(projEntries[i].Key()) < string(projEntries[j].Key())
+		return projEntries[i].Key().Less(projEntries[j].Key())
 	})
 
 	// Create path prefix tree to collect all nested projects

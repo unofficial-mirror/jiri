@@ -170,7 +170,7 @@ func makePathRel(basepath, targpath string) (string, error) {
 
 func moduleDecl(p project.Project) string {
 	tmpl := "[submodule \"%s\"]\n\tpath = %s\n\turl = %s"
-	hashBytes := (sha256.Sum256([]byte(p.Key())))
+	hashBytes := sha256.Sum256([]byte(p.Key().String()))
 	return fmt.Sprintf(tmpl, p.Name+"-"+hex.EncodeToString(hashBytes[:5]), p.Path, p.Remote)
 }
 

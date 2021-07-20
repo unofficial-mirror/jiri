@@ -98,12 +98,12 @@ func TestRunP(t *testing.T) {
 		}
 	}
 
-	manifestKey := strings.Replace(string(projects[0].Key()), "r.a", "manifest", -1)
+	manifestKey := strings.Replace(projects[0].Key().String(), "r.a", "manifest", -1)
 	manifestPath := strings.Replace(projects[0].Path, "r.a", "manifest", -1)
 	keys := []string{manifestKey}
 	paths := []string{manifestPath}
 	for _, p := range projects {
-		keys = append(keys, string(p.Key()))
+		keys = append(keys, p.Key().String())
 		paths = append(paths, p.Path)
 	}
 
