@@ -438,58 +438,35 @@ type ResolveConfig interface {
 // UnmarshalLockEntries unmarshals project locks and package locks from
 // jsonData.
 func UnmarshalLockEntries(jsonData []byte) (ProjectLocks, PackageLocks, error) {
-	entries := make([]interface{}, 0)
 	projectLocks := make(ProjectLocks)
 	pkgLocks := make(PackageLocks)
+	var entries []map[string]string
 	if err := json.Unmarshal(jsonData, &entries); err != nil {
 		return nil, nil, err
 	}
 	for _, entry := range entries {
-		entryMap := entry.(map[string]interface{})
-		if _, ok := entryMap["package"]; ok {
-			pkgName, ok := entryMap["package"].(string)
-			if !ok {
-				return nil, nil, fmt.Errorf("package name %+v is not a valid string", entryMap["package"])
-			}
-			id, ok := entryMap["instance_id"].(string)
-			if !ok {
-				return nil, nil, fmt.Errorf("package instance_id %+v is not a valid string", entryMap["instance_id"])
-			}
-			version, ok := entryMap["version"].(string)
-			if !ok {
-				return nil, nil, fmt.Errorf("package version %+v is not a valid string", entryMap["version"])
-			}
-			localPath, ok := entryMap["path"].(string)
+		if pkgName, ok := entry["package"]; ok {
 			pkgLock := PackageLock{
 				PackageName: pkgName,
-				VersionTag:  version,
-				InstanceID:  id,
-				LocalPath:   localPath,
+				VersionTag:  entry["version"],
+				InstanceID:  entry["instance_id"],
+				LocalPath:   entry["path"],
 			}
 			if v, ok := pkgLocks[pkgLock.Key()]; ok {
 				if v != pkgLock {
-					return nil, nil, fmt.Errorf("package %q has more than 1 version lock %q, %q", pkgName, v.InstanceID, id)
+					return nil, nil, fmt.Errorf("package %q has more than 1 version lock %q, %q", pkgName, v.InstanceID, pkgLock.InstanceID)
 				}
 			}
 			pkgLocks[pkgLock.Key()] = pkgLock
-		} else if _, ok := entryMap["repository_url"]; ok {
-			repoURL, ok := entryMap["repository_url"].(string)
-			if !ok {
-				return nil, nil, fmt.Errorf("project repository url %+v is not a valid string", entryMap["repository_url"])
+		} else if repoURL, ok := entry["repository_url"]; ok {
+			projectLock := ProjectLock{
+				Remote:   repoURL,
+				Name:     entry["name"],
+				Revision: entry["revision"],
 			}
-			revision, ok := entryMap["revision"].(string)
-			if !ok {
-				return nil, nil, fmt.Errorf("project revision %+v is not a valid string", entryMap["revision"])
-			}
-			name, ok := entryMap["name"].(string)
-			if !ok {
-				return nil, nil, fmt.Errorf("project name %+v is not a valid string", entryMap["name"])
-			}
-
-			projectLock := ProjectLock{repoURL, name, revision}
 			if v, ok := projectLocks[projectLock.Key()]; ok {
 				if v != projectLock {
-					return nil, nil, fmt.Errorf("package %q has more than 1 revision lock %q, %q", repoURL, v.Revision, revision)
+					return nil, nil, fmt.Errorf("package %q has more than 1 revision lock %q, %q", repoURL, v.Revision, projectLock.Revision)
 				}
 			}
 			projectLocks[projectLock.Key()] = projectLock
