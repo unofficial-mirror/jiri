@@ -2139,13 +2139,14 @@ func TestManifestToFromBytes(t *testing.T) {
 				},
 				Projects: []project.Project{
 					{
-						Name:         "project1",
-						Path:         "path1",
-						Remote:       "remote1",
-						RemoteBranch: "master",
-						Revision:     "HEAD",
-						GerritHost:   "https://test-review.googlesource.com",
-						GitHooks:     "path/to/githooks",
+						Name:          "project1",
+						Path:          "path1",
+						Remote:        "remote1",
+						RemoteBranch:  "master",
+						Revision:      "HEAD",
+						GerritHost:    "https://test-review.googlesource.com",
+						GitHooks:      "path/to/githooks",
+						GitSubmodules: true,
 					},
 					{
 						Name:         "project2",
@@ -2171,7 +2172,7 @@ func TestManifestToFromBytes(t *testing.T) {
     <localimport file="fileimport"/>
   </imports>
   <projects>
-    <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks"/>
+    <project name="project1" path="path1" remote="remote1" gerrithost="https://test-review.googlesource.com" githooks="path/to/githooks" gitsubmodules="true"/>
     <project name="project2" path="path2" remote="remote2" remotebranch="branch2" revision="rev2"/>
   </projects>
   <hooks>

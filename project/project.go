@@ -73,6 +73,9 @@ type Project struct {
 	// this project.
 	GitHooks string `xml:"githooks,attr,omitempty"`
 
+	// Submodules indicates that the project contains git submodules (sub-projects).
+	GitSubmodules bool `xml:"gitsubmodules,attr,omitempty"`
+
 	// Attributes is a list of attributes for a project seperated by comma.
 	// The project will not be fetched by default when attributes are present.
 	Attributes string `xml:"attributes,attr,omitempty"`

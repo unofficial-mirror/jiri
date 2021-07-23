@@ -27,6 +27,7 @@ Manifests have the following XML schema:
              remotebranch="my-branch"
              gerrithost="https://myorg-review.googlesource.com"
              githooks="path/to/githooks-dir"
+             submodules="true"
     />
     ...
   </projects>
@@ -83,6 +84,8 @@ The &lt;project> tags describe the projects to sync, and what state they should 
 * gerrithost (optional) - The url of the Gerrit host for the project.  If specified, then running "jiri cl upload" will upload a CL to this Gerrit host.
 
 * githooks (optional) - The path (relative to the jiri root) of a directory containing git hooks that will be installed in the projects .git/hooks directory during each update.
+
+* submodules (optional) - Whether the project has git submodules (https://git-scm.com/book/en/v2/Git-Tools-Submodules), this attribute needs to be set to `true`. By default it is `false`.
 
 The &lt;packages> tags describe the CIPD packages to sync, and what version they should sync to, according to the following attributes:
 
