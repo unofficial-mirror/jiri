@@ -437,17 +437,18 @@ type PackageLock struct {
 type PackageLockKey struct {
 	packageName string
 	versionTag  string
+	localPath   string
 }
 
-func MakePackageLockKey(packageName string, versionTag string) PackageLockKey {
-	return PackageLockKey{packageName: packageName, versionTag: versionTag}
+func MakePackageLockKey(packageName, versionTag, localPath string) PackageLockKey {
+	return PackageLockKey{packageName: packageName, versionTag: versionTag, localPath: localPath}
 }
 
 // PackageLocks type is map wrapper over PackageLock for faster look up
 type PackageLocks map[PackageLockKey]PackageLock
 
 func (p PackageLock) Key() PackageLockKey {
-	return MakePackageLockKey(p.PackageName, p.VersionTag)
+	return MakePackageLockKey(p.PackageName, p.VersionTag, p.LocalPath)
 }
 
 // LockEqual determines whether current PackageLock has same version and
@@ -1366,7 +1367,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 						return nil, nil, err
 					}
 					for _, expandedName := range expandedNames {
-						lockKey := MakePackageLockKey(expandedName, v.Version)
+						lockKey := MakePackageLockKey(expandedName, v.Version, v.Path)
 						lockEntry, ok := pkgLocks[lockKey]
 						if !ok {
 							jirix.Logger.Errorf("lock key not found in pkgLocks: %v, package: %+v", lockKey, v)
