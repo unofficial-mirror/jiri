@@ -24,14 +24,13 @@ import (
 	"text/template"
 	"time"
 
-	"golang.org/x/net/publicsuffix"
-
 	"go.fuchsia.dev/jiri"
 	"go.fuchsia.dev/jiri/cipd"
 	"go.fuchsia.dev/jiri/envvar"
 	"go.fuchsia.dev/jiri/gerrit"
 	"go.fuchsia.dev/jiri/gitutil"
 	"go.fuchsia.dev/jiri/retry"
+	"golang.org/x/net/publicsuffix"
 )
 
 // Manifest represents a setting used for updating the universe.
@@ -737,7 +736,7 @@ func (ld *loader) enforceLocks(jirix *jiri.X) error {
 				return err
 			}
 			for _, pkg := range pkgs {
-				if pkgLock, ok := ld.PackageLocks[MakePackageLockKey(pkg, v.Version, v.Path)]; ok {
+				if pkgLock, ok := ld.PackageLocks[MakePackageLockKey(pkg, v.Version)]; ok {
 					if pkgLock.VersionTag != v.Version && !jirix.IgnoreLockConflicts {
 						// Package version conflicts detected. Treated it as an error.
 						s := fmt.Sprintf("package %q has conflicting version in manifest and jiri.lock: %s:%s", v.Name, v.Version, pkgLock.VersionTag)
