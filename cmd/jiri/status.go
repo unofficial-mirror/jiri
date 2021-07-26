@@ -193,7 +193,7 @@ func getStatus(jirix *jiri.X, local project.Project, remote project.Project, cur
 		if r, err := scm.CurrentRevisionForRef("JIRI_HEAD"); err == nil {
 			headRev = r
 		} else {
-			headRev, err = project.GetHeadRevision(jirix, remote)
+			headRev, err = project.GetHeadRevision(remote)
 			if err != nil {
 				return "", "", nil, err
 			}

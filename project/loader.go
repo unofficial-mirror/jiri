@@ -547,7 +547,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 	// Process remote imports.
 	for _, remote := range m.Imports {
 		// Apply override if it exists.
-		remote, err := overrideImport(jirix, remote, ld.ProjectOverrides, ld.ImportOverrides)
+		remote, err := overrideImport(remote, ld.ProjectOverrides, ld.ImportOverrides)
 		if err != nil {
 			return err
 		}
@@ -605,7 +605,7 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 	// Collect projects.
 	for _, project := range m.Projects {
 		// Apply override if it exists.
-		project, err := overrideProject(jirix, project, ld.ProjectOverrides, ld.ImportOverrides)
+		project, err := overrideProject(project, ld.ProjectOverrides, ld.ImportOverrides)
 		if err != nil {
 			return err
 		}
@@ -680,7 +680,7 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath, 
 		ref = v.ref
 		// check conflicting imports
 		if !lm && ref != "JIRI_HEAD" {
-			if tref, err := GetHeadRevision(jirix, project); err != nil {
+			if tref, err := GetHeadRevision(project); err != nil {
 				return err
 			} else if tref != ref {
 				return fmt.Errorf("Conflicting ref for import %s - %q and %q. There are conflicting imports in file:\n%s:\n'%s' and '%s'",
@@ -703,8 +703,8 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath, 
 				}
 				if fetch {
 					if cacheDirPath != "" {
-						remoteUrl := rewriteRemote(jirix, project.Remote)
-						if err := updateOrCreateCache(jirix, cacheDirPath, remoteUrl, project.RemoteBranch, project.Revision, 0); err != nil {
+						remoteURL := rewriteRemote(jirix, project.Remote)
+						if err := updateOrCreateCache(jirix, cacheDirPath, remoteURL, project.RemoteBranch, project.Revision, 0); err != nil {
 							return err
 						}
 					}
@@ -721,7 +721,7 @@ func (ld *loader) loadImport(jirix *jiri.X, root, file, cycleKey, cacheDirPath, 
 			}
 			if ref == "" {
 				var err error
-				if ref, err = GetHeadRevision(jirix, project); err != nil {
+				if ref, err = GetHeadRevision(project); err != nil {
 					return err
 				}
 			}

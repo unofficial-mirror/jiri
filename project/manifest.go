@@ -862,7 +862,7 @@ func resolvePackageLocks(jirix *jiri.X, pkgs Packages) (PackageLocks, error) {
 }
 
 // resolveProjectLocks resolves project revisions <project> tags in manifests
-func resolveProjectLocks(jirix *jiri.X, projects Projects) (ProjectLocks, error) {
+func resolveProjectLocks(projects Projects) (ProjectLocks, error) {
 	projectLocks := make(ProjectLocks)
 	for _, v := range projects {
 		projectLock := ProjectLock{v.Remote, v.Name, v.Revision}

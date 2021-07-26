@@ -893,7 +893,7 @@ func TestLocalProjectWithConfig(t *testing.T) {
 	if err := fake.UpdateUniverse(false); err != nil {
 		t.Fatal(err)
 	}
-	project.WriteUpdateHistorySnapshot(fake.X, "", nil, nil, false)
+	project.WriteUpdateHistorySnapshot(fake.X, nil, nil, false)
 
 	lc := project.LocalConfig{Ignore: true}
 	project.WriteLocalConfig(fake.X, localProjects[1], lc)

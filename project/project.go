@@ -453,17 +453,10 @@ func (p PackageLock) Key() PackageLockKey {
 
 // LockEqual determines whether current PackageLock has same version and
 // instance id with PackageLock O.
-func (P PackageLock) LockEqual(O PackageLock) bool {
-	if P.PackageName != O.PackageName {
-		return false
-	}
-	if P.VersionTag != O.VersionTag {
-		return false
-	}
-	if P.InstanceID != O.InstanceID {
-		return false
-	}
-	return true
+func (p PackageLock) LockEqual(other PackageLock) bool {
+	return (p.PackageName == other.PackageName &&
+		p.VersionTag == other.VersionTag &&
+		p.InstanceID == other.InstanceID)
 }
 
 // ResolveConfig interface provides the configuration
@@ -572,8 +565,7 @@ func MarshalLockEntries(projectLocks ProjectLocks, pkgLocks PackageLocks) ([]byt
 
 // overrideProject performs override on project if matching override declaration is found
 // in manifest. It will return the original project if no suitable match is found.
-func overrideProject(jirix *jiri.X, project Project, projectOverrides map[string]Project, importOverrides map[string]Import) (Project, error) {
-
+func overrideProject(project Project, projectOverrides map[string]Project, importOverrides map[string]Import) (Project, error) {
 	key := project.Key().String()
 	if remoteOverride, ok := importOverrides[key]; ok {
 		project.Revision = remoteOverride.Revision
@@ -590,7 +582,7 @@ func overrideProject(jirix *jiri.X, project Project, projectOverrides map[string
 
 // overrideImport performs override on remote import if matching override declaration is found
 // in manifest. It will return the original remote import if no suitable match is found
-func overrideImport(jirix *jiri.X, remote Import, projectOverrides map[string]Project, importOverrides map[string]Import) (Import, error) {
+func overrideImport(remote Import, projectOverrides map[string]Project, importOverrides map[string]Import) (Import, error) {
 	key := remote.ProjectKey().String()
 	if _, ok := projectOverrides[key]; ok {
 		return remote, fmt.Errorf("project override \"%s:%s\" cannot be used to override an import", remote.Name, remote.Remote)
@@ -642,11 +634,11 @@ func (p *Project) writeJiriRevisionFiles(jirix *jiri.X) error {
 		return err
 	}
 	file = filepath.Join(p.Path, ".git", "JIRI_LAST_BASE")
-	if rev, err := scm.CurrentRevision(); err != nil {
+	rev, err := scm.CurrentRevision()
+	if err != nil {
 		return fmt.Errorf("Cannot find current revision for for project %s(%s): %s", p.Name, p.Path, err)
-	} else {
-		return safeWriteFile(jirix, file, []byte(rev))
 	}
+	return safeWriteFile(jirix, file, []byte(rev))
 }
 
 func (p *Project) setupDefaultPushTarget(jirix *jiri.X) error {
@@ -739,9 +731,8 @@ const (
 func (sm ScanMode) String() string {
 	if sm == FastScan {
 		return "FastScan"
-	} else {
-		return "FullScan"
 	}
+	return "FullScan"
 }
 
 // CreateSnapshot creates a manifest that encodes the current state of
@@ -783,15 +774,15 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, loca
 	}
 
 	if hooks == nil || pkgs == nil {
-		if _, tmpHooks, tmpPkgs, err := LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest); err != nil {
+		_, tmpHooks, tmpPkgs, err := LoadManifestFile(jirix, jirix.JiriManifestFile(), localProjects, localManifest)
+		if err != nil {
 			return err
-		} else {
-			if hooks == nil {
-				hooks = tmpHooks
-			}
-			if pkgs == nil {
-				pkgs = tmpPkgs
-			}
+		}
+		if hooks == nil {
+			hooks = tmpHooks
+		}
+		if pkgs == nil {
+			pkgs = tmpPkgs
 		}
 	}
 
@@ -828,7 +819,7 @@ func CheckoutSnapshot(jirix *jiri.X, snapshot string, gc, runHooks, fetchPkgs bo
 	if err := updateProjects(jirix, localProjects, remoteProjects, hooks, pkgs, gc, runHookTimeout, fetchTimeout, false /*rebaseTracked*/, false /*rebaseUntracked*/, false /*rebaseAll*/, true /*snapshot*/, runHooks, fetchPkgs); err != nil {
 		return err
 	}
-	return WriteUpdateHistorySnapshot(jirix, snapshot, hooks, pkgs, false)
+	return WriteUpdateHistorySnapshot(jirix, hooks, pkgs, false)
 }
 
 // LoadSnapshotFile loads the specified snapshot manifest.  If the snapshot
@@ -1073,9 +1064,8 @@ func loadManifestFiles(jirix *jiri.X, manifestFiles []string, localManifest bool
 					return fmt.Errorf("project: %v conflicts with project: %v", existingProject, project)
 				}
 				continue
-			} else {
-				allProjects[project.Key()] = project
 			}
+			allProjects[project.Key()] = project
 		}
 		return nil
 	}
@@ -1087,9 +1077,8 @@ func loadManifestFiles(jirix *jiri.X, manifestFiles []string, localManifest bool
 					return fmt.Errorf("package: %v conflicts with package: %v", existingPkg, pkg)
 				}
 				continue
-			} else {
-				allPkgs[pkg.Key()] = pkg
 			}
+			allPkgs[pkg.Key()] = pkg
 		}
 		return nil
 	}
@@ -1127,11 +1116,7 @@ func writeLockFile(jirix *jiri.X, lockfilePath string, projectLocks ProjectLocks
 		return errors.New("I/O error while writing jiri lockfile")
 	}
 	tempFile.Close()
-	if err := os.Rename(tempFile.Name(), lockfilePath); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Rename(tempFile.Name(), lockfilePath)
 }
 
 // HostnameAllowed determines if hostname is allowed under reference.
@@ -1274,7 +1259,7 @@ func GenerateJiriLockFile(jirix *jiri.X, manifestFiles []string, resolveConfig R
 		if resolveConfig.EnableProjectLock() {
 			// For project locks, there is no differences between
 			// full or partial resolve.
-			projectLocks, err = resolveProjectLocks(jirix, projects)
+			projectLocks, err = resolveProjectLocks(projects)
 			if err != nil {
 				return
 			}
@@ -1493,7 +1478,7 @@ func WriteUpdateHistoryLog(jirix *jiri.X) error {
 
 // WriteUpdateHistorySnapshot creates a snapshot of the current state of all
 // projects and writes it to the update history directory.
-func WriteUpdateHistorySnapshot(jirix *jiri.X, snapshotPath string, hooks Hooks, pkgs Packages, localManifest bool) error {
+func WriteUpdateHistorySnapshot(jirix *jiri.X, hooks Hooks, pkgs Packages, localManifest bool) error {
 	snapshotFile := filepath.Join(jirix.UpdateHistoryDir(), time.Now().Format(time.RFC3339))
 	if err := CreateSnapshot(jirix, snapshotFile, hooks, pkgs, localManifest, false); err != nil {
 		return err
@@ -1573,13 +1558,12 @@ func CleanupProjects(jirix *jiri.X, localProjects Projects, cleanupBranches bool
 // and uncommitted changes, and optionally deletes all the branches except master.
 func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches bool) error {
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(local.Path))
-	headRev, err := GetHeadRevision(jirix, remote)
+	headRev, err := GetHeadRevision(remote)
 	if err != nil {
 		return err
-	} else {
-		if headRev, err = scm.CurrentRevisionForRef(headRev); err != nil {
-			return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", headRev, local.Name, err)
-		}
+	}
+	if headRev, err = scm.CurrentRevisionForRef(headRev); err != nil {
+		return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", headRev, local.Name, err)
 	}
 	if local.Revision != headRev {
 		if err := scm.CheckoutBranch(headRev, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
@@ -1775,7 +1759,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	return nil
 }
 
-func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
+func GetHeadRevision(project Project) (string, error) {
 	if err := project.fillDefaults(); err != nil {
 		return "", err
 	}
@@ -1787,7 +1771,7 @@ func GetHeadRevision(jirix *jiri.X, project Project) (string, error) {
 }
 
 func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) error {
-	revision, err := GetHeadRevision(jirix, project)
+	revision, err := GetHeadRevision(project)
 	if err != nil {
 		return err
 	}
@@ -1835,9 +1819,9 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 
 	if diff, err := scm.FilesWithUncommittedChanges(); err != nil {
-		return fmt.Errorf("Cannot get uncommited changes for project %q: %s", project.Name, err)
+		return fmt.Errorf("Cannot get uncommitted changes for project %q: %s", project.Name, err)
 	} else if len(diff) != 0 {
-		msg := fmt.Sprintf("Project %s(%s) contains uncommited changes:", project.Name, relativePath)
+		msg := fmt.Sprintf("Project %s(%s) contains uncommitted changes:", project.Name, relativePath)
 		if jirix.Logger.LoggerLevel >= log.DebugLevel {
 			for _, item := range diff {
 				msg += "\n" + item
@@ -1851,7 +1835,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 
 	if state.CurrentBranch.Name == "" || snapshot { // detached head
 		if err := checkoutHeadRevision(jirix, project, false); err != nil {
-			revision, err2 := GetHeadRevision(jirix, project)
+			revision, err2 := GetHeadRevision(project)
 			if err2 != nil {
 				return err2
 			}
@@ -1908,7 +1892,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 		branchMap[branch.Name] = branch
 	}
 	rebaseUntrackedMessage := false
-	headRevision, err := GetHeadRevision(jirix, project)
+	headRevision, err := GetHeadRevision(project)
 	if err != nil {
 		return err
 	}

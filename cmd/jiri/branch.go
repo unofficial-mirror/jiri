@@ -352,7 +352,7 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 		}
 
 		if b.IsHead {
-			revision, err := project.GetHeadRevision(jirix, remote)
+			revision, err := project.GetHeadRevision(remote)
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get head revision: %s\n", b.Name, err))
 				continue
@@ -437,7 +437,7 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 				jirix.Logger.Debugf("Not deleting current branch %q for project %s(%s) as it has changes\n\n", b.Name, local.Name, relativePath)
 				continue
 			}
-			revision, err := project.GetHeadRevision(jirix, remote)
+			revision, err := project.GetHeadRevision(remote)
 			if err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get head revision: %s\n", b.Name, err))
 				continue
