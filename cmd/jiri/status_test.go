@@ -42,11 +42,11 @@ func createCommits(t *testing.T, fake *jiritest.FakeJiriRoot, localProjects []pr
 		gitRemote := gitutil.New(fake.X, gitutil.RootDirOpt(fake.Projects[localProject.Name]))
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file1"+strconv.Itoa(i), "file1"+strconv.Itoa(i))
 		gitRemote.CreateAndCheckoutBranch("file-1")
-		gitRemote.CheckoutBranch("master")
+		gitRemote.CheckoutBranch("master", localProject.GitSubmodules)
 		file1CommitRev, _ := gitRemote.CurrentRevision()
 		file1CommitRevs = append(file1CommitRevs, file1CommitRev)
 		gitRemote.CreateAndCheckoutBranch("file-2")
-		gitRemote.CheckoutBranch("master")
+		gitRemote.CheckoutBranch("master", localProject.GitSubmodules)
 		writeFile(t, fake.X, fake.Projects[localProject.Name], "file2"+strconv.Itoa(i), "file2"+strconv.Itoa(i))
 		file2CommitRev, _ := gitRemote.CurrentRevision()
 		file2CommitRevs = append(file2CommitRevs, file2CommitRev)
@@ -152,9 +152,9 @@ func TestStatus(t *testing.T) {
 
 	// Test when HEAD is on different revsion
 	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
-	gitLocal.CheckoutBranch("HEAD~1")
+	gitLocal.CheckoutBranch("HEAD~1", localProjects[1].GitSubmodules)
 	gitLocal = gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[2].Path))
-	gitLocal.CheckoutBranch("file-2")
+	gitLocal.CheckoutBranch("file-2", localProjects[2].GitSubmodules)
 	got = executeStatus(t, fake, "")
 	currentCommits := []string{latestCommitRevs[0], file2CommitRevs[1], file1CommitRevs[2]}
 	currentBranch := []string{"", "", "file-2"}
@@ -268,11 +268,11 @@ func statusFlagsTest(t *testing.T) {
 		gitLocals[i] = gitLocal
 	}
 
-	gitLocals[0].CheckoutBranch("HEAD~1")
-	gitLocals[1].CheckoutBranch("file-2")
-	gitLocals[3].CheckoutBranch("HEAD~2")
-	gitLocals[4].CheckoutBranch("master")
-	gitLocals[5].CheckoutBranch("master")
+	gitLocals[0].CheckoutBranch("HEAD~1", localProjects[0].GitSubmodules)
+	gitLocals[1].CheckoutBranch("file-2", localProjects[1].GitSubmodules)
+	gitLocals[3].CheckoutBranch("HEAD~2", localProjects[3].GitSubmodules)
+	gitLocals[4].CheckoutBranch("master", localProjects[4].GitSubmodules)
+	gitLocals[5].CheckoutBranch("master", localProjects[5].GitSubmodules)
 
 	newfile(t, localProjects[0].Path, "untracked1")
 	newfile(t, localProjects[0].Path, "untracked2")

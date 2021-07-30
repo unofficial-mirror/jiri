@@ -269,7 +269,7 @@ func (g *Git) IsRevAvailable(jirix *jiri.X, remote, rev string) bool {
 }
 
 // CheckoutBranch checks out the given branch.
-func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
+func (g *Git) CheckoutBranch(branch string, gitSubmodules bool, opts ...CheckoutOpt) error {
 	args := []string{"checkout"}
 	var force ForceOpt = false
 	var detach DetachOpt = false
@@ -287,7 +287,35 @@ func (g *Git) CheckoutBranch(branch string, opts ...CheckoutOpt) error {
 	if detach {
 		args = append(args, "--detach")
 	}
+
+	if gitSubmodules {
+		args = append(args, "--recurse-submodules")
+	}
+
 	args = append(args, branch)
+	if err := g.run(args...); err != nil {
+		return err
+	}
+	// After checkout with submodules update/checkout submodules.
+	if gitSubmodules {
+		return g.SubmoduleUpdate(InitOpt(true))
+	}
+	return nil
+}
+
+// SubmoduleUpdate updates submodules for current branch.
+func (g *Git) SubmoduleUpdate(opts ...SubmoduleUpdateOpt) error {
+	args := []string{"submodule", "update"}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case InitOpt:
+			if typedOpt {
+				args = append(args, "--init")
+			}
+		}
+	}
+	// TODO(iankaz): Add setting submodule.fetchJobs in git config to jiri init
+	args = append(args, "--jobs=16")
 	return g.run(args...)
 }
 
@@ -325,6 +353,11 @@ func (g *Git) Clone(repo, path string, opts ...CloneOpt) error {
 		case OffloadPackfilesOpt:
 			if typedOpt {
 				args = append([]string{"-c", "fetch.uriprotocols=https"}, args...)
+			}
+		case RecurseSubmodulesOpt:
+			// TODO(iankaz): Add setting submodule.fetchJobs in git config to jiri init
+			if typedOpt {
+				args = append([]string{"--recurse-submodules", "--jobs=16"}, args...)
 			}
 		}
 	}
@@ -696,6 +729,7 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	depth := 0
 	fetchTag := ""
 	updateHeadOk := false
+	recurseSubmodules := false
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case TagsOpt:
@@ -712,6 +746,8 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 			fetchTag = string(typedOpt)
 		case UpdateHeadOkOpt:
 			updateHeadOk = bool(typedOpt)
+		case RecurseSubmodulesOpt:
+			recurseSubmodules = bool(typedOpt)
 		}
 	}
 	args := []string{}
@@ -733,6 +769,9 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	}
 	if updateHeadOk {
 		args = append(args, "--update-head-ok")
+	}
+	if recurseSubmodules {
+		args = append(args, "--recurse-submodules", "--jobs=16")
 	}
 	if remote != "" {
 		args = append(args, remote)

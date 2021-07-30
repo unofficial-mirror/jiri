@@ -104,7 +104,7 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 					return false, err
 				}
 				if currentBranch == branch {
-					if err := scm.CheckoutBranch("remotes/origin/"+remote, gitutil.DetachOpt(true)); err != nil {
+					if err := scm.CheckoutBranch("remotes/origin/"+remote, local.GitSubmodules, gitutil.DetachOpt(true)); err != nil {
 						return false, err
 					}
 				}
@@ -145,10 +145,10 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 		if err := scm.SetUpstream(branch, "origin/"+remote); err != nil {
 			return false, fmt.Errorf("setting upstream to 'origin/%s': %s", remote, err)
 		}
-		if err := scm.CheckoutBranch(branch); err != nil {
+		if err := scm.CheckoutBranch(branch, local.GitSubmodules); err != nil {
 			return false, err
 		}
-	} else if err := scm.CheckoutBranch(branchBase); err != nil {
+	} else if err := scm.CheckoutBranch(branchBase, local.GitSubmodules); err != nil {
 		return false, err
 	}
 	if cherryPickFlag {
@@ -166,7 +166,7 @@ func patchProject(jirix *jiri.X, local project.Project, ref, branch, remote stri
 			}
 
 			// checkout last ref
-			if err := scm.CheckoutBranch(lastRef); err != nil {
+			if err := scm.CheckoutBranch(lastRef, local.GitSubmodules); err != nil {
 				jirix.Logger.Errorf("Not able to checkout last ref. Error:%s\nPlease do it manually:'%s'\n\n", err,
 					jirix.Color.Yellow("git -C %q checkout %s", local.Path, lastRef))
 				return false, nil

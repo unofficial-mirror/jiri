@@ -140,7 +140,7 @@ func (fake FakeJiriRoot) AddPackage(pkg project.Package) error {
 // repository.
 func (fake FakeJiriRoot) DisableRemoteManifestPush() error {
 	dir := gitutil.RootDirOpt(filepath.Join(fake.remote, ManifestProjectPath))
-	if err := gitutil.New(fake.X, dir).CheckoutBranch("master"); err != nil {
+	if err := gitutil.New(fake.X, dir).CheckoutBranch("master", false); err != nil {
 		return err
 	}
 	return nil
@@ -158,7 +158,7 @@ func (fake FakeJiriRoot) EnableRemoteManifestPush() error {
 	} else if err != nil {
 		return err
 	}
-	if err := scm.CheckoutBranch("non-master"); err != nil {
+	if err := scm.CheckoutBranch("non-master", false); err != nil {
 		return err
 	}
 	return nil

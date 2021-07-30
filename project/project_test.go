@@ -953,7 +953,7 @@ func TestBranchUpdateWhenNoRebase(t *testing.T) {
 		t.Fatal(err)
 	}
 	gitLocal := gitutil.New(fake.X, gitutil.RootDirOpt(localProjects[1].Path))
-	gitLocal.CheckoutBranch("master")
+	gitLocal.CheckoutBranch("master", localProjects[1].GitSubmodules)
 
 	lc := project.LocalConfig{NoRebase: true}
 	project.WriteLocalConfig(fake.X, localProjects[1], lc)
@@ -1601,7 +1601,7 @@ func TestUpdateWhenRemoteChangesRebased(t *testing.T) {
 	}
 
 	// checkout branch in local repo
-	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+	if err := gitLocal.CheckoutBranch("non-master", localProjects[1].GitSubmodules); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1651,7 +1651,7 @@ func TestUpdateWhenConflictMerge(t *testing.T) {
 	}
 
 	// checkout branch in local repo
-	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+	if err := gitLocal.CheckoutBranch("non-master", localProjects[1].GitSubmodules); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1703,7 +1703,7 @@ func TestTagNotContainedInBranch(t *testing.T) {
 		t.Fatalf("Creating tag: %s", err)
 
 	}
-	if err := gitRemote.CheckoutBranch("master"); err != nil {
+	if err := gitRemote.CheckoutBranch("master", localProjects[1].GitSubmodules); err != nil {
 		t.Fatal(err)
 	}
 	if err := gitRemote.DeleteBranch("non-master", gitutil.ForceOpt(true)); err != nil {
@@ -1777,7 +1777,7 @@ func testCheckoutSnapshot(t *testing.T, testURL bool) {
 
 		// Test case when local repo in on a branch
 		if i == 1 {
-			if err := gitLocal.CheckoutBranch("master"); err != nil {
+			if err := gitLocal.CheckoutBranch("master", localProject.GitSubmodules); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -1848,7 +1848,7 @@ func testLocalBranchesAreUpdated(t *testing.T, shouldLocalBeOnABranch, rebaseAll
 
 	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "non-master commit")
 
-	if err := gitRemote.CheckoutBranch("master"); err != nil {
+	if err := gitRemote.CheckoutBranch("master", localProjects[1].GitSubmodules); err != nil {
 		t.Fatal(err)
 	}
 	writeReadme(t, fake.X, fake.Projects[localProjects[1].Name], "master commit")
@@ -1856,13 +1856,13 @@ func testLocalBranchesAreUpdated(t *testing.T, shouldLocalBeOnABranch, rebaseAll
 	gitLocal := gitutil.New(fake.X, gitutil.UserNameOpt("John Doe"), gitutil.UserEmailOpt("john.doe@example.com"), gitutil.RootDirOpt(localProjects[1].Path))
 
 	// This will create a local branch non-master
-	if err := gitLocal.CheckoutBranch("non-master"); err != nil {
+	if err := gitLocal.CheckoutBranch("non-master", localProjects[1].GitSubmodules); err != nil {
 		t.Fatal(err)
 	}
 
 	// Go back to detached HEAD
 	if !shouldLocalBeOnABranch {
-		if err := gitLocal.CheckoutBranch("HEAD", gitutil.DetachOpt(true)); err != nil {
+		if err := gitLocal.CheckoutBranch("HEAD", localProjects[1].GitSubmodules, gitutil.DetachOpt(true)); err != nil {
 			t.Fatal(err)
 		}
 	}

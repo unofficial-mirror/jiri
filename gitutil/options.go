@@ -35,6 +35,10 @@ type RebaseOpt interface {
 	rebaseOpt()
 }
 
+type SubmoduleUpdateOpt interface {
+	submoduleUpdateOpt()
+}
+
 type FollowTagsOpt bool
 
 func (FollowTagsOpt) pushOpt() {}
@@ -134,3 +138,12 @@ func (UpdateHeadOkOpt) fetchOpt() {}
 type OffloadPackfilesOpt bool
 
 func (OffloadPackfilesOpt) cloneOpt() {}
+
+type RecurseSubmodulesOpt bool
+
+func (RecurseSubmodulesOpt) cloneOpt() {}
+func (RecurseSubmodulesOpt) fetchOpt() {}
+
+type InitOpt bool
+
+func (InitOpt) submoduleUpdateOpt() {}

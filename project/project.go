@@ -1565,7 +1565,7 @@ func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches boo
 		return fmt.Errorf("Cannot find revision for ref %q for project %q: %v", headRev, local.Name, err)
 	}
 	if local.Revision != headRev {
-		if err := scm.CheckoutBranch(headRev, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+		if err := scm.CheckoutBranch(headRev, remote.GitSubmodules, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 			return err
 		}
 	}
@@ -1592,6 +1592,14 @@ func resetLocalProject(jirix *jiri.X, local, remote Project, cleanupBranches boo
 
 // IsLocalProject returns true if there is a project at the given path.
 func IsLocalProject(jirix *jiri.X, path string) (bool, error) {
+	// Check if this is a submodule and if so, ignore it.
+	// Git submodules have a file (.git) instead of a directory (.git/).
+	// If .git exists, but isn't a directory assume it's a submodule.
+	gitDir := filepath.Join(path, ".git")
+	if info, err := os.Stat(gitDir); err == nil && !info.IsDir() {
+		jirix.Logger.Debugf("Submodule detected at %q", path)
+		return false, nil
+	}
 	// Existence of a metadata directory is how we know we've found a
 	// Jiri-maintained project.
 	metadataDir := filepath.Join(path, jiri.ProjectMetaDir)
@@ -1727,6 +1735,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if project.Remote == "" {
 		return fmt.Errorf("project %q does not have a remote", project.Name)
 	}
+
 	scm := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
 	remote := rewriteRemote(jirix, project.Remote)
 	r := remote
@@ -1745,15 +1754,15 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	if err := scm.SetRemoteUrl("origin", r); err != nil {
 		return err
 	}
+	opts := []gitutil.FetchOpt{gitutil.PruneOpt(true)}
+	if project.GitSubmodules {
+		opts = append(opts, gitutil.RecurseSubmodulesOpt(true))
+	}
 	if project.HistoryDepth > 0 {
-		if err := fetch(jirix, project.Path, "origin", gitutil.PruneOpt(true),
-			gitutil.DepthOpt(project.HistoryDepth), gitutil.UpdateShallowOpt(true)); err != nil {
-			return err
-		}
-	} else {
-		if err := fetch(jirix, project.Path, "origin", gitutil.PruneOpt(true)); err != nil {
-			return err
-		}
+		opts = append(opts, gitutil.DepthOpt(project.HistoryDepth), gitutil.UpdateShallowOpt(true))
+	}
+	if err := fetch(jirix, project.Path, "origin", opts...); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1775,7 +1784,8 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 		return err
 	}
 	git := gitutil.New(jirix, gitutil.RootDirOpt(project.Path))
-	err = git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
+	opts := []gitutil.CheckoutOpt{gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout)}
+	err = git.CheckoutBranch(revision, project.GitSubmodules, opts...)
 	if err == nil {
 		return nil
 	}
@@ -1784,8 +1794,9 @@ func checkoutHeadRevision(jirix *jiri.X, project Project, forceCheckout bool) er
 		if err2 := git.FetchRefspec("origin", project.Revision); err2 != nil {
 			return fmt.Errorf("error while fetching after failed to checkout revision %s for project %s (%s): %s\ncheckout error: %v", revision, project.Name, project.Path, err2, err)
 		}
-		return git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(forceCheckout))
+		return git.CheckoutBranch(revision, project.GitSubmodules, opts...)
 	}
+
 	return err
 }
 
@@ -1857,7 +1868,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 	} else if rebaseAll {
 		// This should run after program exit so that original branch can be restored
 		defer func() {
-			if err := scm.CheckoutBranch(state.CurrentBranch.Name); err != nil {
+			if err := scm.CheckoutBranch(state.CurrentBranch.Name, project.GitSubmodules); err != nil {
 				// This should not happen, panic
 				panic(fmt.Sprintf("for project %s(%s), not able to checkout branch %q: %s", project.Name, relativePath, state.CurrentBranch.Name, err))
 			}
@@ -1936,7 +1947,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 				break
 			}
 
-			if err := scm.CheckoutBranch(branch.Name); err != nil {
+			if err := scm.CheckoutBranch(branch.Name, project.GitSubmodules); err != nil {
 				msg := fmt.Sprintf("For project %s(%s), not able to rebase your local branch %q onto %q", project.Name, relativePath, branch.Name, tracking.Name)
 				msg += "\nPlease do it manually\n\n"
 				jirix.Logger.Errorf(msg)
@@ -1966,7 +1977,7 @@ func syncProjectMaster(jirix *jiri.X, project Project, state ProjectState, rebas
 					break
 				}
 
-				if err := scm.CheckoutBranch(branch.Name); err != nil {
+				if err := scm.CheckoutBranch(branch.Name, project.GitSubmodules); err != nil {
 					msg := fmt.Sprintf("For project %s(%s), not able to rebase your untracked branch %q onto JIRI_HEAD.", project.Name, relativePath, branch.Name)
 					msg += "\nPlease do it manually\n\n"
 					jirix.Logger.Errorf(msg)
@@ -2062,7 +2073,7 @@ func setRemoteHeadRevisions(jirix *jiri.X, remoteProjects Projects, localProject
 	return multiErr
 }
 
-func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, depth int) error {
+func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, depth int, gitSubmodules bool) error {
 	refspec := "+refs/heads/*:refs/heads/*"
 	if depth > 0 {
 		// Shallow cache, fetch only manifest tracked remote branch
@@ -2127,7 +2138,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 				return err
 			}
 			if jirix.UsePartialClone(remote) {
-				if err := scm.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+				if err := scm.CheckoutBranch(revision, gitSubmodules, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 					return err
 				}
 			}
@@ -2169,7 +2180,7 @@ func updateOrCreateCache(jirix *jiri.X, dir, remote, branch, revision string, de
 			}
 		}
 		if jirix.UsePartialClone(remote) {
-			if err := git.CheckoutBranch(revision, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
+			if err := git.CheckoutBranch(revision, gitSubmodules, gitutil.DetachOpt(true), gitutil.ForceOpt(true)); err != nil {
 				return err
 			}
 		}
@@ -2224,17 +2235,17 @@ func updateCache(jirix *jiri.X, remoteProjects Projects) error {
 			}
 			wg.Add(1)
 			fetchLimit <- struct{}{}
-			go func(dir, remote string, depth int, branch, revision string, cacheMutex *sync.Mutex) {
+			go func(dir, remote string, depth int, branch, revision string, gitSubmodules bool, cacheMutex *sync.Mutex) {
 				cacheMutex.Lock()
 				defer func() { <-fetchLimit }()
 				defer wg.Done()
 				defer cacheMutex.Unlock()
 				remote = rewriteRemote(jirix, remote)
-				if err := updateOrCreateCache(jirix, dir, remote, branch, revision, depth); err != nil {
+				if err := updateOrCreateCache(jirix, dir, remote, branch, revision, depth, gitSubmodules); err != nil {
 					errs <- err
 					return
 				}
-			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision, processingPath[cacheDirPath])
+			}(cacheDirPath, project.Remote, project.HistoryDepth, project.RemoteBranch, project.Revision, project.GitSubmodules, processingPath[cacheDirPath])
 		} else {
 			errs <- err
 		}

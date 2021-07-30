@@ -357,7 +357,7 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get head revision: %s\n", b.Name, err))
 				continue
 			}
-			if err := scm.CheckoutBranch(revision, gitutil.DetachOpt(true)); err != nil {
+			if err := scm.CheckoutBranch(revision, remote.GitSubmodules, gitutil.DetachOpt(true)); err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't checkout JIRI_HEAD: %s\n", b.Name, err))
 				continue
 			}
@@ -371,7 +371,7 @@ func deleteProjectMergedClsBranches(jirix *jiri.X, local project.Project, remote
 		if err := scm.DeleteBranch(b.Name, gitutil.ForceOpt(true)); err != nil {
 			retErr = append(retErr, fmt.Errorf("Cannot delete branch %q: %s\n", b.Name, err))
 			if b.IsHead {
-				if err := scm.CheckoutBranch(b.Name); err != nil {
+				if err := scm.CheckoutBranch(b.Name, remote.GitSubmodules); err != nil {
 					retErr = append(retErr, fmt.Errorf("Not able to put project back on branch %q: %s\n", b.Name, err))
 				}
 			}
@@ -442,7 +442,7 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't get head revision: %s\n", b.Name, err))
 				continue
 			}
-			if err := scm.CheckoutBranch(revision, gitutil.DetachOpt(true)); err != nil {
+			if err := scm.CheckoutBranch(revision, remote.GitSubmodules, gitutil.DetachOpt(true)); err != nil {
 				retErr = append(retErr, fmt.Errorf("Not deleting current branch %q as can't checkout JIRI_HEAD: %s\n", b.Name, err))
 				continue
 			}
@@ -458,7 +458,7 @@ func deleteProjectMergedBranches(jirix *jiri.X, local project.Project, remote pr
 				retErr = append(retErr, fmt.Errorf("Cannot delete branch %q: %s\n", b.Name, err))
 			}
 			if b.IsHead {
-				if err := scm.CheckoutBranch(b.Name); err != nil {
+				if err := scm.CheckoutBranch(b.Name, remote.GitSubmodules); err != nil {
 					retErr = append(retErr, fmt.Errorf("Not able to put project back on branch %q: %s\n", b.Name, err))
 				}
 			}
