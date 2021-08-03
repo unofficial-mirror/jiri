@@ -314,8 +314,8 @@ func (g *Git) SubmoduleUpdate(opts ...SubmoduleUpdateOpt) error {
 			}
 		}
 	}
-	// TODO(iankaz): Add setting submodule.fetchJobs in git config to jiri init
-	args = append(args, "--jobs=16")
+	// TODO(iankaz): Use Jiri jobsFlag setting (or set submodule.fetchJobs on superproject init)
+	args = append(args, "--jobs=50")
 	return g.run(args...)
 }
 
@@ -730,6 +730,7 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 	fetchTag := ""
 	updateHeadOk := false
 	recurseSubmodules := false
+	jobs := uint(0)
 	for _, opt := range opts {
 		switch typedOpt := opt.(type) {
 		case TagsOpt:
@@ -748,6 +749,8 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 			updateHeadOk = bool(typedOpt)
 		case RecurseSubmodulesOpt:
 			recurseSubmodules = bool(typedOpt)
+		case JobsOpt:
+			jobs = uint(typedOpt)
 		}
 	}
 	args := []string{}
@@ -771,7 +774,10 @@ func (g *Git) FetchRefspec(remote, refspec string, opts ...FetchOpt) error {
 		args = append(args, "--update-head-ok")
 	}
 	if recurseSubmodules {
-		args = append(args, "--recurse-submodules", "--jobs=16")
+		args = append(args, "--recurse-submodules")
+	}
+	if jobs > 0 {
+		args = append(args, "--jobs="+strconv.FormatUint(uint64(jobs), 10))
 	}
 	if remote != "" {
 		args = append(args, remote)

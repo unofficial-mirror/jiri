@@ -147,3 +147,7 @@ func (RecurseSubmodulesOpt) fetchOpt() {}
 type InitOpt bool
 
 func (InitOpt) submoduleUpdateOpt() {}
+
+type JobsOpt uint
+
+func (JobsOpt) fetchOpt() {}

@@ -1756,7 +1756,7 @@ func fetchAll(jirix *jiri.X, project Project) error {
 	}
 	opts := []gitutil.FetchOpt{gitutil.PruneOpt(true)}
 	if project.GitSubmodules {
-		opts = append(opts, gitutil.RecurseSubmodulesOpt(true))
+		opts = append(opts, gitutil.RecurseSubmodulesOpt(true), gitutil.JobsOpt(jirix.Jobs))
 	}
 	if project.HistoryDepth > 0 {
 		opts = append(opts, gitutil.DepthOpt(project.HistoryDepth), gitutil.UpdateShallowOpt(true))
