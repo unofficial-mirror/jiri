@@ -11,11 +11,13 @@ import (
 )
 
 var (
-	submoduleFlag bool
+	submoduleFlag  bool
+	cipdEnsureFlag bool
 )
 
 func init() {
 	cmdSnapshot.Flags.BoolVar(&submoduleFlag, "submodule", false, "Filter snapshot for use with git submodules.")
+	cmdSnapshot.Flags.BoolVar(&cipdEnsureFlag, "cipd", false, "Generate a cipd.ensure (packages only) snapshot.")
 }
 
 var cmdSnapshot = &cmdline.Command{
@@ -34,5 +36,5 @@ func runSnapshot(jirix *jiri.X, args []string) error {
 	if len(args) != 1 {
 		return jirix.UsageErrorf("unexpected number of arguments")
 	}
-	return project.CreateSnapshot(jirix, args[0], nil, nil, true, submoduleFlag)
+	return project.CreateSnapshot(jirix, args[0], nil, nil, true, submoduleFlag, cipdEnsureFlag)
 }

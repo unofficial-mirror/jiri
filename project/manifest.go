@@ -870,6 +870,30 @@ func resolveProjectLocks(projects Projects) (ProjectLocks, error) {
 	return projectLocks, nil
 }
 
+// CipdSnapshot generates a snapshot of the cipd ensure and version file
+func CreateCipdSnapshot(jirix *jiri.X, pkgs Packages, file string) error {
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false)
+	if err != nil {
+		return err
+	}
+
+	versionFilePath, err := generateVersionFile(jirix, ensureFilePath, pkgs)
+	if err != nil {
+		return err
+	}
+
+	// Move files to snapshot destination
+	err = os.Rename(ensureFilePath, file+".ensure")
+	if err != nil {
+		return err
+	}
+	err = os.Rename(versionFilePath, file+".version")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // FetchPackages fetches prebuilt packages described in given pkgs using cipd.
 // Parameter fetchTimeout is in minutes.
 func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {

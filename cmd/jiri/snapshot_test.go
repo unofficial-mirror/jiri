@@ -119,3 +119,53 @@ func TestSnapshot(t *testing.T) {
 		checkReadme(t, fake.X, localProject, "revision 1")
 	}
 }
+
+// TestCipdSnapshot tests creating cipd snapshot files.
+func TestCipdSnapshot(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	// Setup a fake package
+	fake.AddPackage(project.Package{
+		Name:       "test_package",
+		Path:       "path-to-test-package",
+		Version:    "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
+		Attributes: "",
+	})
+
+	// Create a snapshot.
+	var stdout bytes.Buffer
+	fake.X.Context = tool.NewContext(tool.ContextOpts{Stdout: &stdout, Env: fake.X.Context.Env()})
+
+	tmpfile, err := ioutil.TempFile("", "jiri-snapshot-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	if err := project.CreateSnapshot(fake.X, tmpfile.Name(), nil, nil, true, false /*submoduleFlag*/, true /*cipdEnsureFlag*/); err != nil {
+		t.Fatalf("%v", err)
+	}
+	pathExists := func(pkgPath string) bool {
+		if _, err := os.Stat(pkgPath); err != nil {
+			if os.IsNotExist(err) {
+				return false
+			}
+			t.Errorf("failed to access path due to error: %v", err)
+		}
+		return true
+	}
+	assertExist := func(localPath string) {
+		if !pathExists(localPath) {
+			t.Errorf("expecting path %q exists, but it does not", localPath)
+		}
+	}
+
+	// Verify cipd snapshot files were generated.
+	ensureFilePath := tmpfile.Name() + ".ensure"
+	versionFilePath := tmpfile.Name() + ".version"
+	assertExist(ensureFilePath)
+	assertExist(versionFilePath)
+	os.Remove(ensureFilePath)
+	os.Remove(versionFilePath)
+}
