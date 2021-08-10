@@ -125,12 +125,19 @@ func TestCipdSnapshot(t *testing.T) {
 	fake, cleanup := jiritest.NewFakeJiriRoot(t)
 	defer cleanup()
 
-	// Setup a fake package
+	// Setup fake packages
 	fake.AddPackage(project.Package{
 		Name:       "test_package",
 		Path:       "path-to-test-package",
 		Version:    "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
 		Attributes: "",
+	})
+	fake.AddPackage(project.Package{
+		Name:       "test_package_internal",
+		Path:       "path-to-test-package-internal",
+		Version:    "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b41",
+		Attributes: "",
+		Internal:   true,
 	})
 
 	// Create a snapshot.
@@ -163,9 +170,15 @@ func TestCipdSnapshot(t *testing.T) {
 
 	// Verify cipd snapshot files were generated.
 	ensureFilePath := tmpfile.Name() + ".ensure"
+	ensureFileIntPath := tmpfile.Name() + "_internal.ensure"
 	versionFilePath := tmpfile.Name() + ".version"
+	versionFileIntPath := tmpfile.Name() + "_internal.version"
 	assertExist(ensureFilePath)
+	assertExist(ensureFileIntPath)
 	assertExist(versionFilePath)
+	assertExist(versionFileIntPath)
 	os.Remove(ensureFilePath)
+	os.Remove(ensureFileIntPath)
 	os.Remove(versionFilePath)
+	os.Remove(versionFileIntPath)
 }

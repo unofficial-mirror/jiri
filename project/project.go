@@ -788,7 +788,21 @@ func CreateSnapshot(jirix *jiri.X, file string, hooks Hooks, pkgs Packages, loca
 	if cipdEnsure {
 		// CreateCipdSnapshot adds a file suffix to 'file' so it won't conflict with
 		// with the manifest filename.
-		err := CreateCipdSnapshot(jirix, pkgs, file)
+
+		// Create separate snapshots for public and internal
+		var publicPkgs, internalPkgs = make(Packages), make(Packages)
+		for _, pkg := range pkgs {
+			if pkg.Internal {
+				internalPkgs[pkg.Key()] = pkg
+			} else {
+				publicPkgs[pkg.Key()] = pkg
+			}
+		}
+		err := CreateCipdSnapshot(jirix, publicPkgs, file)
+		if err != nil {
+			return err
+		}
+		err = CreateCipdSnapshot(jirix, internalPkgs, file+"_internal")
 		if err != nil {
 			return err
 		}

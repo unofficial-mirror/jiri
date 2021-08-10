@@ -835,7 +835,7 @@ func resolvePackageLocks(jirix *jiri.X, pkgs Packages) (PackageLocks, error) {
 		return nil, err
 	}
 
-	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false)
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false, "")
 	if err != nil {
 		return nil, err
 	}
@@ -872,7 +872,9 @@ func resolveProjectLocks(projects Projects) (ProjectLocks, error) {
 
 // CipdSnapshot generates a snapshot of the cipd ensure and version file
 func CreateCipdSnapshot(jirix *jiri.X, pkgs Packages, file string) error {
-	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false)
+	ensureSnapshotFilePath := file + ".ensure"
+	versionSnapshotFilePath := file + ".version"
+	ensureFilePath, err := generateEnsureFile(jirix, pkgs, false, filepath.Base(versionSnapshotFilePath))
 	if err != nil {
 		return err
 	}
@@ -883,11 +885,11 @@ func CreateCipdSnapshot(jirix *jiri.X, pkgs Packages, file string) error {
 	}
 
 	// Move files to snapshot destination
-	err = os.Rename(ensureFilePath, file+".ensure")
+	err = os.Rename(ensureFilePath, ensureSnapshotFilePath)
 	if err != nil {
 		return err
 	}
-	err = os.Rename(versionFilePath, file+".version")
+	err = os.Rename(versionFilePath, versionSnapshotFilePath)
 	if err != nil {
 		return err
 	}
@@ -905,7 +907,7 @@ func FetchPackages(jirix *jiri.X, pkgs Packages, fetchTimeout uint) error {
 		return err
 	}
 
-	ensureFilePath, err := generateEnsureFile(jirix, pkgsWAccess, !jirix.LockfileEnabled || jirix.UsingSnapshot)
+	ensureFilePath, err := generateEnsureFile(jirix, pkgsWAccess, !jirix.LockfileEnabled || jirix.UsingSnapshot, "")
 	if err != nil {
 		return err
 	}
@@ -1019,7 +1021,7 @@ func writePackageJSON(jirix *jiri.X, access bool) error {
 	return ioutil.WriteFile(filepath.Join(jirix.RootMetaDir(), jirix.PrebuiltJSON), jsonData, 0644)
 }
 
-func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (string, error) {
+func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool, versionFilePath string) (string, error) {
 	ensureFile, err := ioutil.TempFile("", "jiri*.ensure")
 	if err != nil {
 		return "", fmt.Errorf("not able to create tmp file: %v", err)
@@ -1054,6 +1056,9 @@ func generateEnsureFile(jirix *jiri.X, pkgs Packages, ignoreCryptoCheck bool) (s
 			ensureFileBuf.WriteString(fmt.Sprintf("$VerifiedPlatform %s\n", plat))
 		}
 		versionFileName := ensureFilePath[:len(ensureFilePath)-len(".ensure")] + ".version"
+		if versionFilePath != "" {
+			versionFileName = versionFilePath
+		}
 		ensureFileBuf.WriteString("$ResolvedVersions " + versionFileName + "\n")
 	}
 	if jirix.CipdParanoidMode {
