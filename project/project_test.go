@@ -1275,6 +1275,43 @@ func TestUpdateUniverseMovedProject(t *testing.T) {
 	checkReadme(t, fake.X, localProjects[1], "initial readme")
 }
 
+// TestUpdateUniverseMovedProjectSelf checks that UpdateUniverse can move a
+// project to a path currently nested within itself.
+func TestUpdateUniverseMovedProjectSelf(t *testing.T) {
+	localProjects, fake, cleanup := setupUniverse(t)
+	defer cleanup()
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the local path at which project 1 is located.
+	m, err := fake.ReadRemoteManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldProjectPath := localProjects[1].Path
+	localProjects[1].Path = filepath.Join(oldProjectPath, "new-project-path")
+	projects := []project.Project{}
+	for _, p := range m.Projects {
+		if p.Name == localProjects[1].Name {
+			p.Path = localProjects[1].Path
+		}
+		projects = append(projects, p)
+	}
+	m.Projects = projects
+	if err := fake.WriteRemoteManifest(m); err != nil {
+		t.Fatal(err)
+	}
+	// Check that UpdateUniverse() moves the local copy of the project 1.
+	if err := fake.UpdateUniverse(false); err != nil {
+		t.Fatal(err)
+	}
+	if err := dirExists(localProjects[2].Path); err != nil {
+		t.Fatalf("expected project %q at path %q to exist but it did not", localProjects[1].Name, localProjects[1].Path)
+	}
+	checkReadme(t, fake.X, localProjects[1], "initial readme")
+}
+
 // TestUpdateUniverseChangeRemote checks that UpdateUniverse can change remote
 // of a project.
 func TestUpdateUniverseChangeRemote(t *testing.T) {

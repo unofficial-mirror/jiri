@@ -6,6 +6,7 @@ package project
 
 import (
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"os"
@@ -371,11 +372,7 @@ func (op moveOperation) Run(jirix *jiri.X) error {
 	}
 	// If it was nested project it might have been moved with its parent project
 	if op.source != op.destination {
-		path, perm := filepath.Dir(op.destination), os.FileMode(0755)
-		if err := os.MkdirAll(path, perm); err != nil {
-			return fmtError(err)
-		}
-		if err := osutil.Rename(op.source, op.destination); err != nil {
+		if err := renameDir(jirix, op.source, op.destination); err != nil {
 			return fmtError(err)
 		}
 	}
@@ -928,5 +925,43 @@ func runCommonOperations(jirix *jiri.X, ops operations, loglevel log.LogLevel) e
 		}
 		task.Done()
 	}
+	return nil
+}
+
+func renameDir(jirix *jiri.X, src, dst string) error {
+	// Parent directory permissions
+	perm := os.FileMode(0755)
+	swapDir := jirix.SwapDir()
+
+	// Hash src path as swap dir name
+	h := fnv.New32a()
+	h.Write([]byte(src))
+	tmp := filepath.Join(swapDir, fmt.Sprintf("%d", h.Sum32()))
+
+	// Ensure .jiri_root/swap exists
+	if err := os.MkdirAll(swapDir, perm); err != nil {
+		return err
+	}
+
+	// Move src -> tmp
+	if err := osutil.Rename(src, tmp); err != nil {
+		return err
+	}
+
+	// Ensure the dst's parent exists, it may have
+	// been within src
+	parentDir := filepath.Dir(dst)
+	if err := os.MkdirAll(parentDir, perm); err != nil {
+		return err
+	}
+
+	// Move tmp -> dst
+	if err := osutil.Rename(tmp, dst); err != nil {
+		if err := osutil.Rename(tmp, src); err != nil {
+			jirix.Logger.Errorf("Could not move %s to %s, original contents are in %s. Please complete the move manually", src, dst, tmp)
+		}
+		return err
+	}
+
 	return nil
 }

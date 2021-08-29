@@ -458,6 +458,16 @@ func (x *X) ScriptsDir() string {
 	return filepath.Join(x.RootMetaDir(), "scripts")
 }
 
+// SwapDir returns the path to the swap directory. This is used
+// to stage moves of direcories that may be moving into subdirectories
+// of themselves or to handle unnesting of repositories.
+//
+// We use a directory in `.jiri_root` to prevent the complexities of an
+// arbitrary $TMPDIR which can cross mountpoints/filesystems.
+func (x *X) SwapDir() string {
+	return filepath.Join(x.RootMetaDir(), "swap")
+}
+
 // UpdateHistoryDir returns the path to the update history directory.
 func (x *X) UpdateHistoryDir() string {
 	return filepath.Join(x.RootMetaDir(), "update_history")
