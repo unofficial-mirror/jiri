@@ -665,6 +665,11 @@ func (ld *loader) load(jirix *jiri.X, root, repoPath, file, ref, parentImport st
 		// Record manifest location.
 		pkg.ManifestPath = f
 		key := pkg.Key()
+		if val, ok := ld.Packages[key]; ok {
+			// Package with same remote url and local path already exists in manifest.
+			// Abort loading.
+			return fmt.Errorf("conflicting packages: %v conflicts %v when loading manifest %s", val, pkg, file)
+		}
 		ld.Packages[key] = pkg
 	}
 	return nil

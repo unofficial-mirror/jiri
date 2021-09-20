@@ -2609,6 +2609,33 @@ func TestMultiplePackageVersions(t *testing.T) {
 	assertExist(filepath.Join(fake.X.Root, pkg1.Path))
 }
 
+func TestPackageConflics(t *testing.T) {
+	fake, cleanup := jiritest.NewFakeJiriRoot(t)
+	defer cleanup()
+
+	pkg0 := project.Package{
+		Name:    "fuchsia/tools/jiri/${platform}",
+		Path:    "path-multi-pkg0",
+		Version: "git_revision:9904764ed228c7fb87bfb252762952b502d1e360",
+	}
+	pkg1 := project.Package{
+		Name:    "fuchsia/tools/jiri/${platform}",
+		Path:    "path-multi-pkg0",
+		Version: "git_revision:05715c8fbbdb952ab38e50533a1b653445e74b40",
+	}
+
+	fake.AddPackage(pkg0)
+	fake.AddPackage(pkg1)
+
+	if err := fake.UpdateUniverse(true); err != nil {
+		if !strings.Contains(err.Error(), "conflicting packages:") {
+			t.Errorf("expecting package conflicting error, but got %v", err)
+		}
+		return
+	}
+	t.Errorf("expect package conflicting error, but it didn't happen")
+}
+
 func TestOverrideImport(t *testing.T) {
 	_, fake, cleanup := setupUniverse(t)
 	defer cleanup()
