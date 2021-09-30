@@ -480,7 +480,7 @@ see [Jiri local update][hacking doc]
 
 [android repo]: https://source.android.com/source/using-repo.html "Repo command reference"
 [bootstrap_jiri]: scripts/bootstrap_jiri "bootstrap_jiri"
-[gerrit]: https://code.google.com/p/gerrit/ "Gerrit code review"
+[gerrit]: https://https://www.gerritcodereview.com/ "Gerrit code review"
 [gerrit web ui]: https://gerrit-review.googlesource.com/Documentation/user-review-ui.html "Gerrit review UI"
 [github resolve conflict]: https://help.github.com/articles/resolving-a-merge-conflict-from-the-command-line/ "Resolving a merge conflict"
 [go contrib]: https://golang.org/doc/contribute.html#Code_review "Go Contribution Guidelines - Code Review"
