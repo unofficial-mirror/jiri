@@ -2492,7 +2492,7 @@ func updateProjects(jirix *jiri.X, localProjects, remoteProjects Projects, hooks
 				msg = fmt.Sprintf("%s (%s)", msg, jirix.Color.Yellow("Not on JIRI_HEAD"))
 			}
 		}
-		jirix.Logger.Warningf("%s\n\nTo force an update to JIRI_HEAD, you may run 'jiri runp 'git checkout JIRI_HEAD'", msg)
+		jirix.Logger.Warningf("%s\n\nTo force an update to JIRI_HEAD, you may run 'jiri runp git checkout JIRI_HEAD'", msg)
 	}
 
 	if shouldFetchPkgs {
